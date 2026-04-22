@@ -7,7 +7,6 @@ import type {
   CustomerAgent,
   ContractResult,
   ContractConfirm,
-  BillAnalysis,
   BillAnalysisResult,
   ManualBillRequest,
   TicketSummary,
@@ -75,11 +74,6 @@ export const customerApi = {
       .then((r) => r.data),
 
   // Bill Analysis
-  getBillAnalysis: (subscriptionId: number) =>
-    client
-      .get<ExecutionResult<BillAnalysis>>(`/BillCalculation/GetFullBillAnalysis/${subscriptionId}`)
-      .then((r) => r.data),
-
   manualBillAnalysis: (data: ManualBillRequest) =>
     client.post<ExecutionResult<BillAnalysisResult>>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
 

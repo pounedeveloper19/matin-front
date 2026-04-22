@@ -3,5 +3,5 @@ import type { ExecutionResult, LoginRequest, LoginResponse } from '../types'
 
 export const authApi = {
   login: (data: LoginRequest) =>
-    client.post<ExecutionResult<LoginResponse>>('/User/Login', data).then((r) => r.data),
+    client.post<ExecutionResult<LoginResponse>>('/Auth/Login', data).then((r) => r.data),
 }
