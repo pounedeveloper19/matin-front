@@ -292,6 +292,19 @@ export interface HourEntry {
   toutypeId: number
 }
 
+// Pending Registrations
+export interface PendingUser {
+  id: number
+  fullName: string | null
+  mobile: string
+  customerProfileId: number | null
+  customerType: number | null
+  realName: string | null
+  legalName: string | null
+  nationalCode: string | null
+  nationalId: string | null
+}
+
 // Bill Analysis Report (admin)
 export interface AdminBillReport {
   id: number

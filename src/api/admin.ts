@@ -11,6 +11,7 @@ import type {
   TariffSlab,
   HourEntry,
   AdminBillReport,
+  PendingUser,
 } from '../types'
 
 type PageParams = {
@@ -196,4 +197,14 @@ export const adminApi = {
     fridayPeakKwh: number
   }) =>
     client.post<ExecutionResult>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
+
+  // Pending registrations
+  getPendingUsers: () =>
+    client.get<ExecutionResult<PendingUser[]>>('/PendingUsers/List').then((r) => r.data),
+
+  activateUser: (userId: number) =>
+    client.put<ExecutionResult>(`/PendingUsers/Activate/${userId}`, {}).then((r) => r.data),
+
+  rejectUser: (userId: number) =>
+    client.delete<ExecutionResult>(`/PendingUsers/Reject/${userId}`).then((r) => r.data),
 }

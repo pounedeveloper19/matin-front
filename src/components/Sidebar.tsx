@@ -14,6 +14,7 @@ import {
   Layers,
   Clock,
   Receipt,
+  UserCheck,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import clsx from 'clsx'
@@ -36,6 +37,7 @@ const adminNav = [
   { to: '/admin/tariff-slabs',    label: 'پله‌های تعرفه',   icon: Layers },
   { to: '/admin/tou-schedule',    label: 'برنامه TOU',       icon: Clock },
   { to: '/admin/bill-reports',    label: 'گزارش قبض‌ها',    icon: Receipt },
+  { to: '/admin/pending-users',   label: 'درخواست‌های ثبت‌نام', icon: UserCheck },
 ]
 
 interface SidebarProps {

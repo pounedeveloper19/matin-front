@@ -16,6 +16,7 @@ import AdminTariffs from './pages/admin/AdminTariffs'
 import AdminTariffSlabs from './pages/admin/AdminTariffSlabs'
 import AdminTouSchedule from './pages/admin/AdminTouSchedule'
 import AdminBillReports from './pages/admin/AdminBillReports'
+import AdminPendingUsers from './pages/admin/AdminPendingUsers'
 import Register from './pages/Register'
 
 function ProtectedRoute({ children, role }: { children: JSX.Element; role?: 'admin' | 'customer' }) {
@@ -73,7 +74,8 @@ export default function App() {
         <Route path="tariffs"       element={<AdminTariffs />} />
         <Route path="tariff-slabs"  element={<AdminTariffSlabs />} />
         <Route path="tou-schedule"  element={<AdminTouSchedule />} />
-        <Route path="bill-reports"  element={<AdminBillReports />} />
+        <Route path="bill-reports"    element={<AdminBillReports />} />
+        <Route path="pending-users"   element={<AdminPendingUsers />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
