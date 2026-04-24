@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Save, Clock } from 'lucide-react'
+import { Save, Clock, Copy } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import Button from '../../components/ui/Button'
 import type { HourEntry } from '../../types'
+import { toArr } from '../../utils'
 
 const JALALI_MONTHS = ['','فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 
-const TOU_COLORS: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: 'bg-red-500',    text: 'text-white', label: 'اوج بار' },
-  2: { bg: 'bg-yellow-400', text: 'text-black', label: 'میان بار' },
-  3: { bg: 'bg-green-500',  text: 'text-white', label: 'کم بار' },
-  4: { bg: 'bg-purple-500', text: 'text-white', label: 'اوج جمعه' },
+function getTouStyle(title: string): { bg: string; text: string } {
+  if (title.includes('جمعه'))                     return { bg: 'bg-purple-500', text: 'text-white' }
+  if (title.includes('اوج') || title.includes('پیک')) return { bg: 'bg-red-500',    text: 'text-white' }
+  if (title.includes('میان') || title.includes('میانی')) return { bg: 'bg-yellow-400', text: 'text-black' }
+  if (title.includes('کم')  || title.includes('کمبار'))  return { bg: 'bg-green-500',  text: 'text-white' }
+  return { bg: 'bg-gray-400', text: 'text-white' }
 }
 
 export default function AdminTouSchedule() {
@@ -20,18 +22,21 @@ export default function AdminTouSchedule() {
   const [entityId, setEntityId]     = useState<number>(0)
   const [month, setMonth]           = useState<number>(1)
   const [schedule, setSchedule]     = useState<Record<number, number>>({})
-  const [activeTou, setActiveTou]   = useState<number>(1)
+  const [activeTou, setActiveTou]   = useState<number>(0)
   const [loading, setLoading]       = useState(false)
   const [saving, setSaving]         = useState(false)
+  const [copying, setCopying]       = useState(false)
+  const [copyFromMonth, setCopyFromMonth] = useState<number>(1)
   const [dragging, setDragging]     = useState(false)
 
   useEffect(() => {
     Promise.all([adminApi.getPowerEntities(), adminApi.getTouTypes()]).then(([pe, tt]) => {
-      const peList = (pe.result as any) ?? []
-      const ttList = (tt.result as any) ?? []
+      const peList = toArr(pe.result)
+      const ttList = toArr(tt.result)
       setEntities(peList)
       setTouTypes(ttList)
       if (peList.length > 0) setEntityId(peList[0].id)
+      if (ttList.length > 0) setActiveTou(ttList[0].id)
     })
   }, [])
 
@@ -40,7 +45,7 @@ export default function AdminTouSchedule() {
     setLoading(true)
     adminApi.getMonthSchedule(entityId, month)
       .then((r) => {
-        const hours = (r.result as HourEntry[]) ?? []
+        const hours = toArr(r.result) as HourEntry[]
         const map: Record<number, number> = {}
         hours.forEach((h) => { map[h.hourNumber] = h.toutypeId })
         setSchedule(map)
@@ -61,7 +66,7 @@ export default function AdminTouSchedule() {
       }))
       const res = await adminApi.saveSchedule(entityId, month, hours)
       if (res.code === 200) toast.success('برنامه TOU ذخیره شد')
-      else toast.error(res.caption ?? 'خطا در ذخیره‌سازی')
+      else toast.error(res.message ?? res.caption ?? 'خطا در ذخیره‌سازی')
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -74,9 +79,34 @@ export default function AdminTouSchedule() {
     setSchedule(map)
   }
 
+  const handleCopy = async () => {
+    if (copyFromMonth === month) { toast.error('ماه مبدأ و مقصد یکسان است'); return }
+    setCopying(true)
+    try {
+      const res = await adminApi.copyTouFromMonth(entityId, copyFromMonth, month)
+      if (res.code === 200) {
+        toast.success(`برنامه از ${JALALI_MONTHS[copyFromMonth]} کپی شد`)
+        setLoading(true)
+        const r2 = await adminApi.getMonthSchedule(entityId, month)
+        const hours = toArr(r2.result) as HourEntry[]
+        const map: Record<number, number> = {}
+        hours.forEach((h) => { map[h.hourNumber] = h.toutypeId })
+        setSchedule(map)
+        setLoading(false)
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در کپی') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setCopying(false) }
+  }
+
+  const styleOf = (id: number) => {
+    const t = touTypes.find(t => t.id === id)
+    return t ? getTouStyle(t.title) : { bg: 'bg-gray-300', text: 'text-gray-600' }
+  }
+
+  const titleOf = (id: number) => touTypes.find(t => t.id === id)?.title ?? ''
+
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center gap-2">
         <Clock className="h-4 w-4 text-gray-400" />
         <span className="text-sm font-medium text-gray-600">برنامه‌ریزی TOU ساعتی</span>
@@ -109,13 +139,13 @@ export default function AdminTouSchedule() {
       {/* TOU type picker */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-gray-500">نوع فعال:</span>
-        {(touTypes.length > 0 ? touTypes : Object.entries(TOU_COLORS).map(([id, c]) => ({ id: +id, title: c.label }))).map((t) => {
-          const style = TOU_COLORS[t.id] ?? { bg: 'bg-gray-400', text: 'text-white', label: t.title }
+        {touTypes.map((t) => {
+          const s = getTouStyle(t.title)
           return (
             <button
               key={t.id}
               onClick={() => setActiveTou(t.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${style.bg} ${style.text} ${activeTou === t.id ? 'ring-2 ring-offset-1 ring-gray-700 scale-105' : 'opacity-70'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${s.bg} ${s.text} ${activeTou === t.id ? 'ring-2 ring-offset-1 ring-gray-700 scale-105' : 'opacity-70'}`}
             >
               {t.title}
             </button>
@@ -127,15 +157,18 @@ export default function AdminTouSchedule() {
         >
           پاک کردن همه
         </button>
-        {Object.entries(TOU_COLORS).map(([id, c]) => (
-          <button
-            key={id}
-            onClick={() => fillAll(+id)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${c.bg} ${c.text} opacity-60 hover:opacity-100`}
-          >
-            همه {c.label}
-          </button>
-        ))}
+        {touTypes.map((t) => {
+          const s = getTouStyle(t.title)
+          return (
+            <button
+              key={t.id}
+              onClick={() => fillAll(t.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${s.bg} ${s.text} opacity-60 hover:opacity-100`}
+            >
+              همه {t.title}
+            </button>
+          )
+        })}
       </div>
 
       {/* 24-hour grid */}
@@ -149,7 +182,7 @@ export default function AdminTouSchedule() {
         >
           {Array.from({ length: 24 }, (_, h) => {
             const tou = schedule[h]
-            const style = tou ? TOU_COLORS[tou] : null
+            const style = tou ? styleOf(tou) : null
             return (
               <div
                 key={h}
@@ -160,38 +193,60 @@ export default function AdminTouSchedule() {
                   ${style ? `${style.bg} ${style.text} border-transparent` : 'border-gray-200 bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
               >
                 <span>{String(h).padStart(2, '0')}:00</span>
-                {style && <span className="mt-0.5 text-[10px] opacity-80">{TOU_COLORS[tou!]?.label}</span>}
+                {tou && <span className="mt-0.5 text-[10px] opacity-80">{titleOf(tou)}</span>}
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Legend + Save */}
-      <div className="flex items-center justify-between">
+      {/* Legend + Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-xs text-gray-500">
-          {Object.entries(TOU_COLORS).map(([id, c]) => (
-            <span key={id} className="flex items-center gap-1">
-              <span className={`inline-block h-3 w-3 rounded-sm ${c.bg}`} />
-              {c.label}
-            </span>
-          ))}
+          {touTypes.map((t) => {
+            const s = getTouStyle(t.title)
+            return (
+              <span key={t.id} className="flex items-center gap-1">
+                <span className={`inline-block h-3 w-3 rounded-sm ${s.bg}`} />
+                {t.title}
+              </span>
+            )
+          })}
         </div>
-        <Button loading={saving} onClick={handleSave}>
-          <Save className="h-4 w-4" /> ذخیره برنامه
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1">
+            <Copy className="h-3.5 w-3.5 text-gray-400" />
+            <span className="text-xs text-gray-500">کپی از:</span>
+            <select
+              value={copyFromMonth}
+              onChange={(e) => setCopyFromMonth(+e.target.value)}
+              className="rounded border-0 bg-transparent text-xs text-gray-700 focus:outline-none"
+            >
+              {JALALI_MONTHS.slice(1).map((m, i) => (
+                <option key={i + 1} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <Button size="sm" variant="secondary" loading={copying} onClick={handleCopy}>
+              کپی
+            </Button>
+          </div>
+          <Button loading={saving} onClick={handleSave}>
+            <Save className="h-4 w-4" /> ذخیره برنامه
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}
       <div className="rounded-lg border border-gray-200 p-4">
         <p className="mb-2 text-xs font-medium text-gray-600">خلاصه ساعات:</p>
         <div className="flex flex-wrap gap-4">
-          {Object.entries(TOU_COLORS).map(([id, c]) => {
-            const count = Object.values(schedule).filter((v) => v === +id).length
+          {touTypes.map((t) => {
+            const s = getTouStyle(t.title)
+            const count = Object.values(schedule).filter((v) => v === t.id).length
             return (
-              <div key={id} className="flex items-center gap-2">
-                <span className={`inline-block h-3 w-3 rounded-sm ${c.bg}`} />
-                <span className="text-xs text-gray-700">{c.label}: <strong>{count}</strong> ساعت</span>
+              <div key={t.id} className="flex items-center gap-2">
+                <span className={`inline-block h-3 w-3 rounded-sm ${s.bg}`} />
+                <span className="text-xs text-gray-700">{t.title}: <strong>{count}</strong> ساعت</span>
               </div>
             )
           })}

@@ -114,6 +114,7 @@ export interface ContractResult {
   id: number
   contractNumber: string
   contractRate: number
+  statusId: number
   status: string
   subscription: string
   startDate: string
@@ -121,6 +122,15 @@ export interface ContractResult {
   address: string
   warrantyAmount: number
   warrantyType: string
+  warrantyTypeId: number
+  warrantyFileId: string | null
+}
+
+export interface SubmitWarrantyRequest {
+  contractId: number
+  amount: number
+  typeId: number
+  fileId?: string | null
 }
 
 export interface ContractConfirm {
@@ -138,10 +148,11 @@ export interface AdminContract {
   startDate: string | null
   endDate: string | null
   amount?: number
-  fileId?: number
+  fileId?: string | null
   typeId?: number
   customerNationalId?: string
   status?: string
+  warrantyFileId?: string | null
 }
 
 // Bills
@@ -204,13 +215,74 @@ export interface ManualBillRequest {
 
 // Tickets
 export interface TicketSummary {
-  id?: number
+  id: number
   subject: string
   status: string
+  statusId: number
+  createdAt: string | null
+  messageCount: number
 }
 
 export interface TicketMessage {
+  id: number
+  body: string | null
+  fileId: string | null
+  senderName: string
+  isAdmin: boolean
+  createdAt: string | null
+}
+
+export interface CreateTicketRequest {
+  subject: string
   body: string
+}
+
+export interface AddTicketMessageRequest {
+  ticketId: number
+  body: string
+  fileId?: string | null
+}
+
+export interface UpdateTicketStatusRequest {
+  ticketId: number
+  statusId: number
+}
+
+// Announcements
+export interface AnnouncementItem {
+  id: number
+  title: string
+  contents: string
+  publishDate: string
+}
+
+export interface AdminAnnouncement {
+  id: number
+  title: string
+  contents: string
+  publishDate: string | null
+  finishDate: string | null
+}
+
+// Admin Tickets
+export interface AdminTicketSummary {
+  id: number
+  subject: string
+  status: string
+  statusId: number
+  customerName: string
+  createdAt: string | null
+  messageCount: number
+}
+
+// Admin Subscription
+export interface AdminSubscription {
+  id: number
+  billIdentifier: string
+  contractCapacityKw: number | null
+  addressId: number
+  mainAddress?: string
+  city?: string
 }
 
 // Admin tables
@@ -240,10 +312,13 @@ export interface AdminRealCustomer {
 
 export interface AdminAddress {
   id: number
-  city: string
-  province: string
+  city?: string
+  province?: string
+  cityId?: number
+  powerEntityId?: number
   postalCode: string
   mainAddress: string
+  customerProfileId?: number
 }
 
 // Monthly Market Rates

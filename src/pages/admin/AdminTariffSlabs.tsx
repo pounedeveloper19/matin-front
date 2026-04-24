@@ -2,11 +2,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Layers } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
+import { lookupApi } from '../../api/lookup'
+import type { TariffOption } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import Input from '../../components/ui/Input'
+import Input, { Select } from '../../components/ui/Input'
 import type { TariffSlab } from '../../types'
+import { toArr } from '../../utils'
 
 const empty: TariffSlab = { id: 0, tariffId: 0, fromKwh: 0, toKwh: null, multiplier: 1 }
 
@@ -20,7 +23,15 @@ export default function AdminTariffSlabs() {
   const [form, setForm]             = useState<TariffSlab>(empty)
   const [saving, setSaving]         = useState(false)
   const [filterTariffId, setFilterTariffId] = useState('')
+  const [tariffs, setTariffs]       = useState<TariffOption[]>([])
+  const [tariffsLoading, setTariffsLoading] = useState(true)
   const pageSize = 10
+
+  useEffect(() => {
+    lookupApi.getAllTariffs()
+      .then(r => { if (r.code === 200) setTariffs(toArr(r.result) as TariffOption[]) })
+      .finally(() => setTariffsLoading(false))
+  }, [])
 
   const fetch = useCallback((p: number) => {
     setLoading(true)
@@ -56,7 +67,7 @@ export default function AdminTariffSlabs() {
       if (res.code === 200) {
         toast.success(modal === 'create' ? 'پله تعرفه ثبت شد' : 'پله تعرفه ویرایش شد')
         setModal(null); fetch(page)
-      } else { toast.error(res.caption ?? 'خطا') }
+      } else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -66,7 +77,7 @@ export default function AdminTariffSlabs() {
     try {
       const res = await adminApi.deleteTariffSlab(form.id)
       if (res.code === 200) { toast.success('پله تعرفه حذف شد'); setModal(null); fetch(page) }
-      else { toast.error(res.caption ?? 'خطا') }
+      else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -100,13 +111,15 @@ export default function AdminTariffSlabs() {
 
       {/* Filter */}
       <div className="flex gap-3">
-        <input
-          type="number"
-          placeholder="فیلتر بر اساس شناسه تعرفه..."
-          value={filterTariffId}
-          onChange={(e) => { setFilterTariffId(e.target.value); setPage(1) }}
-          className="w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
+        <div className="w-64">
+          <Select
+            placeholder="همه تعرفه‌ها"
+            value={filterTariffId}
+            loading={tariffsLoading}
+            options={tariffs.map(t => ({ value: t.tariffId, label: `تعرفه #${t.tariffId}` }))}
+            onChange={(v) => { setFilterTariffId(String(v)); setPage(1) }}
+          />
+        </div>
       </div>
 
       <Table columns={columns} data={data} loading={loading} keyField="id" emptyText="پله‌ای ثبت نشده" />
@@ -119,11 +132,12 @@ export default function AdminTariffSlabs() {
         size="sm"
       >
         <div className="grid grid-cols-1 gap-4">
-          <Input
-            label="شناسه تعرفه"
-            type="number"
-            value={form.tariffId}
-            onChange={(e) => setForm({ ...form, tariffId: +e.target.value })}
+          <Select
+            label="تعرفه"
+            value={form.tariffId || ''}
+            loading={tariffsLoading}
+            options={tariffs.map(t => ({ value: t.tariffId, label: `تعرفه #${t.tariffId}` }))}
+            onChange={(v) => setForm({ ...form, tariffId: +v })}
           />
           <Input
             label="از (kWh)"

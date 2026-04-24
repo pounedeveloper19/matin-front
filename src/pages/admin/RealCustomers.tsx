@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Users, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Search, Users, Plus, Pencil, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { Table, Pagination } from '../../components/ui/Table'
@@ -7,6 +7,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
+import CustomerDetailPanel from '../../components/admin/CustomerDetailPanel'
 import type { AdminRealCustomer } from '../../types'
 
 const emptyForm: AdminRealCustomer = {
@@ -39,6 +40,8 @@ export default function AdminRealCustomers() {
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [form, setForm] = useState<AdminRealCustomer>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [detailProfileId, setDetailProfileId] = useState<number | null>(null)
+  const [detailTitle, setDetailTitle] = useState('')
   const pageSize = 10
 
   const fetchData = useCallback((p: number, filters: typeof search) => {
@@ -52,11 +55,16 @@ export default function AdminRealCustomers() {
         ...(filters.mobile && { Search_Mobile: filters.mobile }),
       })
       .then((r) => {
+        if (r.code !== 200) {
+          toast.error(r.caption ?? 'خطا در دریافت اطلاعات')
+          return
+        }
         const res = r.result as any
         setData(res?.data ?? [])
         setTotal(res?.totalRecords ?? 0)
         setTotalPages(res?.totalPages ?? 1)
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -66,6 +74,11 @@ export default function AdminRealCustomers() {
   const handleReset = () => {
     const e = { name: '', nationalCode: '', mobile: '' }
     setSearch(e); setApplied(e); setPage(1)
+  }
+
+  const openDetail = (row: AdminRealCustomer) => {
+    setDetailProfileId(row.id)
+    setDetailTitle(`${row.firstName} ${row.lastName}`)
   }
 
   const openCreate = () => { setForm(emptyForm); setModal('create') }
@@ -93,7 +106,7 @@ export default function AdminRealCustomers() {
         setModal(null)
         fetchData(page, applied)
       } else {
-        toast.error(res.caption ?? 'خطا در عملیات')
+        toast.error(res.message ?? res.caption ?? 'خطا در عملیات')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -108,7 +121,7 @@ export default function AdminRealCustomers() {
         setModal(null)
         fetchData(page, applied)
       } else {
-        toast.error(res.caption ?? 'خطا در حذف')
+        toast.error(res.message ?? res.caption ?? 'خطا در حذف')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -134,9 +147,13 @@ export default function AdminRealCustomers() {
     {
       key: 'actions',
       header: 'عملیات',
-      className: 'w-24',
+      className: 'w-32',
       render: (row: AdminRealCustomer) => (
         <div className="flex gap-1">
+          <button onClick={() => openDetail(row)} title="جزئیات"
+            className="rounded p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600">
+            <Eye className="h-3.5 w-3.5" />
+          </button>
           <button onClick={() => openEdit(row)} title="ویرایش"
             className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
             <Pencil className="h-3.5 w-3.5" />
@@ -231,6 +248,13 @@ export default function AdminRealCustomers() {
           </Button>
         </div>
       </Modal>
+
+      <CustomerDetailPanel
+        open={detailProfileId !== null}
+        profileId={detailProfileId}
+        customerTitle={detailTitle}
+        onClose={() => setDetailProfileId(null)}
+      />
     </div>
   )
 }

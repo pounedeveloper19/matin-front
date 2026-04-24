@@ -2,11 +2,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { Receipt, Plus, Trash2, Eye, TrendingDown, AlertTriangle, BarChart3, ChevronDown, ChevronUp, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
+import { lookupApi } from '../../api/lookup'
+import type { SubOption } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import Input from '../../components/ui/Input'
+import Input, { Select } from '../../components/ui/Input'
 import type { AdminBillReport, BillAnalysisResult, BillBand } from '../../types'
+import { toArr } from '../../utils'
 
 const MONTHS = ['','فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 const rial = (n: number) => n.toLocaleString('fa-IR') + ' ریال'
@@ -202,6 +205,14 @@ export default function AdminBillReports() {
   const [selected, setSelected] = useState<AdminBillReport | null>(null)
   const [analysisResult, setAnalysisResult] = useState<BillAnalysisResult | null>(null)
   const [saving, setSaving] = useState(false)
+  const [subscriptions, setSubscriptions] = useState<SubOption[]>([])
+  const [subsLoading, setSubsLoading] = useState(true)
+
+  useEffect(() => {
+    lookupApi.getAllSubscriptions()
+      .then(r => { if (r.code === 200) setSubscriptions(toArr(r.result) as SubOption[]) })
+      .finally(() => setSubsLoading(false))
+  }, [])
 
   const fetchData = useCallback((p: number) => {
     setLoading(true)
@@ -246,7 +257,7 @@ export default function AdminBillReports() {
         toast.success('تحلیل قبض انجام شد')
         fetchData(page)
       } else {
-        toast.error(res.caption ?? res.message ?? 'خطا در تحلیل')
+        toast.error(res.message ?? res.caption ?? 'خطا در تحلیل')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -281,7 +292,7 @@ export default function AdminBillReports() {
         toast.success('گزارش حذف شد')
         setDeleteModal(false)
         fetchData(page)
-      } else { toast.error(res.caption ?? 'خطا') }
+      } else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -338,13 +349,15 @@ export default function AdminBillReports() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <input
-          type="number"
-          placeholder="شناسه اشتراک..."
-          value={filterSubId}
-          onChange={(e) => { setFilterSubId(e.target.value); setPage(1) }}
-          className="w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
+        <div className="w-56">
+          <Select
+            placeholder="همه اشتراک‌ها"
+            value={filterSubId}
+            loading={subsLoading}
+            options={subscriptions.map(s => ({ value: s.id, label: `${s.billIdentifier} — ${s.address}` }))}
+            onChange={(v) => { setFilterSubId(String(v)); setPage(1) }}
+          />
+        </div>
         <input
           type="number"
           placeholder="سال..."
@@ -374,7 +387,13 @@ export default function AdminBillReports() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Input label="شناسه اشتراک *" value={form.subscriptionId} onChange={set('subscriptionId')} placeholder="مثال: ۱" inputMode="numeric" />
+            <Select
+              label="اشتراک *"
+              value={form.subscriptionId}
+              loading={subsLoading}
+              options={subscriptions.map(s => ({ value: s.id, label: `${s.billIdentifier} — ${s.address}` }))}
+              onChange={(v) => setForm(f => ({ ...f, subscriptionId: String(v) }))}
+            />
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">سال (شمسی) *</label>
               <input type="number" value={form.year} onChange={set('year')}

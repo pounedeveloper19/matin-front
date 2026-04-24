@@ -12,6 +12,10 @@ import type {
   HourEntry,
   AdminBillReport,
   PendingUser,
+  AdminAnnouncement,
+  AdminSubscription,
+  AddTicketMessageRequest,
+  UpdateTicketStatusRequest,
 } from '../types'
 
 type PageParams = {
@@ -197,6 +201,90 @@ export const adminApi = {
     fridayPeakKwh: number
   }) =>
     client.post<ExecutionResult>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
+
+  // Customer full detail (addresses, subscriptions, identity doc)
+  getCustomerFullDetail: (profileId: number) =>
+    client.get<ExecutionResult>('/Lookup/GetCustomerFullDetail', { params: { profileId } }).then((r) => r.data),
+
+  // Admin address CRUD (parentId = customerProfileId)
+  getAdminAddresses: (parentId: number, params: PageParams = {}) =>
+    client
+      .get<ExecutionResult<PaginationResult<AdminAddress>>>('/CustomerAddress/List', {
+        params: buildParams({ pageNumber: 1, pageSize: 50, parentId, ...params }),
+      })
+      .then((r) => r.data),
+
+  getAdminAddressDetail: (id: number) =>
+    client.get<ExecutionResult<AdminAddress>>(`/CustomerAddress/Detail/${id}`).then((r) => r.data),
+
+  createAdminAddress: (parentId: number, data: Omit<AdminAddress, 'id' | 'city' | 'province'> & Record<string, unknown>) =>
+    client.post<ExecutionResult>('/CustomerAddress/Insert',
+      { id: 0, customerProfileId: parentId, ...data },
+      { params: { parentId } }
+    ).then((r) => r.data),
+
+  updateAdminAddress: (data: AdminAddress) =>
+    client.put<ExecutionResult>('/CustomerAddress/Update', data).then((r) => r.data),
+
+  deleteAdminAddress: (id: number) =>
+    client.delete<ExecutionResult>(`/CustomerAddress/Delete/${id}`).then((r) => r.data),
+
+  // Admin subscription CRUD (parentId = customerProfileId)
+  getAdminSubscriptions: (parentId: number, params: PageParams = {}) =>
+    client
+      .get<ExecutionResult<PaginationResult<AdminSubscription>>>('/AdminSubscription/List', {
+        params: buildParams({ pageNumber: 1, pageSize: 50, parentId, ...params }),
+      })
+      .then((r) => r.data),
+
+  getAdminSubscriptionDetail: (id: number) =>
+    client.get<ExecutionResult<AdminSubscription>>(`/AdminSubscription/Detail/${id}`).then((r) => r.data),
+
+  createAdminSubscription: (data: AdminSubscription) =>
+    client.post<ExecutionResult>('/AdminSubscription/Insert', data).then((r) => r.data),
+
+  updateAdminSubscription: (data: AdminSubscription) =>
+    client.put<ExecutionResult>('/AdminSubscription/Update', data).then((r) => r.data),
+
+  deleteAdminSubscription: (id: number) =>
+    client.delete<ExecutionResult>(`/AdminSubscription/Delete/${id}`).then((r) => r.data),
+
+  // Announcements
+  getAnnouncements: (params: PageParams = {}) =>
+    client
+      .get<ExecutionResult<PaginationResult<AdminAnnouncement>>>('/Announcement/List', {
+        params: buildParams({ pageNumber: 1, pageSize: 10, ...params }),
+      })
+      .then((r) => r.data),
+
+  getAnnouncementDetail: (id: number) =>
+    client.get<ExecutionResult<AdminAnnouncement>>(`/Announcement/Detail/${id}`).then((r) => r.data),
+
+  createAnnouncement: (data: AdminAnnouncement) =>
+    client.post<ExecutionResult>('/Announcement/Insert', data).then((r) => r.data),
+
+  updateAnnouncement: (data: AdminAnnouncement) =>
+    client.put<ExecutionResult>('/Announcement/Update', data).then((r) => r.data),
+
+  deleteAnnouncement: (id: number) =>
+    client.delete<ExecutionResult>(`/Announcement/Delete/${id}`).then((r) => r.data),
+
+  // Admin Tickets
+  getAdminTickets: () =>
+    client.get<ExecutionResult>('/AdminTicket/GetAll').then((r) => r.data),
+
+  getAdminTicketMessages: (ticketId: number) =>
+    client.get<ExecutionResult>('/AdminTicket/GetMessages', { params: { ticketId } }).then((r) => r.data),
+
+  replyTicket: (data: AddTicketMessageRequest) =>
+    client.post<ExecutionResult>('/AdminTicket/Reply', data).then((r) => r.data),
+
+  setTicketStatus: (data: UpdateTicketStatusRequest) =>
+    client.put<ExecutionResult>('/AdminTicket/SetStatus', data).then((r) => r.data),
+
+  // TOU copy
+  copyTouFromMonth: (powerEntityId: number, sourceMonth: number, targetMonth: number) =>
+    client.post<ExecutionResult>('/TouSchedule/CopyFromMonth', { powerEntityId, sourceMonth, targetMonth }).then((r) => r.data),
 
   // Pending registrations
   getPendingUsers: () =>

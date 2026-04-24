@@ -1,13 +1,18 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Plus, Pencil, Trash2, FileText, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
+import { uploadApi } from '../../api/upload'
+import { lookupApi } from '../../api/lookup'
+import type { SubOption, IdTitle } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import Input from '../../components/ui/Input'
+import Input, { Select, DatePicker } from '../../components/ui/Input'
+import FileUpload from '../../components/ui/FileUpload'
 import Badge, { contractStatusVariant } from '../../components/ui/Badge'
 import type { AdminContract } from '../../types'
+import { toArr } from '../../utils'
 
 const emptyForm: AdminContract = {
   id: 0,
@@ -30,7 +35,29 @@ export default function AdminContracts() {
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [form, setForm] = useState<AdminContract>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [subscriptions, setSubscriptions] = useState<SubOption[]>([])
+  const [subsLoading, setSubsLoading] = useState(true)
+  const [guaranteeTypes, setGuaranteeTypes] = useState<IdTitle[]>([])
+  const [guaranteeLoading, setGuaranteeLoading] = useState(true)
+  const [selectedCustomer, setSelectedCustomer] = useState('')
   const pageSize = 10
+
+  const customerOptions = useMemo(() =>
+    [...new Set(subscriptions.map(s => s.customerName ?? '').filter(Boolean))].sort()
+  , [subscriptions])
+
+  const filteredSubs = useMemo(() =>
+    selectedCustomer ? subscriptions.filter(s => s.customerName === selectedCustomer) : subscriptions
+  , [subscriptions, selectedCustomer])
+
+  useEffect(() => {
+    lookupApi.getAllSubscriptions()
+      .then(r => { if (r.code === 200) setSubscriptions(toArr(r.result) as SubOption[]) })
+      .finally(() => setSubsLoading(false))
+    lookupApi.getGuaranteeTypes()
+      .then(r => { if (r.code === 200) setGuaranteeTypes(toArr(r.result) as IdTitle[]) })
+      .finally(() => setGuaranteeLoading(false))
+  }, [])
 
   const fetchData = useCallback((p: number) => {
     setLoading(true)
@@ -46,17 +73,20 @@ export default function AdminContracts() {
 
   useEffect(() => { fetchData(page) }, [page, fetchData])
 
-  const openCreate = () => { setForm(emptyForm); setModal('create') }
+  const openCreate = () => { setForm(emptyForm); setSelectedCustomer(''); setModal('create') }
   const openEdit = async (row: AdminContract) => {
     try {
       const res = await adminApi.getContractDetail(row.id)
       setForm(res.result ?? row)
     } catch { setForm(row) }
+    const sub = subscriptions.find(s => s.id === row.subscriptionId)
+    setSelectedCustomer(sub?.customerName ?? '')
     setModal('edit')
   }
   const openDelete = (row: AdminContract) => { setForm(row); setModal('delete') }
 
   const handleSave = async () => {
+    if (!form.subscriptionId) { toast.error('لطفاً انشعاب را انتخاب کنید'); return }
     setSaving(true)
     try {
       const res = modal === 'create'
@@ -67,7 +97,7 @@ export default function AdminContracts() {
         setModal(null)
         fetchData(page)
       } else {
-        toast.error(res.caption ?? 'خطا در عملیات')
+        toast.error(res.message ?? res.caption ?? 'خطا در عملیات')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -82,7 +112,7 @@ export default function AdminContracts() {
         setModal(null)
         fetchData(page)
       } else {
-        toast.error(res.caption ?? 'خطا در حذف')
+        toast.error(res.message ?? res.caption ?? 'خطا در حذف')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -107,6 +137,17 @@ export default function AdminContracts() {
       className: 'w-24',
       render: (row: AdminContract) => (
         <div className="flex items-center gap-1">
+          {row.warrantyFileId && (
+            <a
+              href={uploadApi.downloadUrl(row.warrantyFileId)}
+              target="_blank"
+              rel="noreferrer"
+              title="دانلود فایل تضمین"
+              className="rounded p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </a>
+          )}
           <button onClick={() => openEdit(row)} className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -142,22 +183,40 @@ export default function AdminContracts() {
         size="lg"
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="شماره قرارداد"
-            value={form.contractNumber}
-            onChange={(e) => setForm({ ...form, contractNumber: e.target.value })}
-          />
+          {modal === 'edit' && (
+            <Input
+              label="شماره قرارداد"
+              value={form.contractNumber}
+              disabled
+              onChange={() => {}}
+            />
+          )}
           <Input
             label="نرخ قرارداد"
             type="number"
             value={form.contractRate}
             onChange={(e) => setForm({ ...form, contractRate: +e.target.value })}
           />
-          <Input
-            label="شناسه اشتراک"
-            type="number"
+          <Select
+            label="مشتری"
+            value={selectedCustomer}
+            loading={subsLoading}
+            options={customerOptions.map(name => ({ value: name, label: name }))}
+            onChange={(v) => {
+              setSelectedCustomer(String(v))
+              setForm({ ...form, subscriptionId: 0 })
+            }}
+          />
+          <Select
+            label="انشعاب"
             value={form.subscriptionId || ''}
-            onChange={(e) => setForm({ ...form, subscriptionId: +e.target.value })}
+            loading={subsLoading}
+            disabled={!selectedCustomer}
+            options={filteredSubs.map(s => ({
+              value: s.id,
+              label: `${s.billIdentifier} — ${s.address}`,
+            }))}
+            onChange={(v) => setForm({ ...form, subscriptionId: +v })}
           />
           <Input
             label="مبلغ ضمانت"
@@ -165,17 +224,30 @@ export default function AdminContracts() {
             value={form.amount || ''}
             onChange={(e) => setForm({ ...form, amount: +e.target.value })}
           />
-          <Input
+          <DatePicker
             label="تاریخ شروع"
-            type="date"
-            value={form.startDate ?? ''}
-            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+            value={form.startDate}
+            onChange={(v) => setForm({ ...form, startDate: v })}
           />
-          <Input
+          <DatePicker
             label="تاریخ پایان"
-            type="date"
-            value={form.endDate ?? ''}
-            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+            value={form.endDate}
+            onChange={(v) => setForm({ ...form, endDate: v })}
+          />
+          <Select
+            label="نوع ضمانت"
+            value={form.typeId ?? ''}
+            loading={guaranteeLoading}
+            options={guaranteeTypes.map(t => ({ value: t.id, label: t.title }))}
+            onChange={(v) => setForm({ ...form, typeId: +v })}
+          />
+        </div>
+        <div className="mt-4">
+          <FileUpload
+            label="فایل ضمانت"
+            fileId={form.fileId}
+            onUploaded={(id) => setForm({ ...form, fileId: id })}
+            onDeleted={() => setForm({ ...form, fileId: null })}
           />
         </div>
         <div className="mt-5 flex justify-end gap-3">

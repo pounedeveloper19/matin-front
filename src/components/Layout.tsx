@@ -20,7 +20,7 @@ interface LayoutProps {
 
 export default function Layout({ role }: LayoutProps) {
   const { pathname } = useLocation()
-  const title = pageTitles[pathname] ?? 'متین پاور'
+  const title = pageTitles[pathname] ?? 'برق متین'
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">

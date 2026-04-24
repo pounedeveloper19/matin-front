@@ -13,10 +13,11 @@ import AdminRealCustomers from './pages/admin/RealCustomers'
 import AdminContracts from './pages/admin/AdminContracts'
 import AdminMarketRates from './pages/admin/AdminMarketRates'
 import AdminTariffs from './pages/admin/AdminTariffs'
-import AdminTariffSlabs from './pages/admin/AdminTariffSlabs'
 import AdminTouSchedule from './pages/admin/AdminTouSchedule'
 import AdminBillReports from './pages/admin/AdminBillReports'
 import AdminPendingUsers from './pages/admin/AdminPendingUsers'
+import AdminTickets from './pages/admin/AdminTickets'
+import AdminAnnouncements from './pages/admin/AdminAnnouncements'
 import Register from './pages/Register'
 
 function ProtectedRoute({ children, role }: { children: JSX.Element; role?: 'admin' | 'customer' }) {
@@ -72,9 +73,10 @@ export default function App() {
         <Route path="contracts"     element={<AdminContracts />} />
         <Route path="market-rates"  element={<AdminMarketRates />} />
         <Route path="tariffs"       element={<AdminTariffs />} />
-        <Route path="tariff-slabs"  element={<AdminTariffSlabs />} />
         <Route path="tou-schedule"  element={<AdminTouSchedule />} />
         <Route path="bill-reports"    element={<AdminBillReports />} />
+        <Route path="tickets"         element={<AdminTickets />} />
+        <Route path="announcements"   element={<AdminAnnouncements />} />
         <Route path="pending-users"   element={<AdminPendingUsers />} />
       </Route>
 

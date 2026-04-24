@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Building2, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Search, Building2, Plus, Pencil, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { Table, Pagination } from '../../components/ui/Table'
@@ -7,6 +7,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
+import CustomerDetailPanel from '../../components/admin/CustomerDetailPanel'
 import type { AdminLegalCustomer } from '../../types'
 
 const emptyForm: AdminLegalCustomer = {
@@ -40,6 +41,8 @@ export default function AdminLegalCustomers() {
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [form, setForm] = useState<AdminLegalCustomer>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [detailProfileId, setDetailProfileId] = useState<number | null>(null)
+  const [detailTitle, setDetailTitle] = useState('')
   const pageSize = 10
 
   const fetchData = useCallback((p: number, filters: typeof search) => {
@@ -53,11 +56,16 @@ export default function AdminLegalCustomers() {
         ...(filters.ceoFullName && { Search_CeoFullName: filters.ceoFullName }),
       })
       .then((r) => {
+        if (r.code !== 200) {
+          toast.error(r.caption ?? 'خطا در دریافت اطلاعات')
+          return
+        }
         const res = r.result as any
         setData(res?.data ?? [])
         setTotal(res?.totalRecords ?? 0)
         setTotalPages(res?.totalPages ?? 1)
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -67,6 +75,11 @@ export default function AdminLegalCustomers() {
   const handleReset = () => {
     const e = { companyName: '', nationalId: '', ceoFullName: '' }
     setSearch(e); setApplied(e); setPage(1)
+  }
+
+  const openDetail = (row: AdminLegalCustomer) => {
+    setDetailProfileId(row.id)
+    setDetailTitle(row.companyName)
   }
 
   const openCreate = () => { setForm(emptyForm); setModal('create') }
@@ -94,7 +107,7 @@ export default function AdminLegalCustomers() {
         setModal(null)
         fetchData(page, applied)
       } else {
-        toast.error(res.caption ?? 'خطا در عملیات')
+        toast.error(res.message ?? res.caption ?? 'خطا در عملیات')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -109,7 +122,7 @@ export default function AdminLegalCustomers() {
         setModal(null)
         fetchData(page, applied)
       } else {
-        toast.error(res.caption ?? 'خطا در حذف')
+        toast.error(res.message ?? res.caption ?? 'خطا در حذف')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -134,9 +147,13 @@ export default function AdminLegalCustomers() {
     {
       key: 'actions',
       header: 'عملیات',
-      className: 'w-24',
+      className: 'w-32',
       render: (row: AdminLegalCustomer) => (
         <div className="flex gap-1">
+          <button onClick={() => openDetail(row)} title="جزئیات"
+            className="rounded p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600">
+            <Eye className="h-3.5 w-3.5" />
+          </button>
           <button onClick={() => openEdit(row)} title="ویرایش"
             className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
             <Pencil className="h-3.5 w-3.5" />
@@ -230,6 +247,13 @@ export default function AdminLegalCustomers() {
           </Button>
         </div>
       </Modal>
+
+      <CustomerDetailPanel
+        open={detailProfileId !== null}
+        profileId={detailProfileId}
+        customerTitle={detailTitle}
+        onClose={() => setDetailProfileId(null)}
+      />
     </div>
   )
 }

@@ -1,30 +1,41 @@
 import { useEffect, useState } from 'react'
-import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap } from 'lucide-react'
+import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
+import { lookupApi } from '../../api/lookup'
+import type { IdTitle, IdName } from '../../api/lookup'
 import { Card } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import Input from '../../components/ui/Input'
-import type { AddressResult, CustomerAgent, CustomerReal, CustomerLegal, SubscriptionResult, AddSubscriptionRequest } from '../../types'
+import Input, { Select } from '../../components/ui/Input'
+import FileUpload from '../../components/ui/FileUpload'
+import type {
+  AddressResult, CustomerAgent, CustomerReal, CustomerLegal,
+  SubscriptionResult, AddSubscriptionRequest,
+} from '../../types'
 
 type ProfileData =
   | ({ type: 'real' } & CustomerReal)
   | ({ type: 'legal' } & CustomerLegal)
 
 export default function CustomerProfile() {
-  const [profile, setProfile]           = useState<ProfileData | null>(null)
-  const [addresses, setAddresses]       = useState<AddressResult[]>([])
+  const [profile, setProfile]             = useState<ProfileData | null>(null)
+  const [addresses, setAddresses]         = useState<AddressResult[]>([])
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
-  const [agent, setAgent]               = useState<CustomerAgent | null>(null)
-  const [loading, setLoading]           = useState(true)
-  const [saving, setSaving]             = useState(false)
+  const [agent, setAgent]                 = useState<CustomerAgent | null>(null)
+  const [identityDocFileId, setIdentityDocFileId] = useState<string | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [saving, setSaving]               = useState(false)
+  const [cities, setCities]               = useState<IdTitle[]>([])
+  const [powerEntities, setPowerEntities] = useState<IdName[]>([])
+  const [lookupsLoading, setLookupsLoading] = useState(true)
 
   // modals
-  const [editModal, setEditModal]   = useState(false)
-  const [addrModal, setAddrModal]   = useState(false)
-  const [agentModal, setAgentModal] = useState(false)
-  const [subModal, setSubModal]     = useState(false)
+  const [editModal, setEditModal]         = useState(false)
+  const [addrModal, setAddrModal]         = useState(false)
+  const [deleteAddrId, setDeleteAddrId]   = useState<number | null>(null)
+  const [agentModal, setAgentModal]       = useState(false)
+  const [subModal, setSubModal]           = useState(false)
 
   // form states
   const [realForm, setRealForm]   = useState<CustomerReal>({ firstName: '', lastName: '', nationalCode: '', mobile: '' })
@@ -33,35 +44,77 @@ export default function CustomerProfile() {
   const [agentForm, setAgentForm] = useState<CustomerAgent>({ customerProfileId: 0, fullName: '', mobile: '', password: '' })
   const [subForm, setSubForm]     = useState<AddSubscriptionRequest>({ addressId: 0, billIdentifier: '', contractCapacityKw: null })
 
-  const loadAll = () => {
+  const loadAll = async () => {
     setLoading(true)
-    Promise.all([
-      customerApi.getCustomer(),
-      customerApi.getAddresses(),
-      customerApi.getSubscriptions(),
-      customerApi.getAgent(),
-    ]).then(([c, a, s, ag]) => {
-      if (c.code === 200 && c.result) {
-        const raw = Array.isArray(c.result) ? c.result[0] : c.result
-        if (raw && 'firstName' in raw) {
-          setProfile({ type: 'real', ...(raw as CustomerReal) })
-          setRealForm(raw as CustomerReal)
-        } else if (raw && 'companyName' in raw) {
-          setProfile({ type: 'legal', ...(raw as CustomerLegal) })
-          setLegalForm(raw as CustomerLegal)
+    try {
+      const [c, a, s, ag, meta] = await Promise.allSettled([
+        customerApi.getCustomer(),
+        customerApi.getAddresses(),
+        customerApi.getSubscriptions(),
+        customerApi.getAgent(),
+        customerApi.getProfileMeta(),
+      ])
+
+      const toArr = (v: any): any[] =>
+        Array.isArray(v) ? v : (v?.$values ?? [])
+
+      if (c.status === 'fulfilled') {
+        const r = c.value
+        if (r.code === 200 && r.result) {
+          const raw: any = r.result
+          if (raw.type === 'real') {
+            const p: CustomerReal = {
+              firstName: raw.firstName ?? '',
+              lastName: raw.lastName ?? '',
+              nationalCode: raw.nationalCode ?? '',
+              mobile: raw.mobile ?? '',
+            }
+            setProfile({ type: 'real', ...p })
+            setRealForm(p)
+          } else if (raw.type === 'legal') {
+            const p: CustomerLegal = {
+              companyName: raw.companyName ?? '',
+              nationalId: raw.nationalId ?? '',
+              economicCode: raw.economicCode ?? '',
+              ceo_FullName: raw.ceo_FullName ?? '',
+              ceo_Mobile: raw.ceo_Mobile ?? '',
+            }
+            setProfile({ type: 'legal', ...p })
+            setLegalForm(p)
+          } else {
+            toast.error('نوع پروفایل قابل تشخیص نیست')
+          }
+        } else if (r.code !== 200) {
+          toast.error(r.message ?? r.caption ?? 'خطا در دریافت اطلاعات پروفایل')
         }
+      } else {
+        toast.error('خطا در ارتباط با سرور هنگام دریافت پروفایل')
       }
-      if (a.code === 200 && Array.isArray(a.result)) setAddresses(a.result)
-      if (s.code === 200 && Array.isArray(s.result)) setSubscriptions(s.result)
-      if (ag.code === 200 && ag.result) setAgent(ag.result as CustomerAgent)
-    }).finally(() => setLoading(false))
+
+      if (a.status === 'fulfilled' && a.value.code === 200)
+        setAddresses(toArr(a.value.result))
+      if (s.status === 'fulfilled' && s.value.code === 200)
+        setSubscriptions(toArr(s.value.result))
+      if (ag.status === 'fulfilled' && ag.value.code === 200 && ag.value.result)
+        setAgent(ag.value.result as CustomerAgent)
+      if (meta.status === 'fulfilled' && meta.value.code === 200 && meta.value.result)
+        setIdentityDocFileId((meta.value.result as any).identityDocFileId ?? null)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    loadAll()
+    Promise.all([lookupApi.getCities(), lookupApi.getPowerEntities()])
+      .then(([c, p]) => {
+        if (c.code === 200 && Array.isArray(c.result)) setCities(c.result as IdTitle[])
+        if (p.code === 200 && Array.isArray(p.result)) setPowerEntities(p.result as IdName[])
+      })
+      .finally(() => setLookupsLoading(false))
+  }, [])
 
-  // ─── ویرایش پروفایل ───────────────────────────────────────────
-  const openEdit = () => setEditModal(true)
-
+  // ─── ویرایش پروفایل ──────────────────────────────────────────
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
@@ -73,13 +126,31 @@ export default function CustomerProfile() {
         setEditModal(false)
         loadAll()
       } else {
-        toast.error(res.caption ?? 'خطا در ذخیره')
+        toast.error(res.message ?? res.caption ?? 'خطا در ذخیره')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
 
-  // ─── افزودن آدرس ──────────────────────────────────────────────
+  // ─── حذف آدرس ────────────────────────────────────────────────
+  const handleDeleteAddress = async () => {
+    if (!deleteAddrId) return
+    setSaving(true)
+    try {
+      const res = await customerApi.deleteAddress(deleteAddrId)
+      if (res.code === 200) {
+        toast.success('آدرس حذف شد')
+        setDeleteAddrId(null)
+        const updated = await customerApi.getAddresses()
+        if (updated.code === 200 && Array.isArray(updated.result)) setAddresses(updated.result)
+      } else {
+        toast.error(res.message ?? res.caption ?? 'خطا در حذف آدرس')
+      }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSaving(false) }
+  }
+
+  // ─── افزودن آدرس ─────────────────────────────────────────────
   const handleAddAddress = async () => {
     if (!addrForm.mainAddress || !addrForm.postalCode) {
       toast.error('آدرس و کد پستی را وارد کنید')
@@ -95,13 +166,13 @@ export default function CustomerProfile() {
         const updated = await customerApi.getAddresses()
         if (updated.code === 200 && Array.isArray(updated.result)) setAddresses(updated.result)
       } else {
-        toast.error(res.caption ?? 'خطا در ثبت آدرس')
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت آدرس')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
 
-  // ─── ثبت اشتراک ────────────────────────────────────────────────
+  // ─── ثبت اشتراک ──────────────────────────────────────────────
   const handleAddSubscription = async () => {
     if (!subForm.addressId) { toast.error('یک آدرس انتخاب کنید'); return }
     if (!subForm.billIdentifier.trim()) { toast.error('شناسه قبض را وارد کنید'); return }
@@ -115,13 +186,13 @@ export default function CustomerProfile() {
         const updated = await customerApi.getSubscriptions()
         if (updated.code === 200 && Array.isArray(updated.result)) setSubscriptions(updated.result)
       } else {
-        toast.error(res.caption ?? 'خطا در ثبت اشتراک')
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت اشتراک')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
 
-  // ─── ثبت / ویرایش نماینده ─────────────────────────────────────
+  // ─── ثبت / ویرایش نماینده ────────────────────────────────────
   const handleSaveAgent = async () => {
     if (!agentForm.fullName || !agentForm.mobile) {
       toast.error('نام و موبایل نماینده را وارد کنید')
@@ -136,16 +207,36 @@ export default function CustomerProfile() {
         const updated = await customerApi.getAgent()
         if (updated.code === 200 && updated.result) setAgent(updated.result as CustomerAgent)
       } else {
-        toast.error(res.caption ?? 'خطا در ثبت نماینده')
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت نماینده')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
 
-  // ─── render helpers ────────────────────────────────────────────
+  // ─── آپلود مدرک شناسایی ──────────────────────────────────────
+  const handleIdentityUploaded = async (fileId: string) => {
+    try {
+      const res = await customerApi.updateIdentityDoc(fileId)
+      if (res.code === 200) {
+        setIdentityDocFileId(fileId)
+        toast.success('مدرک شناسایی ثبت شد')
+      } else {
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت مدرک')
+      }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+  }
+
+  const handleIdentityDeleted = async () => {
+    try {
+      await customerApi.updateIdentityDoc(null)
+      setIdentityDocFileId(null)
+    } catch { /* silent */ }
+  }
+
+  // ─── render helpers ───────────────────────────────────────────
   const isLegal = profile?.type === 'legal'
 
-  const profileRows: { label: string; value: string | undefined }[] = profile
+  const profileRows = profile
     ? profile.type === 'real'
       ? [
           { label: 'نام',          value: profile.firstName },
@@ -181,12 +272,16 @@ export default function CustomerProfile() {
               {isLegal ? <Building2 className="h-5 w-5" /> : <User className="h-5 w-5" />}
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">{isLegal ? 'اطلاعات شرکت' : 'اطلاعات فردی'}</h3>
-              <p className="text-xs text-gray-400">{isLegal ? 'مشتری حقوقی' : 'مشتری حقیقی'}</p>
+              <h3 className="font-semibold text-gray-900">
+                {profile ? (isLegal ? 'اطلاعات شرکت' : 'اطلاعات فردی') : 'پروفایل کاربری'}
+              </h3>
+              <p className="text-xs text-gray-400">
+                {profile ? (isLegal ? 'مشتری حقوقی' : 'مشتری حقیقی') : ''}
+              </p>
             </div>
           </div>
           {profile && (
-            <Button variant="secondary" size="sm" onClick={openEdit}>
+            <Button variant="secondary" size="sm" onClick={() => setEditModal(true)}>
               <Pencil className="h-3.5 w-3.5" /> ویرایش
             </Button>
           )}
@@ -202,11 +297,30 @@ export default function CustomerProfile() {
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-5 text-center">
-            <p className="text-sm text-amber-700 font-medium">پروفایل تکمیل نشده است</p>
-            <p className="mt-1 text-xs text-amber-500">لطفاً اطلاعات خود را تکمیل کنید</p>
+          <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+            <p className="text-sm text-gray-400">اطلاعات پروفایل یافت نشد. جهت تکمیل با پشتیبانی تماس بگیرید.</p>
           </div>
         )}
+      </Card>
+
+      {/* ─── مدارک شناسایی ─── */}
+      <Card>
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">مدارک شناسایی</h3>
+            <p className="text-xs text-gray-400">تصویر کارت ملی یا شناسنامه / اساسنامه شرکت</p>
+          </div>
+        </div>
+        <FileUpload
+          label="بارگذاری مدرک"
+          fileId={identityDocFileId}
+          accept="image/*,.pdf"
+          onUploaded={handleIdentityUploaded}
+          onDeleted={handleIdentityDeleted}
+        />
       </Card>
 
       {/* ─── آدرس‌ها ─── */}
@@ -216,7 +330,12 @@ export default function CustomerProfile() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
               <MapPin className="h-5 w-5" />
             </div>
-            <h3 className="font-semibold text-gray-900">آدرس‌ها</h3>
+            <h3 className="font-semibold text-gray-900">
+              آدرس‌ها
+              {addresses.length > 0 && (
+                <span className="mr-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">{addresses.length}</span>
+              )}
+            </h3>
           </div>
           <Button variant="secondary" size="sm" onClick={() => setAddrModal(true)}>
             <Plus className="h-3.5 w-3.5" /> افزودن آدرس
@@ -237,9 +356,18 @@ export default function CustomerProfile() {
                       {a.postalCode && <> · کد پستی: {a.postalCode}</>}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700 font-medium">
-                    {a.powerEntityName}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700 font-medium">
+                      {a.powerEntityName}
+                    </span>
+                    <button
+                      onClick={() => setDeleteAddrId(a.id)}
+                      className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      title="حذف آدرس"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -255,13 +383,17 @@ export default function CustomerProfile() {
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">اشتراک‌های برق</h3>
+              <h3 className="font-semibold text-gray-900">
+                اشتراک‌های برق
+                {subscriptions.length > 0 && (
+                  <span className="mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">{subscriptions.length}</span>
+                )}
+              </h3>
               <p className="text-xs text-gray-400">هر آدرس می‌تواند چند اشتراک داشته باشد</p>
             </div>
           </div>
           <Button
-            variant="secondary"
-            size="sm"
+            variant="secondary" size="sm"
             onClick={() => {
               setSubForm({ addressId: addresses[0]?.id ?? 0, billIdentifier: '', contractCapacityKw: null })
               setSubModal(true)
@@ -360,6 +492,19 @@ export default function CustomerProfile() {
         </div>
       </Modal>
 
+      {/* ═══ مودال حذف آدرس ═══ */}
+      <Modal open={deleteAddrId !== null} onClose={() => setDeleteAddrId(null)} title="حذف آدرس" size="sm">
+        <p className="text-sm text-gray-600 mb-5">
+          آیا از حذف این آدرس اطمینان دارید؟ آدرس‌هایی که دارای انشعاب فعال هستند قابل حذف نمی‌باشند.
+        </p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setDeleteAddrId(null)}>انصراف</Button>
+          <Button variant="danger" loading={saving} onClick={handleDeleteAddress}>
+            <Trash2 className="h-4 w-4" /> حذف
+          </Button>
+        </div>
+      </Modal>
+
       {/* ═══ مودال افزودن آدرس ═══ */}
       <Modal open={addrModal} onClose={() => setAddrModal(false)} title="افزودن آدرس جدید" size="md">
         <div className="space-y-4">
@@ -378,22 +523,21 @@ export default function CustomerProfile() {
             placeholder="۱۰ رقم"
           />
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="شناسه شهر"
-              type="number"
+            <Select
+              label="شهر"
               value={addrForm.cityId || ''}
-              onChange={(e) => setAddrForm({ ...addrForm, cityId: +e.target.value })}
-              placeholder="عدد شناسه"
+              loading={lookupsLoading}
+              options={cities.map(c => ({ value: c.id, label: c.title }))}
+              onChange={(v) => setAddrForm({ ...addrForm, cityId: +v })}
             />
-            <Input
-              label="شناسه شرکت برق"
-              type="number"
+            <Select
+              label="شرکت برق"
               value={addrForm.powerEntityId || ''}
-              onChange={(e) => setAddrForm({ ...addrForm, powerEntityId: +e.target.value })}
-              placeholder="عدد شناسه"
+              loading={lookupsLoading}
+              options={powerEntities.map(p => ({ value: p.id, label: p.province ? `${p.name} — ${p.province}` : p.name }))}
+              onChange={(v) => setAddrForm({ ...addrForm, powerEntityId: +v })}
             />
           </div>
-          <p className="text-xs text-gray-400">شناسه‌ها را از بخش مدیریت سیستم دریافت کنید.</p>
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="secondary" onClick={() => setAddrModal(false)}>انصراف</Button>
@@ -404,21 +548,12 @@ export default function CustomerProfile() {
       {/* ═══ مودال اشتراک جدید ═══ */}
       <Modal open={subModal} onClose={() => setSubModal(false)} title="ثبت اشتراک جدید" size="sm">
         <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">آدرس مرتبط *</label>
-            <select
-              value={subForm.addressId}
-              onChange={(e) => setSubForm({ ...subForm, addressId: +e.target.value })}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value={0}>انتخاب کنید...</option>
-              {addresses.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.mainAddress} ({a.powerEntityName})
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="آدرس مرتبط *"
+            value={subForm.addressId || ''}
+            options={addresses.map(a => ({ value: a.id, label: `${a.mainAddress} (${a.powerEntityName})` }))}
+            onChange={(v) => setSubForm({ ...subForm, addressId: +v })}
+          />
           <Input
             label="شناسه قبض (Meter ID) *"
             value={subForm.billIdentifier}
@@ -443,9 +578,9 @@ export default function CustomerProfile() {
       {/* ═══ مودال نماینده ═══ */}
       <Modal open={agentModal} onClose={() => setAgentModal(false)} title={agent ? 'ویرایش نماینده' : 'ثبت نماینده'} size="sm">
         <div className="space-y-4">
-          <Input label="نام کامل *"   value={agentForm.fullName} onChange={(e) => setAgentForm({ ...agentForm, fullName: e.target.value })} />
-          <Input label="موبایل *"     value={agentForm.mobile}   onChange={(e) => setAgentForm({ ...agentForm, mobile: e.target.value })}   inputMode="numeric" maxLength={11} />
-          <Input label="رمز عبور *"   type="password" value={agentForm.password} onChange={(e) => setAgentForm({ ...agentForm, password: e.target.value })} />
+          <Input label="نام کامل *"  value={agentForm.fullName} onChange={(e) => setAgentForm({ ...agentForm, fullName: e.target.value })} />
+          <Input label="موبایل *"    value={agentForm.mobile}   onChange={(e) => setAgentForm({ ...agentForm, mobile: e.target.value })}   inputMode="numeric" maxLength={11} />
+          <Input label="رمز عبور *"  type="password" value={agentForm.password} onChange={(e) => setAgentForm({ ...agentForm, password: e.target.value })} />
           <p className="text-xs text-gray-400">نماینده با این موبایل و رمز می‌تواند وارد سیستم شود.</p>
         </div>
         <div className="mt-5 flex justify-end gap-3">

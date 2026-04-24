@@ -136,7 +136,7 @@ export default function AdminPendingUsers() {
       )}
 
       <Modal
-        isOpen={!!confirmUser}
+        open={!!confirmUser}
         onClose={() => { setConfirmUser(null); setConfirmAction(null) }}
         title={confirmAction === 'activate' ? 'تأیید فعال‌سازی' : 'رد درخواست'}
       >

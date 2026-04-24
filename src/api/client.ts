@@ -8,12 +8,14 @@ const client = axios.create({
   timeout: 30000,
 })
 
-// Attach JWT token to every request
+// Attach JWT token + disable browser caching for all API calls
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  config.headers['Cache-Control'] = 'no-cache'
+  config.headers['Pragma'] = 'no-cache'
   return config
 })
 

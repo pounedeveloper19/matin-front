@@ -30,7 +30,7 @@ export default function Login() {
         navigate(role === 'admin' ? '/admin/dashboard' : '/customer/dashboard', { replace: true })
         toast.success(`خوش آمدید، ${res.result.fullName}`)
       } else {
-        toast.error(res.caption ?? 'خطا در ورود به سیستم')
+        toast.error(res.message ?? res.caption ?? 'خطا در ورود به سیستم')
       }
     } catch {
       toast.error('اطلاعات وارد شده صحیح نمی‌باشد')
@@ -53,7 +53,7 @@ export default function Login() {
             <Bolt className="h-8 w-8 text-white" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">متین پاور</h1>
+            <h1 className="text-2xl font-bold text-white">برق متین</h1>
             <p className="mt-1 text-sm text-gray-400">سامانه مدیریت برق آزاد</p>
           </div>
         </div>

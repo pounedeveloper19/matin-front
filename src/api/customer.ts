@@ -6,7 +6,7 @@ import type {
   AddAddress,
   CustomerAgent,
   ContractResult,
-  ContractConfirm,
+  SubmitWarrantyRequest,
   BillAnalysisResult,
   ManualBillRequest,
   TicketSummary,
@@ -16,6 +16,9 @@ import type {
   AddSubscriptionRequest,
   PublicRegisterReal,
   PublicRegisterLegal,
+  AnnouncementItem,
+  CreateTicketRequest,
+  AddTicketMessageRequest,
 } from '../types'
 
 export const customerApi = {
@@ -68,10 +71,8 @@ export const customerApi = {
   getContracts: () =>
     client.post<ExecutionResult<ContractResult[]>>('/Contract/GetContractList').then((r) => r.data),
 
-  confirmContract: (contractId: number, statusId: number) =>
-    client
-      .put<ExecutionResult>(`/Contract/ConfirmContract/${contractId}`, { contractId, statusId } as ContractConfirm)
-      .then((r) => r.data),
+  submitWarranty: (data: SubmitWarrantyRequest) =>
+    client.post<ExecutionResult>('/Contract/SubmitWarranty', data).then((r) => r.data),
 
   // Bill Analysis
   manualBillAnalysis: (data: ManualBillRequest) =>
@@ -80,10 +81,30 @@ export const customerApi = {
   getBillHistory: (subscriptionId: number) =>
     client.get<ExecutionResult>(`/BillCalculation/GetBillHistory/${subscriptionId}`).then((r) => r.data),
 
+  // Address delete
+  deleteAddress: (id: number) =>
+    client.delete<ExecutionResult>(`/CustomerProfile/DeleteAddress/${id}`).then((r) => r.data),
+
   // Tickets
   getTickets: () =>
     client.get<ExecutionResult<TicketSummary[]>>('/CustomerProfile/GetTicket').then((r) => r.data),
 
   getTicketMessages: (ticketId: number) =>
     client.get<ExecutionResult<TicketMessage[]>>(`/CustomerProfile/GetTicketById/${ticketId}`).then((r) => r.data),
+
+  createTicket: (data: CreateTicketRequest) =>
+    client.post<ExecutionResult>('/CustomerProfile/CreateTicket', data).then((r) => r.data),
+
+  addTicketMessage: (data: AddTicketMessageRequest) =>
+    client.post<ExecutionResult>('/CustomerProfile/AddTicketMessage', data).then((r) => r.data),
+
+  // Announcements
+  getAnnouncements: () =>
+    client.get<ExecutionResult<AnnouncementItem[]>>('/Lookup/GetActiveAnnouncements').then((r) => r.data),
+
+  getProfileMeta: () =>
+    client.get<ExecutionResult<{ identityDocFileId: string | null }>>('/CustomerProfile/GetProfileMeta').then((r) => r.data),
+
+  updateIdentityDoc: (fileId: string | null) =>
+    client.post<ExecutionResult>('/CustomerProfile/UpdateIdentityDoc', { fileId }).then((r) => r.data),
 }

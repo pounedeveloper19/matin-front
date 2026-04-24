@@ -9,6 +9,7 @@ import { Card } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import type { BillAnalysisResult, BillBand, SubscriptionResult } from '../../types'
+import { toArr } from '../../utils'
 
 const MONTHS = [
   '', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
@@ -98,9 +99,10 @@ export default function CustomerBills() {
 
   useEffect(() => {
     customerApi.getSubscriptions().then((r) => {
-      if (r.code === 200 && Array.isArray(r.result)) {
-        setSubscriptions(r.result)
-        if (r.result.length === 1) setSelectedSubId(r.result[0].id)
+      if (r.code === 200) {
+        const arr = toArr(r.result)
+        setSubscriptions(arr)
+        if (arr.length === 1) setSelectedSubId(arr[0].id)
       }
     })
   }, [])
@@ -111,7 +113,7 @@ export default function CustomerBills() {
     setHistLoading(true)
     customerApi.getBillHistory(selectedSubId as number)
       .then((r) => {
-        if (r.code === 200 && Array.isArray(r.result)) setHistory(r.result)
+        if (r.code === 200) setHistory(toArr(r.result))
         else setHistory([])
       })
       .finally(() => setHistLoading(false))
@@ -145,7 +147,7 @@ export default function CustomerBills() {
         const h = await customerApi.getBillHistory(selectedSubId as number)
         if (h.code === 200 && Array.isArray(h.result)) setHistory(h.result)
       } else {
-        toast.error(res.caption ?? res.message ?? 'خطا در تحلیل')
+        toast.error(res.message ?? res.caption ?? 'خطا در تحلیل')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setLoading(false) }
@@ -391,7 +393,7 @@ export default function CustomerBills() {
                   <div className="flex items-center gap-3">
                     <TrendingDown className="h-6 w-6 shrink-0" />
                     <div>
-                      <p className="font-bold text-lg">با متین پاور {rial(result.savingRial)} صرفه‌جویی می‌کنید!</p>
+                      <p className="font-bold text-lg">با برق متین {rial(result.savingRial)} صرفه‌جویی می‌کنید!</p>
                       <p className="mt-0.5 text-emerald-100 text-sm">
                         معادل {result.savingPercent.toLocaleString('fa-IR')}٪ کاهش هزینه نسبت به نرخ پشتیبان دولتی
                       </p>
@@ -429,7 +431,7 @@ export default function CustomerBills() {
               onClick={() => {
                 setHistLoading(true)
                 customerApi.getBillHistory(selectedSubId as number)
-                  .then((r) => { if (r.code === 200 && Array.isArray(r.result)) setHistory(r.result) })
+                  .then((r) => { if (r.code === 200) setHistory(toArr(r.result)) })
                   .finally(() => setHistLoading(false))
               }}
               className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"

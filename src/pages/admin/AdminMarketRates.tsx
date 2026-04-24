@@ -60,7 +60,7 @@ export default function AdminMarketRates() {
       if (res.code === 200) {
         toast.success(modal === 'create' ? 'نرخ ثبت شد' : 'نرخ ویرایش شد')
         setModal(null); fetch(page)
-      } else { toast.error(res.caption ?? 'خطا') }
+      } else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -70,7 +70,7 @@ export default function AdminMarketRates() {
     try {
       const res = await adminApi.deleteMarketRate(form.id)
       if (res.code === 200) { toast.success('نرخ حذف شد'); setModal(null); fetch(page) }
-      else { toast.error(res.caption ?? 'خطا') }
+      else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }

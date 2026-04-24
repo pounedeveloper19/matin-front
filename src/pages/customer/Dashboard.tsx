@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Zap, MessageSquare, User, ArrowLeft } from 'lucide-react'
+import { FileText, Zap, MessageSquare, User, ArrowLeft, Megaphone } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { customerApi } from '../../api/customer'
 import { StatCard } from '../../components/ui/Card'
-import type { ContractResult, TicketSummary } from '../../types'
+import type { ContractResult, TicketSummary, AnnouncementItem } from '../../types'
+import { toArr } from '../../utils'
 
 export default function CustomerDashboard() {
   const { user } = useAuth()
-  const [contracts, setContracts] = useState<ContractResult[]>([])
-  const [tickets, setTickets] = useState<TicketSummary[]>([])
+  const [contracts, setContracts]         = useState<ContractResult[]>([])
+  const [tickets, setTickets]             = useState<TicketSummary[]>([])
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
 
   useEffect(() => {
-    customerApi.getContracts().then((r) => { if (r.code === 200 && r.result) setContracts(r.result) })
-    customerApi.getTickets().then((r) => { if (r.code === 200 && r.result) setTickets(r.result) })
+    customerApi.getContracts().then((r) => { if (r.code === 200) setContracts(toArr(r.result)) })
+    customerApi.getTickets().then((r) => { if (r.code === 200) setTickets(toArr(r.result) as TicketSummary[]) })
+    customerApi.getAnnouncements().then((r) => { if (r.code === 200) setAnnouncements(toArr(r.result) as AnnouncementItem[]) })
   }, [])
 
   const activeContracts = contracts.filter((c) => c.status.includes('فعال')).length
@@ -32,7 +35,7 @@ export default function CustomerDashboard() {
       <div className="rounded-xl bg-gradient-to-l from-primary-600 to-primary-800 p-6 text-white">
         <p className="text-primary-200">خوش آمدید،</p>
         <h2 className="mt-1 text-2xl font-bold">{user?.fullName}</h2>
-        <p className="mt-2 text-sm text-primary-200">از سامانه مدیریت برق متین پاور استفاده می‌کنید</p>
+        <p className="mt-2 text-sm text-primary-200">از سامانه مدیریت برق برق متین استفاده می‌کنید</p>
       </div>
 
       {/* Stats */}
@@ -66,6 +69,24 @@ export default function CustomerDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <Megaphone className="h-4 w-4 text-amber-500" />
+            <h3 className="text-sm font-semibold text-gray-500">اعلانات</h3>
+          </div>
+          <div className="space-y-2">
+            {announcements.map((a) => (
+              <div key={a.id} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-semibold text-amber-800">{a.title}</p>
+                <p className="mt-1 text-xs text-amber-700 leading-relaxed">{a.contents}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Last contracts */}
       {contracts.length > 0 && (

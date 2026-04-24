@@ -37,7 +37,7 @@ export default function CustomerRegister() {
       if (res.code === 200) {
         setDone(true)
       } else {
-        toast.error(res.caption ?? res.message ?? 'خطا در ثبت اطلاعات')
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت اطلاعات')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
@@ -55,7 +55,7 @@ export default function CustomerRegister() {
       if (res.code === 200) {
         setDone(true)
       } else {
-        toast.error(res.caption ?? res.message ?? 'خطا در ثبت اطلاعات')
+        toast.error(res.message ?? res.caption ?? 'خطا در ثبت اطلاعات')
       }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }

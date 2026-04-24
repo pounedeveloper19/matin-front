@@ -33,7 +33,7 @@ export default function AdminDashboard() {
       {/* Banner */}
       <div className="rounded-xl bg-gradient-to-l from-gray-800 to-gray-900 p-6 text-white">
         <p className="text-gray-400 text-sm">پنل مدیریت</p>
-        <h2 className="mt-1 text-2xl font-bold">متین پاور</h2>
+        <h2 className="mt-1 text-2xl font-bold">برق متین</h2>
         <p className="mt-2 text-sm text-gray-400">مدیریت مشتریان، قراردادها و اشتراک‌های برق</p>
       </div>
 

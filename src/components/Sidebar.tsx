@@ -11,10 +11,10 @@ import {
   Bolt,
   BarChart2,
   Tag,
-  Layers,
   Clock,
   Receipt,
   UserCheck,
+  Megaphone,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import clsx from 'clsx'
@@ -34,9 +34,10 @@ const adminNav = [
   { to: '/admin/contracts',       label: 'قراردادها',       icon: FileText },
   { to: '/admin/market-rates',    label: 'نرخ‌های بازار',   icon: BarChart2 },
   { to: '/admin/tariffs',         label: 'تعرفه‌ها',         icon: Tag },
-  { to: '/admin/tariff-slabs',    label: 'پله‌های تعرفه',   icon: Layers },
   { to: '/admin/tou-schedule',    label: 'برنامه TOU',       icon: Clock },
-  { to: '/admin/bill-reports',    label: 'گزارش قبض‌ها',    icon: Receipt },
+  { to: '/admin/bill-reports',    label: 'گزارش قبض‌ها',        icon: Receipt },
+  { to: '/admin/tickets',         label: 'تیکت‌های پشتیبانی',  icon: MessageSquare },
+  { to: '/admin/announcements',   label: 'اعلانات',             icon: Megaphone },
   { to: '/admin/pending-users',   label: 'درخواست‌های ثبت‌نام', icon: UserCheck },
 ]
 
@@ -56,7 +57,7 @@ export default function Sidebar({ role }: SidebarProps) {
           <Bolt className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="text-sm font-bold leading-none">متین پاور</p>
+          <p className="text-sm font-bold leading-none">برق متین</p>
           <p className="mt-1 text-xs text-gray-400">سامانه مدیریت برق</p>
         </div>
       </div>
