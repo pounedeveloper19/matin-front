@@ -151,6 +151,7 @@ export interface AdminContract {
   fileId?: string | null
   typeId?: number
   customerNationalId?: string
+  customerName?: string
   status?: string
   warrantyFileId?: string | null
 }
@@ -338,6 +339,17 @@ export interface MonthlyMarketRate {
   fuelFee: number
   industrialTariffBase: number
   executiveTariffBase: number
+}
+
+// PowerEntity
+export interface AdminPowerEntity {
+  id: number
+  name: string
+  provinceId: number
+  province?: string
+  entityTypeId: number
+  entityType?: string
+  isActive: boolean
 }
 
 // Tariff

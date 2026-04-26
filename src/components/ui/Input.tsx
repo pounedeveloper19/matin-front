@@ -18,7 +18,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-gray-700">
+          <label htmlFor={inputId} className="mb-1.5 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
             {label}
           </label>
         )}
@@ -32,19 +32,21 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={clsx(
-              'block w-full rounded-lg border bg-white py-2.5 text-sm shadow-sm transition-colors placeholder:text-gray-400',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500',
+              'block w-full rounded-xl border bg-white/80 py-2.5 text-sm transition-all',
+              'placeholder:text-gray-400',
+              'focus:outline-none focus:ring-2 focus:bg-white',
               prefix ? 'pr-10 pl-4' : 'px-4',
               error
-                ? 'border-red-400 focus:ring-red-400'
-                : 'border-gray-300 focus:border-primary-500',
+                ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                : 'border-gray-200 focus:border-primary-400 focus:ring-primary-100',
+              'disabled:cursor-not-allowed disabled:opacity-60',
               className
             )}
             {...props}
           />
         </div>
-        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-        {hint && !error && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+        {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+        {hint && !error && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
       </div>
     )
   }
@@ -68,7 +70,7 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-gray-700">
+        <label htmlFor={inputId} className="mb-1.5 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
           {label}
         </label>
       )}
@@ -78,9 +80,9 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
         disabled={disabled || loading}
         onChange={(e) => onChange?.(e.target.value)}
         className={clsx(
-          'block w-full rounded-lg border bg-white px-4 py-2.5 text-sm shadow-sm transition-colors',
-          'focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500',
-          error ? 'border-red-400 focus:ring-red-400' : 'border-gray-300',
+          'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
+          'focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:bg-white',
+          error ? 'border-red-300 focus:ring-red-100' : 'border-gray-200',
           (disabled || loading) && 'cursor-not-allowed opacity-60',
           className
         )}
@@ -93,8 +95,8 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-      {hint && !error && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+      {hint && !error && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   )
 }
@@ -106,8 +108,6 @@ interface DatePickerProps {
   value?: string | null
   onChange?: (value: string) => void
   disabled?: boolean
-  min?: string
-  max?: string
 }
 
 export function DatePicker({ label, error, hint, value, onChange, disabled }: DatePickerProps) {
@@ -116,7 +116,7 @@ export function DatePicker({ label, error, hint, value, onChange, disabled }: Da
   return (
     <div className="w-full">
       {label && (
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">{label}</label>
+        <label className="mb-1.5 block text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</label>
       )}
       <DatePickerLib
         calendar={persian}
@@ -130,14 +130,14 @@ export function DatePicker({ label, error, hint, value, onChange, disabled }: Da
         disabled={disabled}
         containerStyle={{ width: '100%' }}
         inputClass={clsx(
-          'block w-full rounded-lg border bg-white px-4 py-2.5 text-sm shadow-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500',
-          error ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-primary-500',
+          'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
+          'focus:outline-none focus:ring-2 focus:ring-primary-100',
+          error ? 'border-red-300' : 'border-gray-200 focus:border-primary-400',
           disabled && 'cursor-not-allowed opacity-60'
         )}
       />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-      {hint && !error && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+      {hint && !error && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   )
 }

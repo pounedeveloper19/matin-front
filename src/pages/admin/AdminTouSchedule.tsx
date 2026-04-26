@@ -3,6 +3,7 @@ import { Save, Clock, Copy } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import Button from '../../components/ui/Button'
+import { DonutChart, AreaWave } from '../../components/ui/Charts'
 import type { HourEntry } from '../../types'
 import { toArr } from '../../utils'
 
@@ -108,8 +109,8 @@ export default function AdminTouSchedule() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4 text-gray-400" />
-        <span className="text-sm font-medium text-gray-600">برنامه‌ریزی TOU ساعتی</span>
+        <Clock className="h-4 w-4 text-blue-500" />
+        <p className="text-sm font-semibold text-gray-700">برنامه‌ریزی TOU ساعتی</p>
       </div>
 
       {/* Filters */}
@@ -119,7 +120,7 @@ export default function AdminTouSchedule() {
           <select
             value={entityId}
             onChange={(e) => setEntityId(+e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
           >
             {entities.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
@@ -129,7 +130,7 @@ export default function AdminTouSchedule() {
           <select
             value={month}
             onChange={(e) => setMonth(+e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
           >
             {JALALI_MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>
@@ -237,8 +238,8 @@ export default function AdminTouSchedule() {
       </div>
 
       {/* Summary */}
-      <div className="rounded-lg border border-gray-200 p-4">
-        <p className="mb-2 text-xs font-medium text-gray-600">خلاصه ساعات:</p>
+      <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid rgba(209,250,229,0.6)' }}>
+        <p className="mb-2 text-xs font-semibold text-gray-600">خلاصه ساعات:</p>
         <div className="flex flex-wrap gap-4">
           {touTypes.map((t) => {
             const s = getTouStyle(t.title)
@@ -256,6 +257,59 @@ export default function AdminTouSchedule() {
           </div>
         </div>
       </div>
+
+      {/* Charts row */}
+      {Object.keys(schedule).length > 0 && (() => {
+        const peakId  = touTypes.find(t => t.title.includes('اوج') || t.title.includes('پیک'))?.id
+        const midId   = touTypes.find(t => t.title.includes('میان') || t.title.includes('میانی'))?.id
+        const lowId   = touTypes.find(t => t.title.includes('کم') || t.title.includes('کمبار'))?.id
+        const peakH   = peakId  ? Object.values(schedule).filter(v => v === peakId).length  : 0
+        const midH    = midId   ? Object.values(schedule).filter(v => v === midId).length   : 0
+        const lowH    = lowId   ? Object.values(schedule).filter(v => v === lowId).length   : 0
+        const totalSet = peakH + midH + lowH
+        const offPeakPct = totalSet ? Math.round(((midH + lowH) / 24) * 100) : 0
+
+        // Generate 24-point load profile from schedule (simulated bell curve per TOU zone)
+        const loadProfile = Array.from({ length: 24 }, (_, h) => {
+          const tou = schedule[h]
+          if (tou === peakId)  return 60 + Math.sin((h - 12) * 0.3) * 20 + Math.random() * 5
+          if (tou === midId)   return 35 + Math.sin((h - 6) * 0.4) * 10  + Math.random() * 4
+          if (tou === lowId)   return 15 + Math.random() * 5
+          return 25 + Math.random() * 8
+        })
+
+        const hourLabels = Array.from({ length: 24 }, (_, i) => i % 3 === 0 ? String(i).padStart(2, '0') : '')
+
+        return (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Donut: off-peak savings */}
+            <div className="flex flex-col items-center gap-3 rounded-2xl p-5"
+              style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid rgba(209,250,229,0.6)' }}>
+              <p className="text-xs font-semibold text-gray-600 self-start">صرفه‌جویی اوج‌بار</p>
+              <DonutChart value={offPeakPct} color="#10b981" size={110} label="ساعات غیر اوج" />
+              <p className="text-[11px] text-gray-400 text-center">
+                {midH + lowH} ساعت از ۲۴ ساعت در زمان غیر اوج
+              </p>
+            </div>
+
+            {/* Area wave: load distribution */}
+            <div className="col-span-2 rounded-2xl p-5"
+              style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid rgba(209,250,229,0.6)' }}>
+              <p className="mb-3 text-xs font-semibold text-gray-600">توزیع بار شبانه‌روزی (شبیه‌سازی)</p>
+              <AreaWave
+                data={loadProfile}
+                color="#10b981"
+                height={110}
+                labels={hourLabels}
+              />
+              <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
+                <span>ابتدای شبانه‌روز</span>
+                <span>انتهای شبانه‌روز</span>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

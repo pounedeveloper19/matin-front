@@ -5,6 +5,7 @@ import type {
   AdminRealCustomer,
   AdminAddress,
   AdminContract,
+  AdminPowerEntity,
   PaginationResult,
   MonthlyMarketRate,
   Tariff,
@@ -285,6 +286,26 @@ export const adminApi = {
   // TOU copy
   copyTouFromMonth: (powerEntityId: number, sourceMonth: number, targetMonth: number) =>
     client.post<ExecutionResult>('/TouSchedule/CopyFromMonth', { powerEntityId, sourceMonth, targetMonth }).then((r) => r.data),
+
+  // Power Entities
+  getPowerEntitiesAdmin: (params: PageParams = {}) =>
+    client
+      .get<ExecutionResult<PaginationResult<AdminPowerEntity>>>('/PowerEntity/List', {
+        params: buildParams({ pageNumber: 1, pageSize: 10, ...params }),
+      })
+      .then((r) => r.data),
+
+  getPowerEntityDetail: (id: number) =>
+    client.get<ExecutionResult<AdminPowerEntity>>(`/PowerEntity/Detail/${id}`).then((r) => r.data),
+
+  createPowerEntity: (data: AdminPowerEntity) =>
+    client.post<ExecutionResult>('/PowerEntity/Insert', data).then((r) => r.data),
+
+  updatePowerEntity: (data: AdminPowerEntity) =>
+    client.put<ExecutionResult>('/PowerEntity/Update', data).then((r) => r.data),
+
+  deletePowerEntity: (id: number) =>
+    client.delete<ExecutionResult>(`/PowerEntity/Delete/${id}`).then((r) => r.data),
 
   // Pending registrations
   getPendingUsers: () =>

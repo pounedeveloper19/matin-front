@@ -23,12 +23,29 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={clsx('relative w-full rounded-2xl bg-white shadow-xl', sizes[size])}>
+      <div
+        className="absolute inset-0"
+        style={{ background: 'rgba(3, 40, 24, 0.45)', backdropFilter: 'blur(6px)' }}
+        onClick={onClose}
+      />
+      <div className={clsx('relative w-full rounded-2xl overflow-hidden shadow-2xl', sizes[size])}
+        style={{
+          background: 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(209,250,229,0.6)',
+          boxShadow: '0 24px 64px rgba(6,78,59,0.15), 0 4px 16px rgba(6,78,59,0.08)',
+        }}
+      >
         {title && (
-          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+          <div
+            className="flex items-center justify-between px-6 py-4"
+            style={{ borderBottom: '1px solid rgba(209,250,229,0.8)', background: 'rgba(236,253,245,0.5)' }}
+          >
+            <h2 className="text-base font-bold text-primary-900">{title}</h2>
+            <button
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-emerald-100 hover:text-primary-700"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>

@@ -52,6 +52,19 @@ export const uploadApi = {
   /** Download URL (open in browser or anchor tag) */
   downloadUrl: (fileId: string): string => `/api/File/Download/${fileId}`,
 
+  /** Download a file with auth — triggers browser save-as dialog */
+  download: async (fileId: string, filename?: string): Promise<void> => {
+    const response = await client.get<Blob>(`/File/Download/${fileId}`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(response.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename ?? fileId
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
   /** Soft-delete a file */
   delete: (fileId: string): Promise<ExecutionResult> =>
     client.delete<ExecutionResult>(`/File/Delete/${fileId}`).then((r) => r.data),

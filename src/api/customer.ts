@@ -67,6 +67,9 @@ export const customerApi = {
   registerAgent: (data: CustomerAgent) =>
     client.post<ExecutionResult>('/CustomerProfile/RegisterCustomerAgent', data).then((r) => r.data),
 
+  updateAgent: (data: CustomerAgent) =>
+    client.put<ExecutionResult>('/CustomerProfile/UpdateCustomerAgent', data).then((r) => r.data),
+
   // Contracts
   getContracts: () =>
     client.post<ExecutionResult<ContractResult[]>>('/Contract/GetContractList').then((r) => r.data),

@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, BarChart2 } from 'lucide-react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Plus, Pencil, Trash2, BarChart2, TrendingUp, Activity, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { Table, Pagination } from '../../components/ui/Table'
+import { StatCard } from '../../components/ui/Card'
+import { SvgLineChart } from '../../components/ui/Charts'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
@@ -75,6 +77,22 @@ export default function AdminMarketRates() {
     finally { setSaving(false) }
   }
 
+  const stats = useMemo(() => {
+    if (!data.length) return null
+    const avg = (key: keyof MonthlyMarketRate) =>
+      Math.round(data.reduce((s, d) => s + ((d[key] as number) || 0), 0) / data.length)
+    const latest = data[0]
+    const maxRate = Math.max(latest?.marketPeak || 0, latest?.marketMid || 0, latest?.marketLow || 0) || 1
+    const sorted  = [...data].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
+    const chartLabels = sorted.map(d => (JALALI_MONTHS[d.month] ?? String(d.month)).slice(0, 3))
+    const chartSeries = [
+      { name: 'اوج', color: '#ef4444', data: sorted.map(d => d.marketPeak) },
+      { name: 'میان', color: '#f59e0b', data: sorted.map(d => d.marketMid)  },
+      { name: 'کم',   color: '#10b981', data: sorted.map(d => d.marketLow)  },
+    ]
+    return { avgPeak: avg('marketPeak'), avgMid: avg('marketMid'), avgLow: avg('marketLow'), avgBackup: avg('backupRate'), latest, maxRate, chartLabels, chartSeries }
+  }, [data])
+
   const f = (key: keyof MonthlyMarketRate) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: +e.target.value })
 
@@ -98,10 +116,78 @@ export default function AdminMarketRates() {
 
   return (
     <div className="space-y-5">
+
+      {/* Stat cards */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard title="میانگین اوج بار"  value={stats.avgPeak.toLocaleString('fa-IR')}  icon={<TrendingUp className="h-5 w-5" />} color="red"   subtitle="ریال/kWh" />
+          <StatCard title="میانگین میان بار" value={stats.avgMid.toLocaleString('fa-IR')}   icon={<Activity className="h-5 w-5" />}   color="amber" subtitle="ریال/kWh" />
+          <StatCard title="میانگین کم بار"   value={stats.avgLow.toLocaleString('fa-IR')}   icon={<Zap className="h-5 w-5" />}         color="green" subtitle="ریال/kWh" />
+          <StatCard title="میانگین پشتیبان"  value={stats.avgBackup.toLocaleString('fa-IR')} icon={<BarChart2 className="h-5 w-5" />}  color="blue"  subtitle="ریال/kWh" />
+        </div>
+      )}
+
+      {/* Latest month rate bars */}
+      {stats?.latest && (
+        <div className="overflow-hidden rounded-2xl p-5 space-y-4"
+          style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(209,250,229,0.6)', boxShadow: '0 4px 20px rgba(6,78,59,0.06)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart2 className="h-4 w-4 text-rose-500" />
+            <p className="text-sm font-semibold text-gray-700">نرخ‌های آخرین ماه ثبت‌شده</p>
+            <span className="text-xs text-gray-400">{JALALI_MONTHS[stats.latest.month]} {stats.latest.year}</span>
+          </div>
+          {[
+            { label: 'اوج بار',  value: stats.latest.marketPeak, color: '#ef4444' },
+            { label: 'میان بار', value: stats.latest.marketMid,  color: '#f59e0b' },
+            { label: 'کم بار',   value: stats.latest.marketLow,  color: '#10b981' },
+            { label: 'پشتیبان',  value: stats.latest.backupRate, color: '#6366f1' },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="w-20 text-right text-xs text-gray-500 shrink-0">{label}</span>
+              <div className="flex-1 overflow-hidden rounded-full bg-gray-100 h-3">
+                <div
+                  className="h-3 rounded-full transition-all"
+                  style={{
+                    width: `${Math.round(((Number(value) || 0) / stats.maxRate) * 100)}%`,
+                    background: color,
+                  }}
+                />
+              </div>
+              <span className="w-28 text-xs font-bold text-gray-700 shrink-0">{(Number(value) || 0).toLocaleString('fa-IR')}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Line chart */}
+      {stats && stats.chartSeries[0].data.length > 1 && (
+        <div className="overflow-hidden rounded-2xl p-5"
+          style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(209,250,229,0.6)', boxShadow: '0 4px 20px rgba(6,78,59,0.06)' }}>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-rose-500" />
+              <p className="text-sm font-semibold text-gray-700">نوسانات نرخ ماهانه</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {[{ label: 'اوج بار', color: '#ef4444' }, { label: 'میان بار', color: '#f59e0b' }, { label: 'کم بار', color: '#10b981' }].map(s => (
+                <span key={s.label} className="flex items-center gap-1 text-[11px] text-gray-500">
+                  <span className="inline-block h-2 w-4 rounded-full" style={{ background: s.color }} />
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <SvgLineChart series={stats.chartSeries} labels={stats.chartLabels} height={170} />
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart2 className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">نرخ‌های بازار ماهانه ({total} رکورد)</span>
+          <BarChart2 className="h-4 w-4 text-rose-500" />
+          <p className="text-sm font-semibold text-gray-700">نرخ‌های بازار ماهانه</p>
+          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700">
+            {total.toLocaleString('fa-IR')} رکورد
+          </span>
         </div>
         <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> نرخ جدید</Button>
       </div>
@@ -131,7 +217,7 @@ export default function AdminMarketRates() {
           <Input label="تعرفه پایه صنعتی" type="number" value={form.industrialTariffBase} onChange={f('industrialTariffBase')} />
           <Input label="تعرفه پایه اجرایی" type="number" value={form.executiveTariffBase} onChange={f('executiveTariffBase')} />
         </div>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button loading={saving} onClick={handleSave}>{modal === 'create' ? 'ثبت نرخ' : 'ذخیره تغییرات'}</Button>
         </div>
@@ -141,7 +227,7 @@ export default function AdminMarketRates() {
         <p className="text-sm text-gray-600">
           آیا از حذف نرخ <span className="font-bold text-gray-900">{JALALI_MONTHS[form.month]} {form.year}</span> اطمینان دارید؟
         </p>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button variant="danger" loading={saving} onClick={handleDelete}><Trash2 className="h-4 w-4" /> حذف</Button>
         </div>

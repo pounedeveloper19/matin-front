@@ -18,6 +18,7 @@ import AdminBillReports from './pages/admin/AdminBillReports'
 import AdminPendingUsers from './pages/admin/AdminPendingUsers'
 import AdminTickets from './pages/admin/AdminTickets'
 import AdminAnnouncements from './pages/admin/AdminAnnouncements'
+import AdminPowerEntities from './pages/admin/AdminPowerEntities'
 import Register from './pages/Register'
 
 function ProtectedRoute({ children, role }: { children: JSX.Element; role?: 'admin' | 'customer' }) {
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="tickets"         element={<AdminTickets />} />
         <Route path="announcements"   element={<AdminAnnouncements />} />
         <Route path="pending-users"   element={<AdminPendingUsers />} />
+        <Route path="power-entities"  element={<AdminPowerEntities />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

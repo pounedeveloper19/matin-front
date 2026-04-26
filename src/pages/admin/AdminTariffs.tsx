@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Pencil, Trash2, Tag, Layers, X } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { Plus, Pencil, Trash2, Tag, Layers, X, Zap, CheckCircle, Filter } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi } from '../../api/lookup'
@@ -23,6 +23,7 @@ export default function AdminTariffs() {
   const [tariffModal, setTariffModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [tariffForm, setTariffForm]   = useState<Tariff>(emptyTariff)
   const [tariffSaving, setTariffSaving] = useState(false)
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null)
 
   // ── Lookups ──────────────────────────────────────────────────────────
   const [tariffTypes, setTariffTypes]     = useState<IdTitle[]>([])
@@ -45,6 +46,19 @@ export default function AdminTariffs() {
   const [slabSaving, setSlabSaving] = useState(false)
 
   const pageSize = 10
+
+  const tariffTypeCounts = useMemo(() =>
+    tariffTypes.reduce((acc, t) => ({
+      ...acc,
+      [t.id]: tariffs.filter(x => x.tariffTypeId === t.id).length,
+    }), {} as Record<number, number>)
+  , [tariffTypes, tariffs])
+
+  const typeCardColors = [
+    { border: '#10b981', bg: 'rgba(236,253,245,0.8)', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-600' },
+    { border: '#6366f1', bg: 'rgba(238,242,255,0.8)', badge: 'bg-indigo-100 text-indigo-700',   icon: 'text-indigo-600' },
+    { border: '#064e3b', bg: 'rgba(6,78,59,0.88)',    badge: 'bg-white/20 text-white',           icon: 'text-emerald-300' },
+  ]
 
   // ── Fetchers ─────────────────────────────────────────────────────────
   const fetchTariffs = useCallback((p: number) => {
@@ -224,30 +238,96 @@ export default function AdminTariffs() {
   ]
 
   // ── Render ────────────────────────────────────────────────────────────
+  const filteredTariffs = selectedTypeId
+    ? tariffs.filter(t => t.tariffTypeId === selectedTypeId)
+    : tariffs
+
   return (
     <div className="space-y-5">
+
+      {/* Type cards */}
+      {tariffTypes.length > 0 && (
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${tariffTypes.length}, 1fr)` }}>
+          {tariffTypes.map((type, idx) => {
+            const colors = typeCardColors[idx % typeCardColors.length]
+            const count  = tariffTypeCounts[type.id] ?? 0
+            const active = selectedTypeId === type.id
+            const isDark = idx === 2
+            return (
+              <button
+                key={type.id}
+                onClick={() => setSelectedTypeId(active ? null : type.id)}
+                className="group text-right overflow-hidden rounded-2xl p-5 transition-all hover:shadow-lg"
+                style={{
+                  background: isDark
+                    ? 'linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%)'
+                    : colors.bg,
+                  border: `2px solid ${active ? colors.border : 'transparent'}`,
+                  boxShadow: active ? `0 0 0 2px ${colors.border}33` : '0 2px 10px rgba(0,0,0,0.05)',
+                  backdropFilter: 'blur(12px)',
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isDark ? 'bg-white/10' : 'bg-white/60'}`}>
+                    <Zap className={`h-5 w-5 ${isDark ? 'text-emerald-300' : colors.icon}`} />
+                  </div>
+                  {active && (
+                    <CheckCircle className={`h-5 w-5 ${isDark ? 'text-emerald-300' : colors.icon}`} />
+                  )}
+                </div>
+                <div className="mt-4">
+                  <p className={`text-base font-bold leading-snug ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                    {type.title}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${isDark ? 'bg-white/20 text-white' : colors.badge}`}>
+                      {count} تعرفه
+                    </span>
+                    <span className={`text-xs ${isDark ? 'text-emerald-200' : 'text-gray-400'}`}>
+                      {active ? 'فیلتر فعال' : 'برای فیلتر کلیک کنید'}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Tariffs section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">تعرفه‌ها ({tariffTotal} رکورد)</span>
+          <Tag className="h-4 w-4 text-indigo-500" />
+          <p className="text-sm font-semibold text-gray-700">تعرفه‌ها</p>
+          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+            {(selectedTypeId ? filteredTariffs.length : tariffTotal).toLocaleString('fa-IR')} رکورد
+          </span>
+          {selectedTypeId && (
+            <button
+              onClick={() => setSelectedTypeId(null)}
+              className="flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-600 hover:bg-indigo-100 transition-colors"
+            >
+              <Filter className="h-3 w-3" /> حذف فیلتر
+            </button>
+          )}
         </div>
         <Button size="sm" onClick={openCreateTariff}><Plus className="h-4 w-4" /> تعرفه جدید</Button>
       </div>
 
-      <Table columns={tariffColumns} data={tariffs} loading={tariffLoading} keyField="tariffId" emptyText="تعرفه‌ای ثبت نشده" />
-      <Pagination page={tariffPage} totalPages={tariffPages} total={tariffTotal} pageSize={pageSize} onPageChange={setTariffPage} />
+      <Table columns={tariffColumns} data={filteredTariffs} loading={tariffLoading} keyField="tariffId" emptyText="تعرفه‌ای ثبت نشده" />
+      {!selectedTypeId && <Pagination page={tariffPage} totalPages={tariffPages} total={tariffTotal} pageSize={pageSize} onPageChange={setTariffPage} />}
 
       {/* Slabs panel */}
       {selectedTariff && (
-        <div ref={slabsRef} className="rounded-xl border-2 border-purple-200 bg-purple-50/20 p-5 space-y-4">
+        <div ref={slabsRef} className="overflow-hidden rounded-2xl p-5 space-y-4"
+          style={{ background: 'rgba(245,243,255,0.7)', border: '2px solid rgba(167,139,250,0.3)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-semibold text-gray-700">
                 پله‌های تعرفه #{selectedTariff.tariffId}
               </span>
-              <span className="text-xs text-gray-400">({slabTotal} رکورد)</span>
+              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700">{slabTotal} رکورد</span>
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={openCreateSlab}><Plus className="h-4 w-4" /> تعرفه پلکانی جدید</Button>
@@ -280,7 +360,7 @@ export default function AdminTariffs() {
           <DatePicker label="تاریخ اجرا" value={tariffForm.effectiveFrom}
             onChange={(v) => setTariffForm({ ...tariffForm, effectiveFrom: v })} />
         </div>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setTariffModal(null)}>انصراف</Button>
           <Button loading={tariffSaving} onClick={handleSaveTariff}>
             {tariffModal === 'create' ? 'ثبت تعرفه' : 'ذخیره تغییرات'}
@@ -292,7 +372,7 @@ export default function AdminTariffs() {
         <p className="text-sm text-gray-600">
           آیا از حذف تعرفه <span className="font-bold text-gray-900">#{tariffForm.tariffId}</span> اطمینان دارید؟
         </p>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setTariffModal(null)}>انصراف</Button>
           <Button variant="danger" loading={tariffSaving} onClick={handleDeleteTariff}>
             <Trash2 className="h-4 w-4" /> حذف
@@ -311,7 +391,7 @@ export default function AdminTariffs() {
           <Input label="ضریب" type="number" step="0.01" value={slabForm.multiplier}
             onChange={(e) => setSlabForm({ ...slabForm, multiplier: +e.target.value })} />
         </div>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSlabModal(null)}>انصراف</Button>
           <Button loading={slabSaving} onClick={handleSaveSlab}>
             {slabModal === 'create' ? 'ثبت پله' : 'ذخیره تغییرات'}
@@ -321,7 +401,7 @@ export default function AdminTariffs() {
 
       <Modal open={slabModal === 'delete'} onClose={() => setSlabModal(null)} title="حذف پله تعرفه" size="sm">
         <p className="text-sm text-gray-600">آیا از حذف این پله تعرفه اطمینان دارید؟</p>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSlabModal(null)}>انصراف</Button>
           <Button variant="danger" loading={slabSaving} onClick={handleDeleteSlab}>
             <Trash2 className="h-4 w-4" /> حذف

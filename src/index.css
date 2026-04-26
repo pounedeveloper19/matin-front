@@ -8,7 +8,9 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 40%, #f8fafc 100%);
+    min-height: 100vh;
+    color: #111827;
     direction: rtl;
   }
 
@@ -19,6 +21,24 @@
   }
 }
 
+@layer components {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 4px 24px rgba(6, 78, 59, 0.06), 0 1px 3px rgba(6, 78, 59, 0.04);
+  }
+
+  .glass-card-solid {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(209, 250, 229, 0.6);
+    box-shadow: 0 4px 24px rgba(6, 78, 59, 0.07), 0 1px 3px rgba(6, 78, 59, 0.04);
+  }
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -26,5 +46,16 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
   }
 }

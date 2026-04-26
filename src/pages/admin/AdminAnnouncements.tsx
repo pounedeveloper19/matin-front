@@ -11,14 +11,14 @@ import type { AdminAnnouncement } from '../../types'
 const empty: AdminAnnouncement = { id: 0, title: '', contents: '', publishDate: null, finishDate: null }
 
 export default function AdminAnnouncements() {
-  const [data, setData]           = useState<AdminAnnouncement[]>([])
-  const [total, setTotal]         = useState(0)
+  const [data, setData]             = useState<AdminAnnouncement[]>([])
+  const [total, setTotal]           = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const [page, setPage]           = useState(1)
-  const [loading, setLoading]     = useState(true)
-  const [modal, setModal]         = useState<'create' | 'edit' | 'delete' | null>(null)
-  const [form, setForm]           = useState<AdminAnnouncement>(empty)
-  const [saving, setSaving]       = useState(false)
+  const [page, setPage]             = useState(1)
+  const [loading, setLoading]       = useState(true)
+  const [modal, setModal]           = useState<'create' | 'edit' | 'delete' | null>(null)
+  const [form, setForm]             = useState<AdminAnnouncement>(empty)
+  const [saving, setSaving]         = useState(false)
   const pageSize = 10
 
   const fetchData = useCallback((p: number) => {
@@ -48,9 +48,7 @@ export default function AdminAnnouncements() {
     if (!form.title || !form.contents) { toast.error('عنوان و متن الزامی است'); return }
     setSaving(true)
     try {
-      const res = modal === 'create'
-        ? await adminApi.createAnnouncement(form)
-        : await adminApi.updateAnnouncement(form)
+      const res = modal === 'create' ? await adminApi.createAnnouncement(form) : await adminApi.updateAnnouncement(form)
       if (res.code === 200) {
         toast.success(modal === 'create' ? 'اعلان ثبت شد' : 'اعلان ویرایش شد')
         setModal(null); fetchData(page)
@@ -70,18 +68,24 @@ export default function AdminAnnouncements() {
   }
 
   const columns = [
-    { key: 'id',          header: '#',          className: 'w-16' },
-    { key: 'title',       header: 'عنوان' },
-    { key: 'publishDate', header: 'تاریخ انتشار' },
-    { key: 'finishDate',  header: 'تاریخ پایان', render: (r: AdminAnnouncement) => r.finishDate ?? '—' },
+    { key: 'id',    header: '#', className: 'w-16' },
+    { key: 'title', header: 'عنوان', render: (r: AdminAnnouncement) => (
+      <span className="font-semibold text-gray-800">{r.title}</span>
+    )},
+    { key: 'publishDate', header: 'تاریخ انتشار', render: (r: AdminAnnouncement) => (
+      <span className="text-xs text-gray-600">{r.publishDate ?? '—'}</span>
+    )},
+    { key: 'finishDate', header: 'تاریخ پایان', render: (r: AdminAnnouncement) => (
+      <span className="text-xs text-gray-600">{r.finishDate ?? '—'}</span>
+    )},
     {
       key: 'actions', header: 'عملیات', className: 'w-24',
       render: (row: AdminAnnouncement) => (
         <div className="flex gap-1">
-          <button onClick={() => openEdit(row)} className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
+          <button onClick={() => openEdit(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => openDelete(row)} className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+          <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -93,8 +97,11 @@ export default function AdminAnnouncements() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Megaphone className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">اعلانات ({total} رکورد)</span>
+          <Megaphone className="h-4 w-4 text-amber-500" />
+          <p className="text-sm font-semibold text-gray-700">اعلانات</p>
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+            {total.toLocaleString('fa-IR')} رکورد
+          </span>
         </div>
         <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> اعلان جدید</Button>
       </div>
@@ -108,14 +115,11 @@ export default function AdminAnnouncements() {
           <Input label="عنوان *" value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="عنوان اعلان" />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">متن اعلان *</label>
-            <textarea
-              rows={5}
-              value={form.contents}
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">متن اعلان *</label>
+            <textarea rows={5} value={form.contents}
               onChange={(e) => setForm({ ...form, contents: e.target.value })}
-              className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="متن کامل اعلان..."
-            />
+              className="block w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              placeholder="متن کامل اعلان..." />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <DatePicker label="تاریخ انتشار" value={form.publishDate}
@@ -124,7 +128,7 @@ export default function AdminAnnouncements() {
               onChange={(v) => setForm({ ...form, finishDate: v })} />
           </div>
         </div>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button loading={saving} onClick={handleSave}>
             {modal === 'create' ? 'ثبت اعلان' : 'ذخیره تغییرات'}
@@ -133,10 +137,10 @@ export default function AdminAnnouncements() {
       </Modal>
 
       <Modal open={modal === 'delete'} onClose={() => setModal(null)} title="حذف اعلان" size="sm">
-        <p className="text-sm text-gray-600 mb-5">
+        <p className="text-sm text-gray-600">
           آیا از حذف اعلان <span className="font-bold text-gray-900">«{form.title}»</span> اطمینان دارید؟
         </p>
-        <div className="flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button variant="danger" loading={saving} onClick={handleDelete}>
             <Trash2 className="h-4 w-4" /> حذف

@@ -31,10 +31,10 @@ function BandRow({ band }: { band: BillBand }) {
   const hasDeficit = band.deficitKwh > 0
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden">
+    <div className="overflow-hidden rounded-xl" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(209,250,229,0.5)' }}>
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-right hover:bg-gray-50"
+        className="flex w-full items-center justify-between px-4 py-2.5 text-right transition-colors hover:bg-emerald-50/30"
       >
         <div className="flex items-center gap-3">
           <div className={`h-2 w-2 rounded-full ${hasExcess ? 'bg-red-500' : hasDeficit ? 'bg-amber-400' : 'bg-emerald-500'}`} />
@@ -49,7 +49,7 @@ function BandRow({ band }: { band: BillBand }) {
         </div>
       </button>
       {open && (
-        <div className="border-t border-gray-100 bg-gray-50 px-4 pb-3 pt-2">
+        <div className="px-4 pb-3 pt-2" style={{ background: 'rgba(236,253,245,0.4)', borderTop: '1px solid rgba(209,250,229,0.4)' }}>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-4">
             <div><p className="text-gray-400">واقعی</p><p className="font-medium">{kwh(band.actualKwh)}</p></div>
             <div><p className="text-gray-400">قراردادی</p><p className="font-medium">{kwh(band.contractedKwh)}</p></div>
@@ -80,7 +80,8 @@ function AnalysisDetail({ result }: { result: BillAnalysisResult }) {
   return (
     <div className="space-y-4">
       {/* سربرگ */}
-      <div className="flex items-center justify-between rounded-lg bg-gray-900 px-4 py-3 text-white text-sm">
+      <div className="flex items-center justify-between rounded-xl px-4 py-3 text-white text-sm"
+        style={{ background: 'linear-gradient(135deg, #064e3b, #047857)' }}>
         <div><p className="text-gray-400 text-xs">دوره</p><p className="font-bold">{result.monthName} {result.year}</p></div>
         <div><p className="text-gray-400 text-xs">مصرف کل</p><p className="font-bold">{kwh(result.totalConsumption)}</p></div>
         <div><p className="text-gray-400 text-xs">قدرت قراردادی</p><p className="font-bold">{result.contractCapacityKw.toLocaleString('fa-IR')} kW</p></div>
@@ -114,9 +115,9 @@ function AnalysisDetail({ result }: { result: BillAnalysisResult }) {
       </div>
 
       {/* جزئیات مالی */}
-      <div className="rounded-lg border border-gray-200 overflow-hidden">
+      <div className="overflow-hidden rounded-xl" style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(209,250,229,0.5)' }}>
         <table className="w-full text-xs">
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y" style={{ borderColor: 'rgba(209,250,229,0.4)' }}>
             <tr className="hover:bg-gray-50">
               <td className="px-3 py-2 text-gray-500">قرارداد متین</td>
               <td className="px-3 py-2 text-left font-medium text-blue-700">{rial(result.matinBillRial)}</td>
@@ -141,7 +142,7 @@ function AnalysisDetail({ result }: { result: BillAnalysisResult }) {
                 <td className="px-3 py-2 text-left font-medium">+ {rial(result.fuelFeeRial)}</td>
               </tr>
             )}
-            <tr className="bg-gray-50 font-bold">
+            <tr className="font-bold" style={{ background: 'rgba(236,253,245,0.5)' }}>
               <td className="px-3 py-2.5 text-gray-900">جمع کل با متین</td>
               <td className="px-3 py-2.5 text-left text-blue-700">{rial(result.withMatinBillRial)}</td>
             </tr>
@@ -150,8 +151,8 @@ function AnalysisDetail({ result }: { result: BillAnalysisResult }) {
       </div>
 
       {/* نرخ‌ها */}
-      <div className="rounded-lg bg-gray-50 p-3">
-        <p className="mb-1.5 text-xs font-medium text-gray-500">نرخ‌های بازار این ماه</p>
+      <div className="rounded-xl p-3" style={{ background: 'rgba(236,253,245,0.5)', border: '1px solid rgba(167,243,208,0.3)' }}>
+        <p className="mb-1.5 text-xs font-semibold text-gray-500">نرخ‌های بازار این ماه</p>
         <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
           <div><span className="text-gray-400">اوج: </span><span className="font-medium">{result.marketPeakRate.toLocaleString('fa-IR')}</span></div>
           <div><span className="text-gray-400">میان: </span><span className="font-medium">{result.marketMidRate.toLocaleString('fa-IR')}</span></div>
@@ -323,10 +324,10 @@ export default function AdminBillReports() {
       key: 'actions', header: 'عملیات', className: 'w-20',
       render: (row: AdminBillReport) => (
         <div className="flex items-center gap-1">
-          <button onClick={() => openDetail(row)} className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600" title="جزئیات">
+          <button onClick={() => openDetail(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="جزئیات">
             <Eye className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => openDelete(row)} className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title="حذف">
+          <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="حذف">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -339,8 +340,11 @@ export default function AdminBillReports() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">گزارش‌های تحلیل قبض ({total} رکورد)</span>
+          <Receipt className="h-4 w-4 text-emerald-600" />
+          <p className="text-sm font-semibold text-gray-700">گزارش‌های تحلیل قبض</p>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+            {total.toLocaleString('fa-IR')} رکورد
+          </span>
         </div>
         <Button size="sm" onClick={() => { setForm(emptyForm); setAnalysisResult(null); setAnalysisModal(true) }}>
           <Plus className="h-4 w-4" /> تحلیل جدید
@@ -363,12 +367,12 @@ export default function AdminBillReports() {
           placeholder="سال..."
           value={filterYear}
           onChange={(e) => { setFilterYear(e.target.value); setPage(1) }}
-          className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-28 rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
         />
         <select
           value={filterMonth}
           onChange={(e) => { setFilterMonth(e.target.value); setPage(1) }}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
         >
           <option value="">همه ماه‌ها</option>
           {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
@@ -395,21 +399,21 @@ export default function AdminBillReports() {
               onChange={(v) => setForm(f => ({ ...f, subscriptionId: String(v) }))}
             />
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">سال (شمسی) *</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">سال (شمسی) *</label>
               <input type="number" value={form.year} onChange={set('year')}
-                className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                className="block w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">ماه مصرف *</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">ماه مصرف *</label>
               <select value={form.month} onChange={set('month')}
-                className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                className="block w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
                 {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
               </select>
             </div>
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-gray-700">مصرف TOU (kWh)</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">مصرف TOU (kWh)</p>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Input label="اوج بار *"      value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
               <Input label="میان بار *"     value={form.midKwh}        onChange={set('midKwh')}        placeholder="kWh" inputMode="numeric" />
@@ -422,7 +426,7 @@ export default function AdminBillReports() {
           {analysisResult && <AnalysisDetail result={analysisResult} />}
         </div>
 
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setAnalysisModal(false)}>بستن</Button>
           <Button loading={saving} onClick={handleAnalyze}>
             <BarChart3 className="h-4 w-4" /> اجرای تحلیل
@@ -458,7 +462,7 @@ export default function AdminBillReports() {
           آیا از حذف گزارش تحلیل اشتراک <span className="font-bold text-gray-900">{selected?.billIdentifier}</span> برای{' '}
           <span className="font-bold text-gray-900">{selected?.month ? MONTHS[selected.month] : ''} {selected?.year}</span> اطمینان دارید؟
         </p>
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setDeleteModal(false)}>انصراف</Button>
           <Button variant="danger" loading={saving} onClick={handleDelete}>
             <Trash2 className="h-4 w-4" /> حذف
