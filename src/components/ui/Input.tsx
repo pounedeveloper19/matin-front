@@ -38,7 +38,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               prefix ? 'pr-10 pl-4' : 'px-4',
               error
                 ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                : 'border-gray-200 focus:border-primary-400 focus:ring-primary-100',
+                : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100',
               'disabled:cursor-not-allowed disabled:opacity-60',
               className
             )}
@@ -81,7 +81,7 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
         onChange={(e) => onChange?.(e.target.value)}
         className={clsx(
           'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
-          'focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:bg-white',
+          'focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white',
           error ? 'border-red-300 focus:ring-red-100' : 'border-gray-200',
           (disabled || loading) && 'cursor-not-allowed opacity-60',
           className
@@ -132,7 +132,7 @@ export function DatePicker({ label, error, hint, value, onChange, disabled }: Da
         inputClass={clsx(
           'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
           'focus:outline-none focus:ring-2 focus:ring-primary-100',
-          error ? 'border-red-300' : 'border-gray-200 focus:border-primary-400',
+          error ? 'border-red-300' : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100',
           disabled && 'cursor-not-allowed opacity-60'
         )}
       />

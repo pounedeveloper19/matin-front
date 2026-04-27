@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Tag, Layers, X, Zap, CheckCircle, Filter } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Layers, X, Zap, CheckCircle, Filter, Download, BarChart3, CalendarDays } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi } from '../../api/lookup'
@@ -55,9 +55,9 @@ export default function AdminTariffs() {
   , [tariffTypes, tariffs])
 
   const typeCardColors = [
-    { border: '#10b981', bg: 'rgba(236,253,245,0.8)', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-600' },
-    { border: '#6366f1', bg: 'rgba(238,242,255,0.8)', badge: 'bg-indigo-100 text-indigo-700',   icon: 'text-indigo-600' },
-    { border: '#064e3b', bg: 'rgba(6,78,59,0.88)',    badge: 'bg-white/20 text-white',           icon: 'text-emerald-300' },
+    { border: '#10b981', bg: '#ffffff', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-600' },
+    { border: '#14b8a6', bg: '#ffffff', badge: 'bg-teal-100 text-teal-700',   icon: 'text-teal-600' },
+    { border: '#065f46', bg: '#ffffff', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-800' },
   ]
 
   // ── Fetchers ─────────────────────────────────────────────────────────
@@ -242,50 +242,85 @@ export default function AdminTariffs() {
     ? tariffs.filter(t => t.tariffTypeId === selectedTypeId)
     : tariffs
 
+  const newestPerType = useMemo(() => {
+    const groups = new Map<number, Tariff[]>()
+    tariffs.forEach((t) => {
+      if (!groups.has(t.tariffTypeId)) groups.set(t.tariffTypeId, [])
+      groups.get(t.tariffTypeId)!.push(t)
+    })
+    return Array.from(groups.entries()).map(([typeId, items]) => {
+      const newest = [...items].sort((a, b) => (b.tariffId - a.tariffId))[0]
+      return { typeId, newest, count: items.length }
+    })
+  }, [tariffs])
+
+  const selectedTypeNewest = selectedTypeId
+    ? newestPerType.find((g) => g.typeId === selectedTypeId)?.newest
+    : newestPerType[0]?.newest
+
+  const slabBars = useMemo(() => {
+    if (!slabs.length) return []
+    return slabs
+      .slice()
+      .sort((a, b) => Number(a.fromKwh) - Number(b.fromKwh))
+      .map((s, idx) => ({
+        label: `${Number(s.fromKwh).toLocaleString('fa-IR')}`,
+        value: Number(s.multiplier),
+        color: idx % 3 === 0 ? '#99f6e4' : idx % 3 === 1 ? '#34d399' : '#047857',
+      }))
+  }, [slabs])
+
   return (
     <div className="space-y-5">
+      <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+        <h2 className="text-3xl font-black tracking-tight text-gray-900">ساختار تعرفه‌های هوشمند انرژی</h2>
+        <p className="mt-1 text-sm text-gray-500">مدیریت تعرفه‌های تجاری، صنعتی و مصرف خانگی با تحلیل پله‌ای</p>
+      </div>
 
       {/* Type cards */}
       {tariffTypes.length > 0 && (
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${tariffTypes.length}, 1fr)` }}>
+        <div className="grid gap-4 md:grid-cols-3">
           {tariffTypes.map((type, idx) => {
             const colors = typeCardColors[idx % typeCardColors.length]
             const count  = tariffTypeCounts[type.id] ?? 0
             const active = selectedTypeId === type.id
-            const isDark = idx === 2
+            const groupData = newestPerType.find((g) => g.typeId === type.id)?.newest
             return (
               <button
                 key={type.id}
                 onClick={() => setSelectedTypeId(active ? null : type.id)}
-                className="group text-right overflow-hidden rounded-2xl p-5 transition-all hover:shadow-lg"
+                className="group overflow-hidden rounded-2xl border bg-white p-5 text-right transition-all hover:shadow-md"
                 style={{
-                  background: isDark
-                    ? 'linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%)'
-                    : colors.bg,
-                  border: `2px solid ${active ? colors.border : 'transparent'}`,
-                  boxShadow: active ? `0 0 0 2px ${colors.border}33` : '0 2px 10px rgba(0,0,0,0.05)',
-                  backdropFilter: 'blur(12px)',
+                  background: colors.bg,
+                  borderColor: active ? colors.border : '#e5e7eb',
+                  boxShadow: active ? `0 0 0 2px ${colors.border}22` : '0 2px 10px rgba(0,0,0,0.04)',
                 }}
               >
                 <div className="flex items-start justify-between">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isDark ? 'bg-white/10' : 'bg-white/60'}`}>
-                    <Zap className={`h-5 w-5 ${isDark ? 'text-emerald-300' : colors.icon}`} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100/70">
+                    <Zap className={`h-5 w-5 ${colors.icon}`} />
                   </div>
                   {active && (
-                    <CheckCircle className={`h-5 w-5 ${isDark ? 'text-emerald-300' : colors.icon}`} />
+                    <CheckCircle className={`h-5 w-5 ${colors.icon}`} />
                   )}
                 </div>
                 <div className="mt-4">
-                  <p className={`text-base font-bold leading-snug ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                  <p className="text-base font-bold leading-snug text-gray-800">
                     {type.title}
                   </p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    {groupData?.powerEntity ?? '—'} · {groupData?.customerType ?? '—'}
+                  </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${isDark ? 'bg-white/20 text-white' : colors.badge}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${colors.badge}`}>
                       {count} تعرفه
                     </span>
-                    <span className={`text-xs ${isDark ? 'text-emerald-200' : 'text-gray-400'}`}>
+                    <span className="text-xs text-gray-400">
                       {active ? 'فیلتر فعال' : 'برای فیلتر کلیک کنید'}
                     </span>
+                  </div>
+                  <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+                    اجرا از: {groupData?.effectiveFrom ?? '—'} · {groupData?.slabCount ?? 0} پله
                   </div>
                 </div>
               </button>
@@ -294,24 +329,71 @@ export default function AdminTariffs() {
         </div>
       )}
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <Tag className="h-4 w-4 text-emerald-700" /> تعرفه انتخابی
+          </div>
+          {selectedTypeNewest ? (
+            <div className="space-y-2 text-sm text-gray-600">
+              <p><span className="font-semibold text-gray-800">نوع:</span> {selectedTypeNewest.tariffType}</p>
+              <p><span className="font-semibold text-gray-800">مشتری:</span> {selectedTypeNewest.customerType}</p>
+              <p><span className="font-semibold text-gray-800">شرکت برق:</span> {selectedTypeNewest.powerEntity}</p>
+              <p><span className="font-semibold text-gray-800">تاریخ اجرا:</span> {selectedTypeNewest.effectiveFrom}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">تعرفه‌ای موجود نیست</p>
+          )}
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 lg:col-span-2">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <BarChart3 className="h-4 w-4 text-emerald-700" /> نمودار زمانی تعرفه (TOU)
+            </div>
+            <span className="text-xs text-gray-400">{selectedTariff ? `تعرفه #${selectedTariff.tariffId}` : 'برای نمایش، تعرفه انتخاب کنید'}</span>
+          </div>
+          <div className="flex h-40 items-end gap-2 rounded-xl bg-emerald-50/50 p-3">
+            {slabBars.length === 0 ? (
+              <p className="m-auto text-sm text-gray-400">داده پله‌ای برای رسم نمودار موجود نیست</p>
+            ) : (
+              slabBars.map((bar, idx) => (
+                <div key={`${bar.label}-${idx}`} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-t-md transition-all"
+                    style={{ height: `${Math.max(16, bar.value * 42)}px`, background: bar.color }}
+                    title={`${bar.value.toLocaleString('fa-IR')}×`}
+                  />
+                  <span className="text-[10px] text-gray-500">{bar.label}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Tariffs section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-indigo-500" />
-          <p className="text-sm font-semibold text-gray-700">تعرفه‌ها</p>
-          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+          <Tag className="h-4 w-4 text-emerald-700" />
+          <p className="text-sm font-semibold text-gray-700">جدول تفصیلی پله‌های مصرف</p>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
             {(selectedTypeId ? filteredTariffs.length : tariffTotal).toLocaleString('fa-IR')} رکورد
           </span>
           {selectedTypeId && (
             <button
               onClick={() => setSelectedTypeId(null)}
-              className="flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-600 hover:bg-indigo-100 transition-colors"
+              className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100"
             >
               <Filter className="h-3 w-3" /> حذف فیلتر
             </button>
           )}
         </div>
-        <Button size="sm" onClick={openCreateTariff}><Plus className="h-4 w-4" /> تعرفه جدید</Button>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+            <Download className="h-3.5 w-3.5" /> دریافت PDF
+          </button>
+          <Button size="sm" onClick={openCreateTariff}><Plus className="h-4 w-4" /> تعرفه جدید</Button>
+        </div>
       </div>
 
       <Table columns={tariffColumns} data={filteredTariffs} loading={tariffLoading} keyField="tariffId" emptyText="تعرفه‌ای ثبت نشده" />
@@ -320,14 +402,14 @@ export default function AdminTariffs() {
       {/* Slabs panel */}
       {selectedTariff && (
         <div ref={slabsRef} className="overflow-hidden rounded-2xl p-5 space-y-4"
-          style={{ background: 'rgba(245,243,255,0.7)', border: '2px solid rgba(167,139,250,0.3)' }}>
+          style={{ background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 2px 12px rgba(15,23,42,0.04)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-purple-500" />
+              <Layers className="h-4 w-4 text-emerald-700" />
               <span className="text-sm font-semibold text-gray-700">
                 پله‌های تعرفه #{selectedTariff.tariffId}
               </span>
-              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700">{slabTotal} رکورد</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{slabTotal} رکورد</span>
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={openCreateSlab}><Plus className="h-4 w-4" /> تعرفه پلکانی جدید</Button>

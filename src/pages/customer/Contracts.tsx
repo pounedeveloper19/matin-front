@@ -88,7 +88,7 @@ export default function CustomerContracts() {
       {contracts.length === 0 ? (
         <div
           className="flex flex-col items-center py-20 text-center rounded-2xl"
-          style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(209,250,229,0.6)' }}
+          style={{ background: '#fff', border: '1px solid #e5e7eb' }}
         >
           <FileText className="mb-3 h-12 w-12 text-gray-300" />
           <h3 className="font-semibold text-gray-600">هنوز قراردادی ثبت نشده</h3>
@@ -99,21 +99,18 @@ export default function CustomerContracts() {
           {contracts.map((c) => (
             <div
               key={c.id}
-              className="overflow-hidden rounded-2xl"
+              className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
               style={{
-                background: 'rgba(255,255,255,0.88)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(209,250,229,0.6)',
-                boxShadow: '0 4px 20px rgba(6,78,59,0.06)',
+                boxShadow: '0 2px 12px rgba(15,23,42,0.04)',
               }}
             >
               {/* Card header */}
               <div
                 className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
-                style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}
+                style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
@@ -173,12 +170,12 @@ export default function CustomerContracts() {
 
               {/* Warranty section */}
               <div className="mx-5 mb-5 rounded-xl px-4 py-3"
-                style={{ background: 'rgba(236,253,245,0.6)', border: '1px solid rgba(167,243,208,0.4)' }}
+                style={{ background: '#f8fafc', border: '1px solid #e5e7eb' }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary-600" />
-                    <p className="text-xs font-bold uppercase tracking-wide text-primary-700">ضمانت‌نامه</p>
+                    <Shield className="h-4 w-4 text-emerald-700" />
+                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">ضمانت‌نامه</p>
                   </div>
                   {(c.statusId === 1 || c.statusId === 4) && (
                     <Button size="sm" variant="secondary" onClick={() => openWarrantyModal(c)}>

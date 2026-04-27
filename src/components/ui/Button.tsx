@@ -26,13 +26,13 @@ export default function Button({
 
   const variants = {
     primary: [
-      'bg-primary-700 text-white shadow-sm',
-      'hover:bg-primary-800 hover:shadow-md',
+      'bg-emerald-800 text-white shadow-sm',
+      'hover:bg-emerald-900 hover:shadow-md',
       'focus:ring-primary-500',
     ].join(' '),
     secondary: [
-      'border border-emerald-200 bg-white text-primary-800 shadow-sm',
-      'hover:bg-emerald-50 hover:border-emerald-300',
+      'border border-gray-200 bg-white text-gray-700 shadow-sm',
+      'hover:bg-gray-50 hover:border-gray-300',
       'focus:ring-primary-300',
     ].join(' '),
     danger: [
@@ -42,7 +42,7 @@ export default function Button({
     ].join(' '),
     ghost: [
       'text-gray-600',
-      'hover:bg-emerald-50 hover:text-primary-800',
+      'hover:bg-gray-100 hover:text-emerald-800',
       'focus:ring-primary-300',
     ].join(' '),
   }

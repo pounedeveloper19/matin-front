@@ -20,16 +20,9 @@ type ProfileData =
   | ({ type: 'real' } & CustomerReal)
   | ({ type: 'legal' } & CustomerLegal)
 
-const sectionCard = {
-  background: 'rgba(255,255,255,0.88)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid rgba(209,250,229,0.6)',
-  boxShadow: '0 4px 20px rgba(6,78,59,0.06)',
-}
-
 const fieldRow = {
-  background: 'rgba(236,253,245,0.5)',
-  border: '1px solid rgba(167,243,208,0.3)',
+  background: '#f8fafc',
+  border: '1px solid #e5e7eb',
 }
 
 export default function CustomerProfile() {
@@ -211,14 +204,13 @@ export default function CustomerProfile() {
   }
 
   return (
-    <div className="space-y-5">
-
+    <div className="space-y-6">
       {/* اطلاعات پروفایل */}
-      <div className="overflow-hidden rounded-2xl" style={sectionCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
               {isLegal ? <Building2 className="h-5 w-5" /> : <User className="h-5 w-5" />}
             </div>
             <div>
@@ -254,9 +246,9 @@ export default function CustomerProfile() {
       </div>
 
       {/* مدارک شناسایی */}
-      <div className="overflow-hidden rounded-2xl" style={sectionCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
             <ShieldCheck className="h-5 w-5" />
           </div>
@@ -272,9 +264,9 @@ export default function CustomerProfile() {
       </div>
 
       {/* آدرس‌ها */}
-      <div className="overflow-hidden rounded-2xl" style={sectionCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
               <MapPin className="h-5 w-5" />
@@ -325,9 +317,9 @@ export default function CustomerProfile() {
       </div>
 
       {/* اشتراک‌ها */}
-      <div className="overflow-hidden rounded-2xl" style={sectionCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <Zap className="h-5 w-5" />
@@ -380,9 +372,9 @@ export default function CustomerProfile() {
       </div>
 
       {/* نماینده کاربری */}
-      <div className="overflow-hidden rounded-2xl" style={sectionCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
               <UserCog className="h-5 w-5" />

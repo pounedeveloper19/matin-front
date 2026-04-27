@@ -86,15 +86,13 @@ export default function FileUpload({
         <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
           <FileText className="h-4 w-4 shrink-0 text-primary-600" />
           <span className="flex-1 truncate text-sm text-gray-700">{currentFile.name}</span>
-          <a
-            href={uploadApi.downloadUrl(currentFile.id)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => uploadApi.download(currentFile.id, currentFile.name).catch(() => toast.error('خطا در دانلود'))}
             title="دانلود"
             className="rounded p-1 text-gray-400 hover:text-primary-600"
           >
             <Download className="h-4 w-4" />
-          </a>
+          </button>
           {!readOnly && (
             <button
               onClick={handleDelete}

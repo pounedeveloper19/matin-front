@@ -64,7 +64,7 @@ export function StatCard({ title, value, icon, color = 'green', subtitle, trend 
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-500 truncate">{title}</p>
-          <p className={clsx('mt-2 text-2xl font-bold leading-none tracking-tight', c.value)}>
+          <p className={clsx('mt-2 text-3xl font-black leading-none tracking-tight', c.value)}>
             {value}
           </p>
           {subtitle && (

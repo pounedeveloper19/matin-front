@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Zap, TrendingDown, AlertTriangle, BarChart3,
-  ChevronDown, ChevronUp, History, RefreshCw,
+  ChevronDown, ChevronUp, History, RefreshCw, Target,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
@@ -15,15 +15,18 @@ const MONTHS = [
   'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
 ]
 
+function jalaliYear(): number {
+  const d = new Date()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return (m > 3 || (m === 3 && day >= 20)) ? d.getFullYear() - 621 : d.getFullYear() - 622
+}
+
+const CURRENT_JALALI_YEAR = jalaliYear()
+const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => CURRENT_JALALI_YEAR - 2 + i)
+
 const rial = (n: number) => n.toLocaleString('fa-IR') + ' ریال'
 const kwh  = (n: number) => n.toLocaleString('fa-IR') + ' kWh'
-
-const glassCard = {
-  background: 'rgba(255,255,255,0.88)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid rgba(209,250,229,0.6)',
-  boxShadow: '0 4px 20px rgba(6,78,59,0.06)',
-}
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
@@ -86,11 +89,215 @@ function BandRow({ band }: { band: BillBand }) {
   )
 }
 
+function TouOptimalChart({ bands }: { bands: BillBand[] }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const W = 520, H = 210
+  const ml = 54, mr = 12, mt = 20, mb = 48
+  const chartW = W - ml - mr
+  const chartH = H - mt - mb
+  const n = bands.length
+  const bw = chartW / n
+  const barHalfW = Math.min(bw * 0.27, 20)
+
+  const maxKwh = Math.max(...bands.flatMap(b => [b.actualKwh, b.contractedKwh]), 1) * 1.18
+  const toY = (v: number) => chartH - (v / maxKwh) * chartH
+
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ v: maxKwh * f, y: toY(maxKwh * f) }))
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+
+  const hovered = hoveredIdx !== null ? bands[hoveredIdx] : null
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative select-none"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setHoveredIdx(null)}
+    >
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 210 }}>
+        <defs>
+          <pattern id="opt-stripe" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="5" stroke="#6366f1" strokeWidth="1.5" strokeOpacity="0.35" />
+          </pattern>
+        </defs>
+
+        {/* Grid lines + Y labels */}
+        {ticks.map(({ v, y }, ti) => (
+          <g key={ti}>
+            <line
+              x1={ml} y1={mt + y} x2={W - mr} y2={mt + y}
+              stroke="#e5e7eb" strokeWidth="1"
+              strokeDasharray={ti === 0 ? undefined : '3,3'}
+            />
+            <text x={ml - 5} y={mt + y + 4} textAnchor="end" fontSize="9" fill="#9ca3af">
+              {Math.round(v).toLocaleString('fa-IR')}
+            </text>
+          </g>
+        ))}
+
+        {/* Bars per band */}
+        {bands.map((band, i) => {
+          const hasExcess  = band.excessKwh  > 0
+          const hasDeficit = band.deficitKwh > 0
+          const isOptimal  = !hasExcess && !hasDeficit
+
+          const cx = ml + (i + 0.5) * bw
+          const actualY   = toY(band.actualKwh)
+          const contractY = toY(band.contractedKwh)
+          const barFill   = hasExcess ? '#ef4444' : hasDeficit ? '#f59e0b' : '#10b981'
+
+          return (
+            <g key={i}>
+              {/* Hover highlight zone */}
+              <rect
+                x={ml + i * bw + 2} y={mt}
+                width={bw - 4} height={chartH}
+                fill={hoveredIdx === i ? 'rgba(99,102,241,0.05)' : 'transparent'}
+                rx={4}
+                onMouseEnter={() => setHoveredIdx(i)}
+              />
+
+              {/* Actual bar */}
+              <rect
+                x={cx - barHalfW} y={mt + actualY}
+                width={barHalfW * 2} height={chartH - actualY}
+                fill={barFill} rx={3}
+                opacity={hoveredIdx === i ? 1 : 0.82}
+              />
+
+              {/* Contracted level — dashed reference line */}
+              <line
+                x1={ml + i * bw + 5} y1={mt + contractY}
+                x2={ml + (i + 1) * bw - 5} y2={mt + contractY}
+                stroke="#6366f1" strokeWidth={1.5} strokeDasharray="4,2"
+              />
+
+              {/* Optimal point dot */}
+              <circle
+                cx={cx} cy={mt + contractY}
+                r={isOptimal ? 5 : 4}
+                fill={isOptimal ? '#10b981' : '#6366f1'}
+                stroke="white" strokeWidth={1.5}
+              />
+              {isOptimal && (
+                <circle
+                  cx={cx} cy={mt + contractY} r={9}
+                  fill="none" stroke="#10b981" strokeWidth={1} opacity={0.35}
+                />
+              )}
+
+              {/* Deviation label above the shorter of the two */}
+              <text
+                x={cx} y={mt + Math.min(actualY, contractY) - 6}
+                textAnchor="middle" fontSize="9" fill={barFill} fontWeight="bold"
+              >
+                {hasExcess
+                  ? `+${band.excessKwh.toFixed(0)}`
+                  : hasDeficit
+                  ? `-${band.deficitKwh.toFixed(0)}`
+                  : '✓'}
+              </text>
+
+              {/* X-axis band label */}
+              <text
+                x={cx} y={H - mb + 15}
+                textAnchor="middle" fontSize="10"
+                fill={hoveredIdx === i ? '#1f2937' : '#6b7280'}
+                fontWeight={hoveredIdx === i ? 'bold' : 'normal'}
+              >
+                {band.name}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Legend */}
+        <g transform={`translate(${ml}, ${H - 10})`}>
+          <rect width="8" height="8" fill="#10b981" rx="1" />
+          <text x="11" y="7.5" fontSize="8" fill="#6b7280">بهینه</text>
+          <rect x="42" width="8" height="8" fill="#ef4444" rx="1" />
+          <text x="53" y="7.5" fontSize="8" fill="#6b7280">مازاد</text>
+          <rect x="84" width="8" height="8" fill="#f59e0b" rx="1" />
+          <text x="95" y="7.5" fontSize="8" fill="#6b7280">کسری</text>
+          <line x1="122" y1="4" x2="138" y2="4" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="4,2" />
+          <circle cx="130" cy="4" r="3" fill="#6366f1" stroke="white" strokeWidth="1" />
+          <text x="142" y="7.5" fontSize="8" fill="#6b7280">نقطه بهینه (قراردادی)</text>
+        </g>
+      </svg>
+
+      {/* Floating tooltip */}
+      {hovered && (
+        <div
+          className="pointer-events-none absolute z-50 rounded-xl border border-indigo-100 bg-white p-3 shadow-xl"
+          style={{
+            width: 204,
+            left: mousePos.x > (containerRef.current?.offsetWidth ?? 400) * 0.62
+              ? mousePos.x - 216
+              : mousePos.x + 14,
+            top: Math.max(4, mousePos.y - 115),
+          }}
+        >
+          <p className="mb-2 border-b border-gray-100 pb-1.5 text-xs font-bold text-gray-900">{hovered.name}</p>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-500">مصرف واقعی</span>
+              <span className="font-semibold text-gray-800">{hovered.actualKwh.toLocaleString('fa-IR')} kWh</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-indigo-500">● نقطه بهینه</span>
+              <span className="font-semibold text-indigo-700">{hovered.contractedKwh.toLocaleString('fa-IR')} kWh</span>
+            </div>
+            {hovered.excessKwh > 0 && (
+              <>
+                <div className="border-t border-red-50 pt-1" />
+                <div className="flex justify-between">
+                  <span className="text-red-500">مازاد مصرف</span>
+                  <span className="font-semibold text-red-700">+{hovered.excessKwh.toLocaleString('fa-IR')} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-500">جریمه (×۱.۳)</span>
+                  <span className="font-semibold text-red-700">{hovered.penaltyRial.toLocaleString('fa-IR')} ریال</span>
+                </div>
+              </>
+            )}
+            {hovered.deficitKwh > 0 && (
+              <>
+                <div className="border-t border-amber-50 pt-1" />
+                <div className="flex justify-between">
+                  <span className="text-amber-500">کسری</span>
+                  <span className="font-semibold text-amber-700">-{hovered.deficitKwh.toLocaleString('fa-IR')} kWh</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-emerald-500">بستانکاری (×۰.۷۵)</span>
+                  <span className="font-semibold text-emerald-700">{hovered.creditRial.toLocaleString('fa-IR')} ریال</span>
+                </div>
+              </>
+            )}
+            {hovered.excessKwh === 0 && hovered.deficitKwh === 0 && (
+              <p className="mt-1 rounded-lg bg-emerald-50 px-2 py-1 text-center font-semibold text-emerald-600">
+                ★ در نقطه بهینه هستید!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CustomerBills() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
   const [selectedSubId, setSelectedSubId] = useState<number | ''>('')
   const [form, setForm] = useState({
-    year: '1404', month: '1',
+    year: String(CURRENT_JALALI_YEAR), month: '1',
     peakKwh: '', midKwh: '', lowKwh: '', fridayPeakKwh: '0',
   })
   const [result, setResult]   = useState<BillAnalysisResult | null>(null)
@@ -142,12 +349,11 @@ export default function CustomerBills() {
   const maxBill = result ? Math.max(result.withoutMatinBillRial, result.withMatinBillRial, 1) : 1
 
   return (
-    <div className="space-y-5">
-
+    <div className="space-y-6">
       {/* انتخاب اشتراک */}
-      <div className="overflow-hidden rounded-2xl" style={glassCard}>
+      <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 px-5 py-4"
-          style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
             <Zap className="h-4 w-4" />
           </div>
@@ -169,10 +375,10 @@ export default function CustomerBills() {
                   onClick={() => { setSelectedSubId(s.id); setResult(null) }}
                   className={`rounded-xl p-4 text-right transition-all ${
                     selectedSubId === s.id
-                      ? 'border-2 border-primary-500 bg-primary-50 shadow-sm'
-                      : 'border-2 border-transparent hover:border-emerald-200 hover:bg-emerald-50/30'
+                      ? 'border-2 border-emerald-500 bg-emerald-50 shadow-sm'
+                      : 'border-2 border-transparent hover:border-gray-300 hover:bg-gray-50'
                   }`}
-                  style={selectedSubId !== s.id ? { background: 'rgba(236,253,245,0.3)', border: '2px solid rgba(167,243,208,0.4)' } : undefined}
+                  style={selectedSubId !== s.id ? { background: '#fff', border: '2px solid #e5e7eb' } : undefined}
                 >
                   <p className="font-mono text-sm font-bold text-gray-900">{s.billIdentifier}</p>
                   <p className="mt-1 text-xs text-gray-500">{s.powerEntity}</p>
@@ -191,20 +397,20 @@ export default function CustomerBills() {
 
       {/* تب‌ها */}
       {selectedSubId !== '' && (
-        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgba(0,0,0,0.05)' }}>
+        <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1">
           <button onClick={() => setActiveTab('analyze')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
-              activeTab === 'analyze' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'analyze' ? 'bg-emerald-800 shadow-sm text-white' : 'text-gray-500 hover:text-gray-700'
             }`}>
             <BarChart3 className="h-4 w-4" /> تحلیل قبض
           </button>
           <button onClick={() => setActiveTab('history')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
-              activeTab === 'history' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'history' ? 'bg-emerald-800 shadow-sm text-white' : 'text-gray-500 hover:text-gray-700'
             }`}>
             <History className="h-4 w-4" /> تاریخچه قبض‌ها
             {history.length > 0 && (
-              <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-xs text-primary-700">{history.length}</span>
+              <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-xs text-white">{history.length}</span>
             )}
           </button>
         </div>
@@ -213,10 +419,10 @@ export default function CustomerBills() {
       {/* تب تحلیل */}
       {activeTab === 'analyze' && selectedSubId !== '' && (
         <>
-          <div className="overflow-hidden rounded-2xl" style={glassCard}>
+          <div className="glass-card overflow-hidden rounded-2xl">
             {selectedSub && (
               <div className="flex items-center gap-3 px-5 py-3"
-                style={{ background: 'rgba(254,243,199,0.6)', borderBottom: '1px solid rgba(252,211,77,0.3)' }}>
+                style={{ background: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
                 <Zap className="h-4 w-4 text-amber-500 shrink-0" />
                 <div className="text-xs">
                   <span className="font-semibold text-amber-800">اشتراک انتخاب‌شده: {selectedSub.billIdentifier}</span>
@@ -229,13 +435,17 @@ export default function CustomerBills() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">سال (شمسی) *</label>
-                  <input type="number" value={form.year} onChange={set('year')}
-                    className="block w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  <select value={form.year} onChange={set('year')}
+                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                    {YEAR_OPTIONS.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">ماه مصرف *</label>
                   <select value={form.month} onChange={set('month')}
-                    className="block w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
                     {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
@@ -265,7 +475,7 @@ export default function CustomerBills() {
               {/* سربرگ */}
               <div
                 className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-4 text-white"
-                style={{ background: 'linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%)' }}
+                style={{ background: 'linear-gradient(135deg, #065f46 0%, #064e3b 100%)' }}
               >
                 <div>
                   <p className="text-xs text-emerald-300">دوره مصرف</p>
@@ -301,10 +511,10 @@ export default function CustomerBills() {
               </div>
 
               {/* تفکیک باندها */}
-              <div className="overflow-hidden rounded-2xl" style={glassCard}>
+              <div className="glass-card overflow-hidden rounded-2xl">
                 <div className="flex items-center gap-3 px-5 py-4"
-                  style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
-                  <BarChart3 className="h-4 w-4 text-primary-600" />
+                  style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <BarChart3 className="h-4 w-4 text-emerald-700" />
                   <h3 className="font-semibold text-gray-900">تحلیل مصرف به تفکیک TOU</h3>
                 </div>
                 <div className="space-y-3 p-5">
@@ -312,11 +522,28 @@ export default function CustomerBills() {
                 </div>
               </div>
 
+              {/* نمودار نقطه بهینه */}
+              {result.bands.length > 0 && (
+                <div className="glass-card overflow-hidden rounded-2xl">
+                  <div className="flex items-center gap-3 px-5 py-4"
+                    style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <Target className="h-4 w-4 text-indigo-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">نمودار نقطه بهینه مصرف</h3>
+                      <p className="text-xs text-gray-400">موس را روی هر نوار ببرید تا جزئیات را ببینید</p>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <TouOptimalChart bands={result.bands} />
+                  </div>
+                </div>
+              )}
+
               {/* جزئیات محاسبه */}
-              <div className="overflow-hidden rounded-2xl" style={glassCard}>
+              <div className="glass-card overflow-hidden rounded-2xl">
                 <div className="flex items-center gap-3 px-5 py-4"
-                  style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
-                  <Zap className="h-4 w-4 text-primary-600" />
+                  style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <Zap className="h-4 w-4 text-emerald-700" />
                   <h3 className="font-semibold text-gray-900">جزئیات صورتحساب</h3>
                 </div>
                 <div className="p-5">
@@ -351,7 +578,7 @@ export default function CustomerBills() {
                           <td className="py-2.5 text-left font-bold text-gray-700">+ {rial(result.fuelFeeRial)}</td>
                         </tr>
                       )}
-                      <tr style={{ background: 'rgba(236,253,245,0.5)' }} className="font-bold">
+                      <tr style={{ background: '#f8fafc' }} className="font-bold">
                         <td className="py-3 text-gray-900">جمع کل با متین</td><td></td>
                         <td className="py-3 text-left text-blue-700">{rial(result.withMatinBillRial)}</td>
                       </tr>
@@ -412,11 +639,11 @@ export default function CustomerBills() {
 
       {/* تب تاریخچه */}
       {activeTab === 'history' && selectedSubId !== '' && (
-        <div className="overflow-hidden rounded-2xl" style={glassCard}>
+        <div className="glass-card overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between px-5 py-4"
-            style={{ background: 'rgba(236,253,245,0.5)', borderBottom: '1px solid rgba(209,250,229,0.5)' }}>
+            style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
             <div className="flex items-center gap-3">
-              <History className="h-4 w-4 text-primary-600" />
+              <History className="h-4 w-4 text-emerald-700" />
               <h3 className="font-semibold text-gray-900">تاریخچه تحلیل‌های قبض</h3>
             </div>
             <button

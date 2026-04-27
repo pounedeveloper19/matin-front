@@ -31,11 +31,11 @@ export default function Layout({ role }: LayoutProps) {
   const title = pageTitles[pathname] ?? 'برق متین'
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#f3f4f6]">
       <Sidebar role={role} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header title={title} role={role} />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-5 lg:p-6">
           <Outlet />
         </main>
       </div>

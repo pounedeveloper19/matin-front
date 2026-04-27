@@ -34,21 +34,19 @@ export default function CustomerDashboard() {
     <div className="space-y-6">
       {/* Welcome banner */}
       <div
-        className="relative overflow-hidden rounded-2xl p-6 text-white"
-        style={{ background: 'linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%)' }}
+        className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6"
+        style={{ boxShadow: '0 2px 12px rgba(15,23,42,0.04)' }}
       >
         <div className="relative z-10">
-          <p className="text-sm text-emerald-300">خوش آمدید،</p>
-          <h2 className="mt-1 text-2xl font-bold">{user?.fullName}</h2>
-          <p className="mt-2 text-sm text-emerald-200/80">از سامانه مدیریت هوشمند برق متین استفاده می‌کنید</p>
+          <p className="text-sm text-emerald-700">خوش آمدید،</p>
+          <h2 className="mt-1 text-2xl font-black text-gray-900">{user?.fullName}</h2>
+          <p className="mt-2 text-sm text-gray-500">از سامانه مدیریت هوشمند برق متین استفاده می‌کنید</p>
         </div>
         <div
-          className="absolute left-6 top-1/2 -translate-y-1/2 h-20 w-20 rounded-full opacity-10"
-          style={{ background: 'rgba(255,255,255,0.3)' }}
+          className="absolute left-6 top-1/2 -translate-y-1/2 h-20 w-20 rounded-full bg-emerald-50"
         />
         <div
-          className="absolute left-14 top-1/2 -translate-y-1/2 h-32 w-32 rounded-full opacity-5"
-          style={{ background: 'rgba(255,255,255,0.5)' }}
+          className="absolute left-14 top-1/2 -translate-y-1/2 h-32 w-32 rounded-full bg-emerald-50/70"
         />
       </div>
 
@@ -75,7 +73,7 @@ export default function CustomerDashboard() {
               </div>
               <p className="font-semibold text-gray-800">{label}</p>
               <p className="mt-1 text-xs text-gray-500">{desc}</p>
-              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-primary-600 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100">
                 <span>مشاهده</span>
                 <ArrowLeft className="h-3 w-3" />
               </div>
@@ -111,7 +109,7 @@ export default function CustomerDashboard() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">آخرین قراردادها</h3>
-            <Link to="/customer/contracts" className="text-xs font-semibold text-primary-600 hover:text-primary-800">
+            <Link to="/customer/contracts" className="text-xs font-semibold text-emerald-700 hover:text-emerald-900">
               مشاهده همه
             </Link>
           </div>

@@ -12,8 +12,15 @@ import type { MonthlyMarketRate } from '../../types'
 
 const JALALI_MONTHS = ['', 'فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 
+function jalaliYear(): number {
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate()
+  return (m > 3 || (m === 3 && day >= 20)) ? d.getFullYear() - 621 : d.getFullYear() - 622
+}
+
+const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => jalaliYear() - 2 + i)
+
 const empty: MonthlyMarketRate = {
-  id: 0, year: 1404, month: 1,
+  id: 0, year: jalaliYear(), month: 1,
   marketPeak: 0, marketMid: 0, marketLow: 0, backupRate: 0,
   boardPeak: 0, boardMid: 0, boardLow: 0,
   greenBoardRate: 0, article16Rate: 0, fuelFee: 0,
@@ -94,6 +101,9 @@ export default function AdminMarketRates() {
   }, [data])
 
   const f = (key: keyof MonthlyMarketRate) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [key]: Math.max(0, +e.target.value) })
+
+  const sel = (key: keyof MonthlyMarketRate) => (e: React.ChangeEvent<HTMLSelectElement>) =>
     setForm({ ...form, [key]: +e.target.value })
 
   const columns = [
@@ -202,20 +212,32 @@ export default function AdminMarketRates() {
         size="lg"
       >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Input label="سال"          type="number" value={form.year}             onChange={f('year')} />
-          <Input label="ماه"          type="number" value={form.month}            onChange={f('month')} />
-          <Input label="نرخ اوج بار" type="number" value={form.marketPeak}       onChange={f('marketPeak')} />
-          <Input label="نرخ میان بار" type="number" value={form.marketMid}       onChange={f('marketMid')} />
-          <Input label="نرخ کم بار"  type="number" value={form.marketLow}        onChange={f('marketLow')} />
-          <Input label="نرخ پشتیبان" type="number" value={form.backupRate}       onChange={f('backupRate')} />
-          <Input label="تابلوی اوج"  type="number" value={form.boardPeak}        onChange={f('boardPeak')} />
-          <Input label="تابلوی میان" type="number" value={form.boardMid}         onChange={f('boardMid')} />
-          <Input label="تابلوی کم"   type="number" value={form.boardLow}         onChange={f('boardLow')} />
-          <Input label="نرخ سبز تابلو" type="number" value={form.greenBoardRate} onChange={f('greenBoardRate')} />
-          <Input label="ماده ۱۶ (ریال/kWh)" type="number" value={form.article16Rate} onChange={f('article16Rate')} />
-          <Input label="هزینه سوخت"  type="number" value={form.fuelFee}          onChange={f('fuelFee')} />
-          <Input label="تعرفه پایه صنعتی" type="number" value={form.industrialTariffBase} onChange={f('industrialTariffBase')} />
-          <Input label="تعرفه پایه اجرایی" type="number" value={form.executiveTariffBase} onChange={f('executiveTariffBase')} />
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">سال</label>
+            <select value={form.year} onChange={sel('year')}
+              className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">ماه</label>
+            <select value={form.month} onChange={sel('month')}
+              className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              {JALALI_MONTHS.slice(1).map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
+            </select>
+          </div>
+          <Input label="نرخ اوج بار (ریال/kWh)" type="number" min={0} value={form.marketPeak}           onChange={f('marketPeak')} />
+          <Input label="نرخ میان بار"             type="number" min={0} value={form.marketMid}            onChange={f('marketMid')} />
+          <Input label="نرخ کم بار"               type="number" min={0} value={form.marketLow}            onChange={f('marketLow')} />
+          <Input label="نرخ پشتیبان"              type="number" min={0} value={form.backupRate}           onChange={f('backupRate')} />
+          <Input label="تابلوی اوج"               type="number" min={0} value={form.boardPeak}            onChange={f('boardPeak')} />
+          <Input label="تابلوی میان"              type="number" min={0} value={form.boardMid}             onChange={f('boardMid')} />
+          <Input label="تابلوی کم"                type="number" min={0} value={form.boardLow}             onChange={f('boardLow')} />
+          <Input label="نرخ سبز تابلو"            type="number" min={0} value={form.greenBoardRate}       onChange={f('greenBoardRate')} />
+          <Input label="ماده ۱۶ (ریال/kWh)"       type="number" min={0} value={form.article16Rate}        onChange={f('article16Rate')} />
+          <Input label="هزینه سوخت"               type="number" min={0} value={form.fuelFee}              onChange={f('fuelFee')} />
+          <Input label="تعرفه پایه صنعتی"         type="number" min={0} value={form.industrialTariffBase} onChange={f('industrialTariffBase')} />
+          <Input label="تعرفه پایه اجرایی"        type="number" min={0} value={form.executiveTariffBase}  onChange={f('executiveTariffBase')} />
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>

@@ -1,4 +1,4 @@
-import { Bell, Settings } from 'lucide-react'
+import { Bell, Settings, Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 interface HeaderProps {
@@ -11,50 +11,55 @@ export default function Header({ title, role }: HeaderProps) {
 
   return (
     <header
-      className="flex h-16 shrink-0 items-center justify-between px-6 lg:px-8"
+      className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6 lg:px-8"
       style={{
-        background: 'rgba(255,255,255,0.75)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(209,250,229,0.7)',
-        boxShadow: '0 1px 12px rgba(6,78,59,0.06)',
+        boxShadow: '0 1px 6px rgba(15,23,42,0.04)',
       }}
     >
       {/* Page title — right side (RTL) */}
-      <div>
-        <h1 className="text-base font-bold text-primary-900">{title}</h1>
+      <div className="min-w-0 shrink-0">
+        <h1 className="text-base font-bold text-gray-900">{title}</h1>
         <p className="text-[11px] text-gray-400 mt-0.5">
           {role === 'admin' ? 'پنل مدیریت سیستم' : 'پنل کاربری'}
         </p>
       </div>
 
+      {/* Center search (matches reference top bar) */}
+      <div className="relative mx-auto hidden w-full max-w-md lg:block">
+        <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <input
+          placeholder={role === 'admin' ? 'جستجو در درخواست‌ها...' : 'جستجو در قراردادها و تیکت‌ها...'}
+          className="h-10 w-full rounded-full border border-gray-200 bg-gray-50 py-2 pr-10 pl-4 text-sm text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+        />
+      </div>
+
       {/* Actions — left side (RTL: user pill rightmost, bell leftmost) */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {/* User pill */}
         <div
           className="flex items-center gap-2.5 rounded-xl px-3 py-1.5"
-          style={{ background: 'rgba(236,253,245,0.8)', border: '1px solid rgba(167,243,208,0.5)' }}
+          style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
         >
           <div
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
+            style={{ background: 'linear-gradient(135deg, #065f46, #064e3b)' }}
           >
             {user?.fullName?.charAt(0) ?? 'U'}
           </div>
-          <span className="text-sm font-medium text-primary-800 hidden sm:block">
+          <span className="text-sm font-medium text-gray-700 hidden sm:block">
             {user?.fullName}
           </span>
         </div>
 
         <button
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-all hover:bg-emerald-50 hover:text-primary-700"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-all hover:bg-gray-100 hover:text-emerald-800"
           title="تنظیمات"
         >
           <Settings style={{ width: '18px', height: '18px' }} />
         </button>
 
         <button
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-all hover:bg-emerald-50 hover:text-primary-700"
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-all hover:bg-gray-100 hover:text-emerald-800"
           title="اعلانات"
         >
           <Bell style={{ width: '18px', height: '18px' }} />

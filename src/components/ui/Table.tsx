@@ -52,18 +52,15 @@ export function Table<T extends object>({
 
   return (
     <div
-      className="overflow-hidden rounded-2xl"
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
       style={{
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(209,250,229,0.6)',
-        boxShadow: '0 4px 24px rgba(6,78,59,0.06)',
+        boxShadow: '0 2px 12px rgba(15,23,42,0.04)',
       }}
     >
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y text-sm" style={{ borderColor: 'rgba(209,250,229,0.5)' }}>
+        <table className="min-w-full divide-y text-sm" style={{ borderColor: '#e5e7eb' }}>
           <thead>
-            <tr style={{ background: 'rgba(236,253,245,0.7)' }}>
+            <tr style={{ background: '#f8fafc' }}>
               {selectable && (
                 <th className="w-10 px-4 py-3 text-right">
                   <input
@@ -79,7 +76,7 @@ export function Table<T extends object>({
                 <th
                   key={String(col.key)}
                   className={clsx(
-                    'px-4 py-3 text-right text-xs font-bold text-primary-800/70 uppercase tracking-wide',
+                    'px-4 py-3 text-right text-xs font-bold text-gray-600 tracking-wide',
                     col.className
                   )}
                 >
@@ -88,7 +85,7 @@ export function Table<T extends object>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y" style={{ borderColor: 'rgba(209,250,229,0.4)' }}>
+          <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
             {loading ? (
               <tr>
                 <td colSpan={colCount} className="py-14 text-center text-gray-400">
@@ -114,8 +111,8 @@ export function Table<T extends object>({
                     className={clsx(
                       'transition-colors duration-100',
                       checked
-                        ? 'bg-emerald-50/60'
-                        : 'hover:bg-emerald-50/30'
+                        ? 'bg-emerald-50/70'
+                        : 'hover:bg-gray-50'
                     )}
                   >
                     {selectable && (
@@ -179,7 +176,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-white hover:text-primary-700 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-gray-100 hover:text-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -190,8 +187,8 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
             className={clsx(
               'flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-all',
               p === page
-                ? 'bg-primary-700 text-white shadow-sm'
-                : 'text-gray-500 hover:bg-white hover:text-primary-700 hover:shadow-sm'
+                ? 'bg-emerald-800 text-white shadow-sm'
+                : 'text-gray-500 hover:bg-gray-100 hover:text-emerald-800'
             )}
           >
             {p}
@@ -200,7 +197,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-white hover:text-primary-700 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-gray-100 hover:text-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>

@@ -292,10 +292,11 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, on
               >
                 <FileText className="h-5 w-5 shrink-0 text-primary-500" />
                 <span className="flex-1 text-sm text-gray-700">مدرک شناسایی بارگذاری شده است</span>
-                <a href={uploadApi.downloadUrl(identityDocId)} target="_blank" rel="noreferrer"
+                <button
+                  onClick={() => uploadApi.download(identityDocId).catch(() => {})}
                   className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100 transition-colors">
                   <Download className="h-3.5 w-3.5" /> دانلود
-                </a>
+                </button>
               </div>
             ) : (
               <div className="py-10 text-center text-sm text-gray-400">

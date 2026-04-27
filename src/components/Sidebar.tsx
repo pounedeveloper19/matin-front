@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, User, FileText, Zap, MessageSquare,
   Users, Building2, Building, LogOut, Bolt,
-  BarChart2, Tag, Clock, Receipt, UserCheck, Megaphone,
+  BarChart2, Tag, Clock, Receipt, UserCheck, Megaphone, Headset,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -11,7 +11,7 @@ const customerNav = [
   { to: '/customer/profile',   label: 'پروفایل',          icon: User },
   { to: '/customer/contracts', label: 'قراردادها',         icon: FileText },
   { to: '/customer/bills',     label: 'تحلیل قبض',        icon: Zap },
-  { to: '/customer/tickets',   label: 'تیکت‌ها',          icon: MessageSquare },
+  { to: '/customer/tickets',   label: 'تیکت‌ها',          icon: Headset },
 ]
 
 const adminNav = [
@@ -23,7 +23,7 @@ const adminNav = [
   { to: '/admin/tariffs',         label: 'تعرفه‌ها',              icon: Tag },
   { to: '/admin/tou-schedule',    label: 'برنامه TOU',            icon: Clock },
   { to: '/admin/bill-reports',    label: 'گزارش قبض‌ها',         icon: Receipt },
-  { to: '/admin/tickets',         label: 'تیکت‌های پشتیبانی',   icon: MessageSquare },
+  { to: '/admin/tickets',         label: 'تیکت‌های پشتیبانی',   icon: Headset },
   { to: '/admin/announcements',   label: 'اعلانات',               icon: Megaphone },
   { to: '/admin/pending-users',   label: 'درخواست‌های ثبت‌نام', icon: UserCheck },
   { to: '/admin/power-entities',  label: 'شرکت‌های برق',         icon: Building },
@@ -47,16 +47,16 @@ export default function Sidebar({ role }: SidebarProps) {
       }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-6" style={{ borderBottom: '1px solid #f1f5f9' }}>
+      <div className="flex flex-col items-center px-5 py-6 text-center" style={{ borderBottom: '1px solid #f1f5f9' }}>
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
           style={{ background: '#065f46' }}
         >
           <Bolt className="h-5 w-5 text-emerald-50" />
         </div>
-        <div>
-          <p className="text-sm font-bold text-slate-800 leading-tight">توزیع نیروی برق</p>
-          <p className="mt-0.5 text-[11px] text-emerald-700/70">مدیریت هوشمند انرژی</p>
+        <div className="mt-3">
+          <p className="text-base font-bold text-slate-800 leading-tight">توزیع نیروی برق</p>
+          <p className="mt-1 text-[11px] text-emerald-700/70">مدیریت هوشمند انرژی</p>
         </div>
       </div>
 
@@ -71,8 +71,8 @@ export default function Sidebar({ role }: SidebarProps) {
                   [
                     'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                     isActive
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-emerald-600 hover:text-white',
+                      ? 'bg-emerald-800 text-white shadow-sm'
+                      : 'text-emerald-700 hover:bg-emerald-800 hover:text-white',
                   ].join(' ')
                 }
               >
@@ -81,7 +81,7 @@ export default function Sidebar({ role }: SidebarProps) {
                     <span
                       className={[
                         'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all',
-                        isActive ? 'bg-emerald-500/40' : 'bg-transparent',
+                        isActive ? 'bg-emerald-700/50' : 'bg-transparent',
                       ].join(' ')}
                     >
                       <Icon className="h-4 w-4" />
@@ -117,7 +117,7 @@ export default function Sidebar({ role }: SidebarProps) {
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-slate-600 transition-all hover:bg-emerald-600 hover:text-white"
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-emerald-700 transition-all hover:bg-emerald-800 hover:text-white"
         >
           <LogOut className="h-4 w-4" />
           خروج از سیستم

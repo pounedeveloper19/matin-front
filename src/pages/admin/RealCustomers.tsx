@@ -3,6 +3,7 @@ import { Search, Users, Plus, Pencil, Trash2, Eye, Trash, UserCheck, UserX, Home
 import toast from 'react-hot-toast'
 import { validateNationalCode, validateMobile } from '../../utils/validators'
 import { adminApi } from '../../api/admin'
+import { lookupApi } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
 import { StatCard } from '../../components/ui/Card'
 import { RegionHeatMap } from '../../components/ui/Charts'
@@ -51,7 +52,12 @@ export default function AdminRealCustomers() {
   const [detailTitle, setDetailTitle] = useState('')
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [provinces, setProvinces] = useState<{ id: number; name: string }[]>([])
   const pageSize = 10
+
+  useEffect(() => {
+    lookupApi.getProvinces().then(r => { if (r.code === 200 && Array.isArray(r.result)) setProvinces(r.result) })
+  }, [])
 
   const fetchStats = useCallback(() => {
     adminApi.getRealCustomers({ pageNumber: 1, pageSize: 1, Search_IsActive: 'true' })
@@ -361,7 +367,7 @@ export default function AdminRealCustomers() {
         </div>
 
         {/* Region heat map */}
-        <RegionHeatMap totalCustomers={total} />
+        <RegionHeatMap totalCustomers={total} provinces={provinces} />
       </div>
     </div>
   )

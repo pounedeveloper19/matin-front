@@ -362,6 +362,8 @@ export interface Tariff {
   powerEntitiesId: number
   powerEntity?: string
   effectiveFrom: string | null
+  effectiveFromRaw?: string | null
+  slabCount?: number
 }
 
 // TariffSlab
@@ -390,6 +392,12 @@ export interface PendingUser {
   legalName: string | null
   nationalCode: string | null
   nationalId: string | null
+  registeredAt?: string | null
+  city?: string | null
+  province?: string | null
+  mainAddress?: string | null
+  hasIdentityDoc?: boolean
+  hasAddress?: boolean
 }
 
 // Bill Analysis Report (admin)

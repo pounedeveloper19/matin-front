@@ -5,13 +5,18 @@
 @layer base {
   * {
     font-family: 'Vazirmatn', system-ui, sans-serif;
+    box-sizing: border-box;
   }
 
   body {
-    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 40%, #f8fafc 100%);
+    background: #f3f4f6;
     min-height: 100vh;
-    color: #111827;
+    color: #0f172a;
     direction: rtl;
+  }
+
+  #root {
+    min-height: 100vh;
   }
 
   input,
@@ -23,19 +28,15 @@
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    box-shadow: 0 4px 24px rgba(6, 78, 59, 0.06), 0 1px 3px rgba(6, 78, 59, 0.04);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
   }
 
   .glass-card-solid {
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(209, 250, 229, 0.6);
-    box-shadow: 0 4px 24px rgba(6, 78, 59, 0.07), 0 1px 3px rgba(6, 78, 59, 0.04);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
   }
 }
 
@@ -55,7 +56,7 @@
     background: transparent;
   }
   .sidebar-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(6, 95, 70, 0.22);
     border-radius: 4px;
   }
 }

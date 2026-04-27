@@ -74,14 +74,6 @@ export const adminApi = {
   deleteRealCustomer: (id: number) =>
     client.delete<ExecutionResult>(`/CustomerRealManagement/Delete/${id}`).then((r) => r.data),
 
-  // Addresses
-  getAddresses: (parentId?: number, params: PageParams = {}) =>
-    client
-      .get<ExecutionResult<PaginationResult<AdminAddress>>>('/CustomerAddress/List', {
-        params: buildParams({ pageNumber: 1, pageSize: 10, parentId, ...params }),
-      })
-      .then((r) => r.data),
-
   // Contracts
   getContracts: (params: PageParams = {}) =>
     client
