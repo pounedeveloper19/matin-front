@@ -10,13 +10,28 @@ import type {
   MonthlyMarketRate,
   Tariff,
   TariffSlab,
+  TariffCode,
+  TariffCodeOption,
   HourEntry,
   AdminBillReport,
+  BillAnalysisResult,
   PendingUser,
   AdminAnnouncement,
   AdminSubscription,
   AddTicketMessageRequest,
   UpdateTicketStatusRequest,
+  AdminUser,
+  AdminRole,
+  SetUserRoleRequest,
+  UpdateUserRequest,
+  CreateAdminUserRequest,
+  SetPermissionsRequest,
+  AdminOrderResult,
+  UpdateOrderStatusRequest,
+  ConfirmPaymentRequest,
+  ContractReportResult,
+  OrderReportResult,
+  PaymentReportResult,
 } from '../types'
 
 type PageParams = {
@@ -53,6 +68,9 @@ export const adminApi = {
 
   deleteLegalCustomer: (id: number) =>
     client.delete<ExecutionResult>(`/CustomerLegalManagement/Delete/${id}`).then((r) => r.data),
+
+  getContractPrintData: (contractId: number) =>
+    client.get<ExecutionResult<any>>('/AdminContract/GetContractPrintData', { params: { contractId } }).then((r) => r.data),
 
   // Real customers
   getRealCustomers: (params: PageParams = {}) =>
@@ -181,6 +199,9 @@ export const adminApi = {
       })
       .then((r) => r.data),
 
+  getBillReportsByProfile: (profileId: number) =>
+    client.get<ExecutionResult<AdminBillReport[]>>(`/BillAdmin/GetByProfile/${profileId}`).then((r) => r.data),
+
   deleteBillReport: (id: number) =>
     client.delete<ExecutionResult>(`/BillAdmin/Delete/${id}`).then((r) => r.data),
 
@@ -193,7 +214,7 @@ export const adminApi = {
     lowKwh: number
     fridayPeakKwh: number
   }) =>
-    client.post<ExecutionResult>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
+    client.post<ExecutionResult<BillAnalysisResult>>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
 
   // Customer full detail (addresses, subscriptions, identity doc)
   getCustomerFullDetail: (profileId: number) =>
@@ -299,6 +320,95 @@ export const adminApi = {
   deletePowerEntity: (id: number) =>
     client.delete<ExecutionResult>(`/PowerEntity/Delete/${id}`).then((r) => r.data),
 
+  // TariffCode CRUD
+  getTariffCodes: (params: PageParams = {}) =>
+    client.get<ExecutionResult<PaginationResult<TariffCode>>>('/TariffCode/List', {
+      params: buildParams({ pageNumber: 1, pageSize: 50, ...params }),
+    }).then(r => r.data),
+
+  getTariffCodeDetail: (id: number) =>
+    client.get<ExecutionResult<TariffCode>>(`/TariffCode/Detail/${id}`).then(r => r.data),
+
+  createTariffCode: (data: TariffCode) =>
+    client.post<ExecutionResult>('/TariffCode/Insert', data).then(r => r.data),
+
+  updateTariffCode: (data: TariffCode) =>
+    client.put<ExecutionResult>('/TariffCode/Update', data).then(r => r.data),
+
+  deleteTariffCode: (id: number) =>
+    client.delete<ExecutionResult>(`/TariffCode/Delete/${id}`).then(r => r.data),
+
+  // TariffCodeOption CRUD
+  getTariffCodeOptions: (params: PageParams = {}) =>
+    client.get<ExecutionResult<PaginationResult<TariffCodeOption>>>('/TariffCodeOption/List', {
+      params: buildParams({ pageNumber: 1, pageSize: 100, ...params }),
+    }).then(r => r.data),
+
+  getTariffCodeOptionDetail: (id: number) =>
+    client.get<ExecutionResult<TariffCodeOption>>(`/TariffCodeOption/Detail/${id}`).then(r => r.data),
+
+  createTariffCodeOption: (data: TariffCodeOption) =>
+    client.post<ExecutionResult>('/TariffCodeOption/Insert', data).then(r => r.data),
+
+  updateTariffCodeOption: (data: TariffCodeOption) =>
+    client.put<ExecutionResult>('/TariffCodeOption/Update', data).then(r => r.data),
+
+  deleteTariffCodeOption: (id: number) =>
+    client.delete<ExecutionResult>(`/TariffCodeOption/Delete/${id}`).then(r => r.data),
+
+  // User Management
+  getUsers: (params: PageParams = {}) =>
+    client.get<ExecutionResult<PaginationResult<AdminUser>>>('/AdminUserManagement/List', {
+      params: buildParams({ pageNumber: 1, pageSize: 20, ...params }),
+    }).then(r => r.data),
+
+  updateUser: (data: UpdateUserRequest) =>
+    client.put<ExecutionResult>('/AdminUserManagement/UpdateUser', data).then(r => r.data),
+
+  setUserRole: (data: SetUserRoleRequest) =>
+    client.put<ExecutionResult>('/AdminUserManagement/SetRole', data).then(r => r.data),
+
+  toggleUserActive: (userId: number) =>
+    client.put<ExecutionResult>(`/AdminUserManagement/ToggleActive/${userId}`, {}).then(r => r.data),
+
+  createAdminUser: (data: CreateAdminUserRequest) =>
+    client.post<ExecutionResult>('/AdminUserManagement/CreateAdmin', data).then(r => r.data),
+
+  // Role Management
+  getRoles: () =>
+    client.get<ExecutionResult<AdminRole[]>>('/AdminRole/List').then(r => r.data),
+
+  createRole: (data: { title: string; description?: string }) =>
+    client.post<ExecutionResult>('/AdminRole/Create', data).then(r => r.data),
+
+  updateRole: (data: { id: number; title: string; description?: string }) =>
+    client.put<ExecutionResult>('/AdminRole/Update', data).then(r => r.data),
+
+  deleteRole: (id: number) =>
+    client.delete<ExecutionResult>(`/AdminRole/Delete/${id}`).then(r => r.data),
+
+  getRolePermissions: (roleId: number) =>
+    client.get<ExecutionResult<number[]>>(`/AdminRole/GetPermissions/${roleId}`).then(r => r.data),
+
+  setRolePermissions: (data: SetPermissionsRequest) =>
+    client.put<ExecutionResult>('/AdminRole/SetPermissions', data).then(r => r.data),
+
+  // Orders (Admin)
+  getAdminOrders: (params: PageParams = {}) =>
+    client.get<ExecutionResult<{ pageNumber: number; pageSize: number; totalRecords: number; totalPages: number; data: AdminOrderResult[] }>>(
+      '/AdminOrder/GetList',
+      { params: buildParams({ pageNumber: 1, pageSize: 20, ...params }) }
+    ).then(r => r.data),
+
+  getAdminOrderDetail: (id: number) =>
+    client.get<ExecutionResult<AdminOrderResult>>(`/AdminOrder/GetDetail/${id}`).then(r => r.data),
+
+  updateOrderStatus: (data: UpdateOrderStatusRequest) =>
+    client.put<ExecutionResult>('/AdminOrder/UpdateStatus', data).then(r => r.data),
+
+  confirmPayment: (data: ConfirmPaymentRequest) =>
+    client.put<ExecutionResult>('/AdminOrder/ConfirmPayment', data).then(r => r.data),
+
   // Pending registrations
   getPendingUsers: () =>
     client.get<ExecutionResult<PendingUser[]>>('/PendingUsers/List').then((r) => r.data),
@@ -308,4 +418,14 @@ export const adminApi = {
 
   rejectUser: (userId: number) =>
     client.delete<ExecutionResult>(`/PendingUsers/Reject/${userId}`).then((r) => r.data),
+
+  // Reports
+  getContractReport: (params?: { search?: string; statusId?: number; fromDate?: string; toDate?: string }) =>
+    client.get<ExecutionResult<ContractReportResult>>('/AdminReport/ContractReport', { params }).then(r => r.data),
+
+  getOrderReport: (params?: { statusId?: number; energyTypeId?: number; isPriceRequest?: boolean; fromDate?: string; toDate?: string }) =>
+    client.get<ExecutionResult<OrderReportResult>>('/AdminReport/OrderReport', { params }).then(r => r.data),
+
+  getPaymentReport: (params?: { statusId?: number; methodId?: number; fromDate?: string; toDate?: string }) =>
+    client.get<ExecutionResult<PaymentReportResult>>('/AdminReport/PaymentReport', { params }).then(r => r.data),
 }

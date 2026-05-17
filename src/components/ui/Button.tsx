@@ -26,13 +26,13 @@ export default function Button({
 
   const variants = {
     primary: [
-      'bg-emerald-800 text-white shadow-sm',
-      'hover:bg-emerald-900 hover:shadow-md',
+      'text-white shadow-sm',
+      'hover:brightness-110 hover:shadow-md',
       'focus:ring-primary-500',
     ].join(' '),
     secondary: [
-      'border border-gray-200 bg-white text-gray-700 shadow-sm',
-      'hover:bg-gray-50 hover:border-gray-300',
+      'border shadow-sm',
+      'hover:brightness-[0.98] hover:border-transparent',
       'focus:ring-primary-300',
     ].join(' '),
     danger: [
@@ -57,6 +57,19 @@ export default function Button({
     <button
       disabled={disabled || loading}
       className={clsx(base, variants[variant], sizes[size], className)}
+      style={
+        variant === 'primary'
+          ? {
+              background: 'var(--app-primary)',
+            }
+          : variant === 'secondary'
+            ? {
+                background: 'var(--app-primary-soft)',
+                borderColor: 'var(--app-border-strong)',
+                color: 'var(--app-primary)',
+              }
+            : undefined
+      }
       {...props}
     >
       {loading && <Loader2 className="h-4 w-4 animate-spin" />}

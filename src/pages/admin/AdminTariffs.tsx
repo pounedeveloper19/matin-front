@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Tag, Layers, X, Zap, CheckCircle, Filter, Download, BarChart3, CalendarDays } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Layers, X, Download, BarChart3, Home, Factory, Store, Zap, Calculator } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi } from '../../api/lookup'
@@ -13,16 +13,28 @@ import type { Tariff, TariffSlab } from '../../types'
 const emptyTariff: Tariff = { tariffId: 0, tariffTypeId: 1, customerTypeId: 1, powerEntitiesId: 0, effectiveFrom: null }
 const emptySlab: TariffSlab = { id: 0, tariffId: 0, fromKwh: 0, toKwh: null, multiplier: 1 }
 
+const TYPE_META: Record<number, { badge: string; badgeColor: string; desc: string; btnLabel: string; icon: typeof Home }> = {
+  1: { badge: 'مصرفی', badgeColor: 'bg-blue-100 text-blue-700', desc: 'محاسبه بر اساس پله‌های مصرفی با نرخ‌های پلکانی جهت تشویق به صرفه‌جویی.', btnLabel: 'مشاهده جزئیات کامل', icon: Home },
+  2: { badge: 'تولیدی', badgeColor: 'bg-amber-100 text-amber-700', desc: 'ساختار منعطف بر اساس قدرت قرارداد، ضریب‌بندی قدرت و ولتاژ اتصال.', btnLabel: 'تحلیل هزینه صنعتی', icon: Factory },
+  3: { badge: 'سایر مصارف', badgeColor: 'bg-purple-100 text-purple-700', desc: 'تعرفه‌های ویژه برای اغذیه‌فروشی، مراکز خرید و هتل‌ها.', btnLabel: 'استعلام نرخ تجاری', icon: Store },
+}
+
+const CARD_COLORS = [
+  { border: '#10b981', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+  { border: '#f59e0b', iconBg: 'bg-amber-50',   iconColor: 'text-amber-600' },
+  { border: '#8b5cf6', iconBg: 'bg-violet-50',  iconColor: 'text-violet-600' },
+]
+
 export default function AdminTariffs() {
   // ── Tariff state ─────────────────────────────────────────────────────
-  const [tariffs, setTariffs]         = useState<Tariff[]>([])
-  const [tariffTotal, setTariffTotal] = useState(0)
-  const [tariffPages, setTariffPages] = useState(1)
-  const [tariffPage, setTariffPage]   = useState(1)
+  const [tariffs, setTariffs]             = useState<Tariff[]>([])
+  const [tariffTotal, setTariffTotal]     = useState(0)
+  const [tariffPages, setTariffPages]     = useState(1)
+  const [tariffPage, setTariffPage]       = useState(1)
   const [tariffLoading, setTariffLoading] = useState(true)
-  const [tariffModal, setTariffModal] = useState<'create' | 'edit' | 'delete' | null>(null)
-  const [tariffForm, setTariffForm]   = useState<Tariff>(emptyTariff)
-  const [tariffSaving, setTariffSaving] = useState(false)
+  const [tariffModal, setTariffModal]     = useState<'create' | 'edit' | 'delete' | null>(null)
+  const [tariffForm, setTariffForm]       = useState<Tariff>(emptyTariff)
+  const [tariffSaving, setTariffSaving]   = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null)
 
   // ── Lookups ──────────────────────────────────────────────────────────
@@ -45,20 +57,58 @@ export default function AdminTariffs() {
   const [slabForm, setSlabForm]     = useState<TariffSlab>(emptySlab)
   const [slabSaving, setSlabSaving] = useState(false)
 
+  // ── Per-type preview slabs ────────────────────────────────────────────
+  const [typeSlabs, setTypeSlabs]           = useState<Record<number, TariffSlab[]>>({})
+  const [typeSlabsLoaded, setTypeSlabsLoaded] = useState<Record<number, boolean>>({})
+
+  // ── Estimator ────────────────────────────────────────────────────────
+  const [estimatorKwh, setEstimatorKwh]       = useState('')
+  const [estimatorTypeId, setEstimatorTypeId] = useState<number>(1)
+
   const pageSize = 10
 
-  const tariffTypeCounts = useMemo(() =>
-    tariffTypes.reduce((acc, t) => ({
-      ...acc,
-      [t.id]: tariffs.filter(x => x.tariffTypeId === t.id).length,
-    }), {} as Record<number, number>)
-  , [tariffTypes, tariffs])
+  // ── Derived ──────────────────────────────────────────────────────────
+  const newestPerType = useMemo(() => {
+    const groups = new Map<number, Tariff[]>()
+    tariffs.forEach((t) => {
+      if (!groups.has(t.tariffTypeId)) groups.set(t.tariffTypeId, [])
+      groups.get(t.tariffTypeId)!.push(t)
+    })
+    return Array.from(groups.entries()).map(([typeId, items]) => {
+      const newest = [...items].sort((a, b) => b.tariffId - a.tariffId)[0]
+      return { typeId, newest, count: items.length }
+    })
+  }, [tariffs])
 
-  const typeCardColors = [
-    { border: '#10b981', bg: '#ffffff', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-600' },
-    { border: '#14b8a6', bg: '#ffffff', badge: 'bg-teal-100 text-teal-700',   icon: 'text-teal-600' },
-    { border: '#065f46', bg: '#ffffff', badge: 'bg-emerald-100 text-emerald-700', icon: 'text-emerald-800' },
-  ]
+  const filteredTariffs = selectedTypeId
+    ? tariffs.filter(t => t.tariffTypeId === selectedTypeId)
+    : tariffs
+
+  const slabBars = useMemo(() => {
+    if (!slabs.length) return []
+    return slabs
+      .slice()
+      .sort((a, b) => Number(a.fromKwh) - Number(b.fromKwh))
+      .map((s, idx) => ({
+        label: `${Number(s.fromKwh).toLocaleString('fa-IR')}`,
+        value: Number(s.multiplier),
+        color: idx % 3 === 0 ? '#99f6e4' : idx % 3 === 1 ? '#34d399' : '#047857',
+      }))
+  }, [slabs])
+  const slabBarsMax = useMemo(
+    () => Math.max(...slabBars.map(b => b.value), 1),
+    [slabBars],
+  )
+
+  const estimatorResult = useMemo(() => {
+    const kwh = parseFloat(estimatorKwh)
+    if (!kwh || kwh <= 0) return null
+    const ts = typeSlabs[estimatorTypeId] ?? []
+    const sorted = [...ts].sort((a, b) => Number(a.fromKwh) - Number(b.fromKwh))
+    const slab = sorted.find(s => kwh >= Number(s.fromKwh) && (s.toKwh === null || kwh <= Number(s.toKwh)))
+    if (!slab) return null
+    return { slab, kwh }
+  }, [estimatorKwh, estimatorTypeId, typeSlabs])
 
   // ── Fetchers ─────────────────────────────────────────────────────────
   const fetchTariffs = useCallback((p: number) => {
@@ -97,6 +147,23 @@ export default function AdminTariffs() {
 
   useEffect(() => { fetchTariffs(tariffPage) }, [tariffPage, fetchTariffs])
 
+  // fetch preview slabs for each type's newest tariff
+  useEffect(() => {
+    if (!newestPerType.length) return
+    newestPerType.forEach(({ typeId, newest }) => {
+      if (!newest) {
+        setTypeSlabsLoaded(prev => ({ ...prev, [typeId]: true }))
+        return
+      }
+      adminApi.getTariffSlabs({ pageNumber: 1, pageSize: 20, Search_TariffId: newest.tariffId })
+        .then((r) => {
+          const data: TariffSlab[] = (r.result as any)?.data ?? []
+          setTypeSlabs(prev => ({ ...prev, [typeId]: data }))
+        })
+        .finally(() => setTypeSlabsLoaded(prev => ({ ...prev, [typeId]: true })))
+    })
+  }, [newestPerType])
+
   useEffect(() => {
     if (selectedTariff) {
       setSlabPage(1)
@@ -124,7 +191,7 @@ export default function AdminTariffs() {
       const res = tariffModal === 'create'
         ? await adminApi.createTariff(tariffForm)
         : await adminApi.updateTariff(tariffForm)
-      if (res.code === 200) {
+      if (res.type === 'Success') {
         toast.success(tariffModal === 'create' ? 'تعرفه ثبت شد' : 'تعرفه ویرایش شد')
         setTariffModal(null); fetchTariffs(tariffPage)
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -136,7 +203,7 @@ export default function AdminTariffs() {
     setTariffSaving(true)
     try {
       const res = await adminApi.deleteTariff(tariffForm.tariffId)
-      if (res.code === 200) {
+      if (res.type === 'Success') {
         toast.success('تعرفه حذف شد')
         setTariffModal(null)
         fetchTariffs(tariffPage)
@@ -147,10 +214,7 @@ export default function AdminTariffs() {
   }
 
   // ── Slab CRUD ─────────────────────────────────────────────────────────
-  const openCreateSlab = () => {
-    setSlabForm({ ...emptySlab, tariffId: selectedTariff!.tariffId })
-    setSlabModal('create')
-  }
+  const openCreateSlab = () => { setSlabForm({ ...emptySlab, tariffId: selectedTariff!.tariffId }); setSlabModal('create') }
   const openEditSlab = async (row: TariffSlab) => {
     try { const r = await adminApi.getTariffSlabDetail(row.id); setSlabForm(r.result ?? row) }
     catch { setSlabForm(row) }
@@ -164,7 +228,7 @@ export default function AdminTariffs() {
       const res = slabModal === 'create'
         ? await adminApi.createTariffSlab(slabForm)
         : await adminApi.updateTariffSlab(slabForm)
-      if (res.code === 200) {
+      if (res.type === 'Success') {
         toast.success(slabModal === 'create' ? 'پله ثبت شد' : 'پله ویرایش شد')
         setSlabModal(null); fetchSlabs(slabPage, selectedTariff!.tariffId)
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -176,7 +240,7 @@ export default function AdminTariffs() {
     setSlabSaving(true)
     try {
       const res = await adminApi.deleteTariffSlab(slabForm.id)
-      if (res.code === 200) {
+      if (res.type === 'Success') {
         toast.success('پله حذف شد')
         setSlabModal(null); fetchSlabs(slabPage, selectedTariff!.tariffId)
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -184,9 +248,9 @@ export default function AdminTariffs() {
     finally { setSlabSaving(false) }
   }
 
-  // ── Columns ───────────────────────────────────────────────────────────
+  // ── Table columns ─────────────────────────────────────────────────────
   const tariffColumns = [
-    { key: 'tariffId',      header: '#',          className: 'w-16' },
+    { key: 'tariffId',      header: '#',           className: 'w-16' },
     { key: 'tariffType',    header: 'نوع تعرفه' },
     { key: 'customerType',  header: 'نوع مشتری' },
     { key: 'powerEntity',   header: 'شرکت برق' },
@@ -197,7 +261,7 @@ export default function AdminTariffs() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setSelectedTariff(prev => prev?.tariffId === row.tariffId ? null : row)}
-            title="تعرفه پلکانی"
+            title="پله‌های تعرفه"
             className={`rounded p-1.5 transition-colors ${
               selectedTariff?.tariffId === row.tariffId
                 ? 'bg-purple-100 text-purple-600'
@@ -218,10 +282,31 @@ export default function AdminTariffs() {
   ]
 
   const slabColumns = [
-    { key: 'id',         header: '#',        className: 'w-16' },
-    { key: 'fromKwh',   header: 'از (kWh)' },
-    { key: 'toKwh',     header: 'تا (kWh)',  render: (r: TariffSlab) => r.toKwh ?? '—' },
-    { key: 'multiplier', header: 'ضریب' },
+    {
+      key: 'range', header: 'پله مصرف (کیلووات ساعت در ماه)',
+      render: (r: TariffSlab) => {
+        const from = Number(r.fromKwh).toLocaleString('fa-IR')
+        const to   = r.toKwh != null ? Number(r.toKwh).toLocaleString('fa-IR') : '∞'
+        return <span className="font-mono text-xs">{from} تا {to}</span>
+      },
+    },
+    {
+      key: 'multiplier', header: 'ضریب جریمه الگو',
+      render: (r: TariffSlab) => (
+        <span className="font-semibold text-gray-800">{Number(r.multiplier).toLocaleString('fa-IR')}</span>
+      ),
+    },
+    {
+      key: 'status', header: 'وضعیت اشتراک',
+      render: (r: TariffSlab) => {
+        const m = Number(r.multiplier)
+        if (m <= 1)   return <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">خوش‌مصرف</span>
+        if (m <= 1.5) return <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">نرمال</span>
+        if (m <= 2.5) return <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">در مجزده الگو</span>
+        if (m <= 4)   return <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">پرمصرف</span>
+        return              <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">بسیار پرمصرف</span>
+      },
+    },
     {
       key: 'actions', header: 'عملیات', className: 'w-24',
       render: (row: TariffSlab) => (
@@ -238,121 +323,199 @@ export default function AdminTariffs() {
   ]
 
   // ── Render ────────────────────────────────────────────────────────────
-  const filteredTariffs = selectedTypeId
-    ? tariffs.filter(t => t.tariffTypeId === selectedTypeId)
-    : tariffs
-
-  const newestPerType = useMemo(() => {
-    const groups = new Map<number, Tariff[]>()
-    tariffs.forEach((t) => {
-      if (!groups.has(t.tariffTypeId)) groups.set(t.tariffTypeId, [])
-      groups.get(t.tariffTypeId)!.push(t)
-    })
-    return Array.from(groups.entries()).map(([typeId, items]) => {
-      const newest = [...items].sort((a, b) => (b.tariffId - a.tariffId))[0]
-      return { typeId, newest, count: items.length }
-    })
-  }, [tariffs])
-
-  const selectedTypeNewest = selectedTypeId
-    ? newestPerType.find((g) => g.typeId === selectedTypeId)?.newest
-    : newestPerType[0]?.newest
-
-  const slabBars = useMemo(() => {
-    if (!slabs.length) return []
-    return slabs
-      .slice()
-      .sort((a, b) => Number(a.fromKwh) - Number(b.fromKwh))
-      .map((s, idx) => ({
-        label: `${Number(s.fromKwh).toLocaleString('fa-IR')}`,
-        value: Number(s.multiplier),
-        color: idx % 3 === 0 ? '#99f6e4' : idx % 3 === 1 ? '#34d399' : '#047857',
-      }))
-  }, [slabs])
-
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+
+      {/* Hero */}
+      <div
+        className="overflow-hidden rounded-2xl px-8 py-8 text-right"
+        style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #ecfdf5 100%)', border: '1px solid #e5e7eb' }}
+      >
         <h2 className="text-3xl font-black tracking-tight text-gray-900">ساختار تعرفه‌های هوشمند انرژی</h2>
-        <p className="mt-1 text-sm text-gray-500">مدیریت تعرفه‌های تجاری، صنعتی و مصرف خانگی با تحلیل پله‌ای</p>
+        <p className="mt-2 max-w-lg text-sm text-gray-500">
+          مشاهده و تحلیل دقیق هزینه‌های انرژی بر اساس نوع اشتراک، پله‌های مصرف و ساعات اوج بار جهت مدیریت بهینه هزینه‌ها.
+        </p>
       </div>
 
       {/* Type cards */}
       {tariffTypes.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3">
           {tariffTypes.map((type, idx) => {
-            const colors = typeCardColors[idx % typeCardColors.length]
-            const count  = tariffTypeCounts[type.id] ?? 0
-            const active = selectedTypeId === type.id
-            const groupData = newestPerType.find((g) => g.typeId === type.id)?.newest
+            const meta      = TYPE_META[type.id] ?? TYPE_META[1]
+            const colors    = CARD_COLORS[idx % CARD_COLORS.length]
+            const group     = newestPerType.find(g => g.typeId === type.id)
+            const preview   = (typeSlabs[type.id] ?? []).slice().sort((a, b) => Number(a.fromKwh) - Number(b.fromKwh)).slice(0, 3)
+            const loaded    = !!typeSlabsLoaded[type.id]
+            const TypeIcon  = meta.icon
+            const isSelected = selectedTypeId === type.id
+
+            const btnColors = [
+              'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+              'bg-amber-50 text-amber-700 hover:bg-amber-100',
+              'bg-violet-50 text-violet-700 hover:bg-violet-100',
+            ]
+
             return (
-              <button
+              <div
                 key={type.id}
-                onClick={() => setSelectedTypeId(active ? null : type.id)}
-                className="group overflow-hidden rounded-2xl border bg-white p-5 text-right transition-all hover:shadow-md"
+                className="flex flex-col overflow-hidden rounded-2xl bg-white transition-all"
                 style={{
-                  background: colors.bg,
-                  borderColor: active ? colors.border : '#e5e7eb',
-                  boxShadow: active ? `0 0 0 2px ${colors.border}22` : '0 2px 10px rgba(0,0,0,0.04)',
+                  border: isSelected ? `2px solid ${colors.border}` : '1px solid #e5e7eb',
+                  boxShadow: isSelected
+                    ? `0 0 0 3px ${colors.border}22, 0 4px 16px rgba(0,0,0,0.08)`
+                    : '0 2px 10px rgba(0,0,0,0.04)',
                 }}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100/70">
-                    <Zap className={`h-5 w-5 ${colors.icon}`} />
-                  </div>
-                  {active && (
-                    <CheckCircle className={`h-5 w-5 ${colors.icon}`} />
-                  )}
-                </div>
-                <div className="mt-4">
-                  <p className="text-base font-bold leading-snug text-gray-800">
-                    {type.title}
-                  </p>
-                  <p className="mt-2 text-xs text-gray-500">
-                    {groupData?.powerEntity ?? '—'} · {groupData?.customerType ?? '—'}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${colors.badge}`}>
-                      {count} تعرفه
+                <div className="flex-1 p-5">
+                  {/* Badge + icon row */}
+                  <div className="flex items-start justify-between">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${meta.badgeColor}`}>
+                      {meta.badge}
                     </span>
-                    <span className="text-xs text-gray-400">
-                      {active ? 'فیلتر فعال' : 'برای فیلتر کلیک کنید'}
-                    </span>
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colors.iconBg}`}>
+                      <TypeIcon className={`h-5 w-5 ${colors.iconColor}`} />
+                    </div>
                   </div>
-                  <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                    اجرا از: {groupData?.effectiveFrom ?? '—'} · {groupData?.slabCount ?? 0} پله
+
+                  {/* Title + desc */}
+                  <div className="mt-4">
+                    <p className="text-lg font-bold text-gray-900">{type.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-500">{meta.desc}</p>
+                  </div>
+
+                  {/* Slab metric rows */}
+                  <div className="mt-4 space-y-2">
+                    {preview.length > 0 ? (
+                      preview.map((s, si) => {
+                        const from = Number(s.fromKwh).toLocaleString('fa-IR')
+                        const to   = s.toKwh != null ? Number(s.toKwh).toLocaleString('fa-IR') : '—'
+                        const labels = ['پله اول', 'پله میانی', 'پله نهایی']
+                        return (
+                          <div key={si} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">{labels[si] ?? `پله ${si + 1}`} ({from} تا {to})</span>
+                            <span className="font-bold text-gray-800">ضریب {Number(s.multiplier).toLocaleString('fa-IR')}</span>
+                          </div>
+                        )
+                      })
+                    ) : loaded ? (
+                      <p className="text-xs text-gray-400">پله‌ای برای این تعرفه ثبت نشده</p>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-gray-300">
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-200 border-t-gray-400" />
+                        در حال بارگذاری...
+                      </div>
+                    )}
                   </div>
                 </div>
-              </button>
+
+                {/* Divider + action */}
+                <div className="border-t border-gray-100 px-5 py-3">
+                  <button
+                    onClick={() => {
+                      setSelectedTypeId(isSelected ? null : type.id)
+                      setEstimatorTypeId(type.id)
+                      const newest = group?.newest
+                      if (newest) setSelectedTariff(newest)
+                    }}
+                    className={`w-full rounded-xl py-2 text-sm font-semibold transition-all ${btnColors[idx % btnColors.length]}`}
+                  >
+                    {isSelected ? '✓ انتخاب‌شده' : meta.btnLabel}
+                  </button>
+                </div>
+              </div>
             )
           })}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <Tag className="h-4 w-4 text-emerald-700" /> تعرفه انتخابی
-          </div>
-          {selectedTypeNewest ? (
-            <div className="space-y-2 text-sm text-gray-600">
-              <p><span className="font-semibold text-gray-800">نوع:</span> {selectedTypeNewest.tariffType}</p>
-              <p><span className="font-semibold text-gray-800">مشتری:</span> {selectedTypeNewest.customerType}</p>
-              <p><span className="font-semibold text-gray-800">شرکت برق:</span> {selectedTypeNewest.powerEntity}</p>
-              <p><span className="font-semibold text-gray-800">تاریخ اجرا:</span> {selectedTypeNewest.effectiveFrom}</p>
+      {/* Estimator + TOU chart */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3" dir="ltr">
+
+        {/* Estimator — dark card (left in ltr) */}
+        <div className="flex flex-col justify-between overflow-hidden rounded-2xl p-5 text-right"
+          style={{ background: 'linear-gradient(145deg, #1e293b, #0f172a)', color: '#fff' }}>
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
+                <Calculator className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="font-bold text-white">تخمین‌گر هزینه</p>
+                <p className="text-[10px] text-slate-400">بر اساس آخرین تعرفه‌ها</p>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">تعرفه‌ای موجود نیست</p>
-          )}
+            <p className="mt-3 text-xs leading-relaxed text-slate-400">
+              با وارد کردن میزان مصرف خود، هزینه قبض را بر اساس آخرین تعرفه‌ها محاسبه کنید.
+            </p>
+
+            {tariffTypes.length > 1 && (
+              <div className="mt-3 flex gap-1.5 flex-wrap">
+                {tariffTypes.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setEstimatorTypeId(t.id)}
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      estimatorTypeId === t.id
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {t.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4">
+              <input
+                type="number"
+                placeholder="میزان مصرف (KWh)"
+                value={estimatorKwh}
+                onChange={e => setEstimatorKwh(e.target.value)}
+                className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                dir="ltr"
+              />
+            </div>
+
+            {estimatorResult && (
+              <div className="mt-3 rounded-xl bg-emerald-900/40 px-4 py-3 text-xs">
+                <p className="text-emerald-300">
+                  {estimatorResult.kwh.toLocaleString('fa-IR')} kWh در پله{' '}
+                  <span className="font-bold text-white">
+                    {Number(estimatorResult.slab.fromKwh).toLocaleString('fa-IR')} – {estimatorResult.slab.toKwh != null ? Number(estimatorResult.slab.toKwh).toLocaleString('fa-IR') : '∞'}
+                  </span>
+                </p>
+                <p className="mt-1 text-emerald-300">
+                  ضریب: <span className="font-bold text-white">{Number(estimatorResult.slab.multiplier).toLocaleString('fa-IR')}×</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              if (!estimatorKwh) { toast.error('مقدار مصرف را وارد کنید'); return }
+              if (!estimatorResult && typeSlabsLoaded[estimatorTypeId])
+                toast.error('مصرف وارد‌شده در محدوده پله‌های تعرفه نیست')
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-600"
+          >
+            <Zap className="h-4 w-4" /> محاسبه کن ←
+          </button>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 lg:col-span-2">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <BarChart3 className="h-4 w-4 text-emerald-700" /> نمودار زمانی تعرفه (TOU)
+
+        {/* TOU chart (right, spans 2 cols in ltr) */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 lg:col-span-2" dir="rtl">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-emerald-700" />
+              <span className="text-sm font-semibold text-gray-700">نمودار زمانی تعرفه (TOU)</span>
             </div>
-            <span className="text-xs text-gray-400">{selectedTariff ? `تعرفه #${selectedTariff.tariffId}` : 'برای نمایش، تعرفه انتخاب کنید'}</span>
+            <span className="text-xs text-gray-400">
+              {selectedTariff ? `تعرفه #${selectedTariff.tariffId}` : 'برای نمایش، تعرفه انتخاب کنید'}
+            </span>
           </div>
-          <div className="flex h-40 items-end gap-2 rounded-xl bg-emerald-50/50 p-3">
+          <div className="flex h-40 items-end gap-2 overflow-hidden rounded-xl bg-emerald-50/50 p-3">
             {slabBars.length === 0 ? (
               <p className="m-auto text-sm text-gray-400">داده پله‌ای برای رسم نمودار موجود نیست</p>
             ) : (
@@ -360,8 +523,11 @@ export default function AdminTariffs() {
                 <div key={`${bar.label}-${idx}`} className="flex flex-1 flex-col items-center gap-1">
                   <div
                     className="w-full rounded-t-md transition-all"
-                    style={{ height: `${Math.max(16, bar.value * 42)}px`, background: bar.color }}
-                    title={`${bar.value.toLocaleString('fa-IR')}×`}
+                    style={{
+                      height: `${Math.max(16, (bar.value / slabBarsMax) * 120)}px`,
+                      background: bar.color,
+                    }}
+                    title={`ضریب ${bar.value.toLocaleString('fa-IR')}`}
                   />
                   <span className="text-[10px] text-gray-500">{bar.label}</span>
                 </div>
@@ -371,25 +537,28 @@ export default function AdminTariffs() {
         </div>
       </div>
 
-      {/* Tariffs section */}
+      {/* Table header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4 text-emerald-700" />
-          <p className="text-sm font-semibold text-gray-700">جدول تفصیلی پله‌های مصرف</p>
+          <p className="text-sm font-semibold text-gray-700">
+            جدول تفصیلی پله‌های مصرف
+            {selectedTypeId ? ` (${tariffTypes.find(t => t.id === selectedTypeId)?.title ?? ''})` : ' (عادی)'}
+          </p>
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
             {(selectedTypeId ? filteredTariffs.length : tariffTotal).toLocaleString('fa-IR')} رکورد
           </span>
           {selectedTypeId && (
             <button
               onClick={() => setSelectedTypeId(null)}
-              className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100"
+              className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700 hover:bg-emerald-100"
             >
-              <Filter className="h-3 w-3" /> حذف فیلتر
+              <X className="h-3 w-3" /> حذف فیلتر
             </button>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+          <button className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">
             <Download className="h-3.5 w-3.5" /> دریافت PDF
           </button>
           <Button size="sm" onClick={openCreateTariff}><Plus className="h-4 w-4" /> تعرفه جدید</Button>
@@ -406,17 +575,12 @@ export default function AdminTariffs() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-emerald-700" />
-              <span className="text-sm font-semibold text-gray-700">
-                پله‌های تعرفه #{selectedTariff.tariffId}
-              </span>
+              <span className="text-sm font-semibold text-gray-700">پله‌های تعرفه #{selectedTariff.tariffId}</span>
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{slabTotal} رکورد</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={openCreateSlab}><Plus className="h-4 w-4" /> تعرفه پلکانی جدید</Button>
-              <button
-                onClick={() => setSelectedTariff(null)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
+              <Button size="sm" onClick={openCreateSlab}><Plus className="h-4 w-4" /> پله جدید</Button>
+              <button onClick={() => setSelectedTariff(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -426,7 +590,7 @@ export default function AdminTariffs() {
         </div>
       )}
 
-      {/* ── Tariff modals ── */}
+      {/* Tariff modals */}
       <Modal open={tariffModal === 'create' || tariffModal === 'edit'} onClose={() => setTariffModal(null)}
         title={tariffModal === 'create' ? 'تعرفه جدید' : 'ویرایش تعرفه'} size="md">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -462,7 +626,7 @@ export default function AdminTariffs() {
         </div>
       </Modal>
 
-      {/* ── Slab modals ── */}
+      {/* Slab modals */}
       <Modal open={slabModal === 'create' || slabModal === 'edit'} onClose={() => setSlabModal(null)}
         title={slabModal === 'create' ? 'پله تعرفه جدید' : 'ویرایش پله تعرفه'} size="sm">
         <div className="grid grid-cols-1 gap-4">

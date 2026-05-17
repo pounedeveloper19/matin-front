@@ -1,352 +1,322 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  Zap, TrendingDown, AlertTriangle, BarChart3,
-  ChevronDown, ChevronUp, History, RefreshCw, Target,
-} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Zap, TrendingDown, AlertTriangle, BarChart3, FlaskConical, ChevronDown, ChevronUp, ShoppingCart, Activity } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
+import { lookupApi, type IdTitle } from '../../api/lookup'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import type { BillAnalysisResult, BillBand, SubscriptionResult } from '../../types'
+import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult } from '../../types'
 import { toArr } from '../../utils'
 
-const MONTHS = [
-  '', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
-]
+const MONTHS = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
 
 function jalaliYear(): number {
-  const d = new Date()
-  const m = d.getMonth() + 1
-  const day = d.getDate()
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate()
   return (m > 3 || (m === 3 && day >= 20)) ? d.getFullYear() - 621 : d.getFullYear() - 622
 }
 
-const CURRENT_JALALI_YEAR = jalaliYear()
-const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => CURRENT_JALALI_YEAR - 2 + i)
-
+const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => jalaliYear() - 2 + i)
 const rial = (n: number) => n.toLocaleString('fa-IR') + ' ریال'
-const kwh  = (n: number) => n.toLocaleString('fa-IR') + ' kWh'
+const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
-    <div className="h-2 w-full rounded-full" style={{ background: 'rgba(0,0,0,0.06)' }}>
-      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+    <div className="mt-1.5 h-2 w-full rounded-full" style={{ background: 'rgba(0,0,0,0.06)' }}>
+      <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
     </div>
   )
 }
 
-function BandRow({ band }: { band: BillBand }) {
-  const [open, setOpen] = useState(false)
-  const hasExcess  = band.excessKwh > 0
-  const hasDeficit = band.deficitKwh > 0
+// ─── Optimal Purchase Line Chart ──────────────────────────────────────────────
+function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [hoverIdx, setHoverIdx]       = useState<number | null>(null)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
 
-  return (
-    <div className="overflow-hidden rounded-xl" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(209,250,229,0.5)' }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 text-right transition-colors hover:bg-emerald-50/30"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`h-2 w-2 rounded-full ${hasExcess ? 'bg-red-500' : hasDeficit ? 'bg-amber-400' : 'bg-emerald-500'}`} />
-          <span className="text-sm font-semibold text-gray-900">{band.name}</span>
-          <span className="text-xs text-gray-400">{kwh(band.actualKwh)}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {hasExcess  && <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">جریمه: {rial(band.penaltyRial)}</span>}
-          {hasDeficit && <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">بستانکاری: {rial(band.creditRial)}</span>}
-          {!hasExcess && !hasDeficit && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">در محدوده</span>}
-          {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-        </div>
-      </button>
+  const { points, optimalContractCapacityKw: optKw, currentContractCapacityKw: curKw } = data
+  if (!points.length) return null
 
-      {open && (
-        <div className="px-4 pb-4 pt-3" style={{ background: 'rgba(236,253,245,0.4)', borderTop: '1px solid rgba(209,250,229,0.4)' }}>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-            <div><p className="text-[10px] text-gray-400">مصرف واقعی</p><p className="font-semibold text-gray-700">{kwh(band.actualKwh)}</p></div>
-            <div><p className="text-[10px] text-gray-400">ظرفیت قراردادی</p><p className="font-semibold text-gray-700">{kwh(band.contractedKwh)}</p></div>
-            <div><p className="text-[10px] text-gray-400">مازاد</p><p className={`font-semibold ${band.excessKwh > 0 ? 'text-red-600' : 'text-gray-400'}`}>{kwh(band.excessKwh)}</p></div>
-            <div><p className="text-[10px] text-gray-400">کسری</p><p className={`font-semibold ${band.deficitKwh > 0 ? 'text-amber-600' : 'text-gray-400'}`}>{kwh(band.deficitKwh)}</p></div>
-            <div><p className="text-[10px] text-gray-400">نرخ بازار</p><p className="font-semibold text-gray-700">{band.marketRateRial.toLocaleString('fa-IR')} ر/kWh</p></div>
-            <div><p className="text-[10px] text-gray-400">نرخ جریمه (×۱.۳)</p><p className="font-semibold text-gray-700">{(band.marketRateRial * 1.3).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} ر/kWh</p></div>
-            <div><p className="text-[10px] text-gray-400">جریمه مازاد</p><p className={`font-semibold ${band.penaltyRial > 0 ? 'text-red-600' : 'text-gray-400'}`}>{rial(band.penaltyRial)}</p></div>
-            <div><p className="text-[10px] text-gray-400">بستانکاری (×۰.۷۵)</p><p className={`font-semibold ${band.creditRial > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{rial(band.creditRial)}</p></div>
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <span className="w-20">واقعی</span>
-              <Bar value={band.actualKwh} max={Math.max(band.actualKwh, band.contractedKwh)} color="bg-blue-400" />
-            </div>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <span className="w-20">قراردادی</span>
-              <Bar value={band.contractedKwh} max={Math.max(band.actualKwh, band.contractedKwh)} color="bg-gray-300" />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+  const minKw     = points[0].contractCapacityKw
+  const maxKw     = points[points.length - 1].contractCapacityKw
+  const maxSaving = Math.max(...points.map(p => p.savingRial), 1)
 
-function TouOptimalChart({ bands }: { bands: BillBand[] }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const kwToPct = (kw: number) =>
+    maxKw === minKw ? 50 : ((kw - minKw) / (maxKw - minKw)) * 100
 
-  const W = 520, H = 210
-  const ml = 54, mr = 12, mt = 20, mb = 48
-  const chartW = W - ml - mr
-  const chartH = H - mt - mb
-  const n = bands.length
-  const bw = chartW / n
-  const barHalfW = Math.min(bw * 0.27, 20)
+  const optPct   = kwToPct(optKw)
+  const curPct   = kwToPct(curKw)
+  const hovered  = hoverIdx !== null ? points[hoverIdx] : null
+  const hovPct   = hovered ? kwToPct(hovered.contractCapacityKw) : null
+  const selected    = selectedIdx !== null ? points[selectedIdx] : null
+  const selectedPct = selected ? kwToPct(selected.contractCapacityKw) : null
 
-  const maxKwh = Math.max(...bands.flatMap(b => [b.actualKwh, b.contractedKwh]), 1) * 1.18
-  const toY = (v: number) => chartH - (v / maxKwh) * chartH
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ v: maxKwh * f, y: toY(maxKwh * f) }))
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  const segColor = (s: number) => {
+    if (s <= 0)   return '#ef4444'
+    const r = s / maxSaving
+    if (r < 0.35) return '#f97316'
+    if (r < 0.65) return '#f59e0b'
+    if (r < 0.88) return '#84cc16'
+    return '#10b981'
   }
 
-  const hovered = hoveredIdx !== null ? bands[hoveredIdx] : null
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    setHoverIdx(Math.round(pct * (points.length - 1)))
+  }
+
+  const improve  = data.optimalSavingRial - data.savingAtCurrentContractRial
+  const stepSize = points.length > 1 ? (maxKw - minKw) / (points.length - 1) : 1
+  const isAtOptimal = Math.abs((hovered?.contractCapacityKw ?? -99) - optKw) < stepSize * 0.6
 
   return (
-    <div
-      ref={containerRef}
-      className="relative select-none"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setHoveredIdx(null)}
-    >
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 210 }}>
-        <defs>
-          <pattern id="opt-stripe" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="5" stroke="#6366f1" strokeWidth="1.5" strokeOpacity="0.35" />
-          </pattern>
-        </defs>
+    <div className="select-none space-y-4" dir="ltr">
+      <div className="flex justify-between text-xs font-medium">
+        <span className="text-red-400">← کمترین سود</span>
+        <span className="text-emerald-600">بیشترین سود →</span>
+      </div>
 
-        {/* Grid lines + Y labels */}
-        {ticks.map(({ v, y }, ti) => (
-          <g key={ti}>
-            <line
-              x1={ml} y1={mt + y} x2={W - mr} y2={mt + y}
-              stroke="#e5e7eb" strokeWidth="1"
-              strokeDasharray={ti === 0 ? undefined : '3,3'}
-            />
-            <text x={ml - 5} y={mt + y + 4} textAnchor="end" fontSize="9" fill="#9ca3af">
-              {Math.round(v).toLocaleString('fa-IR')}
-            </text>
-          </g>
-        ))}
+      <div ref={trackRef} className="relative cursor-pointer" style={{ height: 64 }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoverIdx(null)}
+        onClick={() => { if (hoverIdx !== null) setSelectedIdx(hoverIdx) }}>
 
-        {/* Bars per band */}
-        {bands.map((band, i) => {
-          const hasExcess  = band.excessKwh  > 0
-          const hasDeficit = band.deficitKwh > 0
-          const isOptimal  = !hasExcess && !hasDeficit
+        <div className="absolute inset-x-0 flex overflow-hidden"
+          style={{ top: '50%', transform: 'translateY(-50%)', height: 22, borderRadius: 11 }}>
+          {points.map((pt, i) => (
+            <div key={i} style={{
+              flex: 1, background: segColor(pt.savingRial),
+              opacity: hoverIdx === i ? 1 : 0.82, transition: 'opacity 0.08s',
+            }} />
+          ))}
+        </div>
 
-          const cx = ml + (i + 0.5) * bw
-          const actualY   = toY(band.actualKwh)
-          const contractY = toY(band.contractedKwh)
-          const barFill   = hasExcess ? '#ef4444' : hasDeficit ? '#f59e0b' : '#10b981'
+        <div className="absolute" style={{ left: `${optPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 20 }}>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-lg">
+            <span className="text-base leading-none text-white">★</span>
+          </div>
+          <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700 shadow-sm">
+            بهینه {optKw.toFixed(0)} kW
+          </div>
+        </div>
 
-          return (
-            <g key={i}>
-              {/* Hover highlight zone */}
-              <rect
-                x={ml + i * bw + 2} y={mt}
-                width={bw - 4} height={chartH}
-                fill={hoveredIdx === i ? 'rgba(99,102,241,0.05)' : 'transparent'}
-                rx={4}
-                onMouseEnter={() => setHoveredIdx(i)}
-              />
-
-              {/* Actual bar */}
-              <rect
-                x={cx - barHalfW} y={mt + actualY}
-                width={barHalfW * 2} height={chartH - actualY}
-                fill={barFill} rx={3}
-                opacity={hoveredIdx === i ? 1 : 0.82}
-              />
-
-              {/* Contracted level — dashed reference line */}
-              <line
-                x1={ml + i * bw + 5} y1={mt + contractY}
-                x2={ml + (i + 1) * bw - 5} y2={mt + contractY}
-                stroke="#6366f1" strokeWidth={1.5} strokeDasharray="4,2"
-              />
-
-              {/* Optimal point dot */}
-              <circle
-                cx={cx} cy={mt + contractY}
-                r={isOptimal ? 5 : 4}
-                fill={isOptimal ? '#10b981' : '#6366f1'}
-                stroke="white" strokeWidth={1.5}
-              />
-              {isOptimal && (
-                <circle
-                  cx={cx} cy={mt + contractY} r={9}
-                  fill="none" stroke="#10b981" strokeWidth={1} opacity={0.35}
-                />
-              )}
-
-              {/* Deviation label above the shorter of the two */}
-              <text
-                x={cx} y={mt + Math.min(actualY, contractY) - 6}
-                textAnchor="middle" fontSize="9" fill={barFill} fontWeight="bold"
-              >
-                {hasExcess
-                  ? `+${band.excessKwh.toFixed(0)}`
-                  : hasDeficit
-                  ? `-${band.deficitKwh.toFixed(0)}`
-                  : '✓'}
-              </text>
-
-              {/* X-axis band label */}
-              <text
-                x={cx} y={H - mb + 15}
-                textAnchor="middle" fontSize="10"
-                fill={hoveredIdx === i ? '#1f2937' : '#6b7280'}
-                fontWeight={hoveredIdx === i ? 'bold' : 'normal'}
-              >
-                {band.name}
-              </text>
-            </g>
-          )
-        })}
-
-        {/* Legend */}
-        <g transform={`translate(${ml}, ${H - 10})`}>
-          <rect width="8" height="8" fill="#10b981" rx="1" />
-          <text x="11" y="7.5" fontSize="8" fill="#6b7280">بهینه</text>
-          <rect x="42" width="8" height="8" fill="#ef4444" rx="1" />
-          <text x="53" y="7.5" fontSize="8" fill="#6b7280">مازاد</text>
-          <rect x="84" width="8" height="8" fill="#f59e0b" rx="1" />
-          <text x="95" y="7.5" fontSize="8" fill="#6b7280">کسری</text>
-          <line x1="122" y1="4" x2="138" y2="4" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="4,2" />
-          <circle cx="130" cy="4" r="3" fill="#6366f1" stroke="white" strokeWidth="1" />
-          <text x="142" y="7.5" fontSize="8" fill="#6b7280">نقطه بهینه (قراردادی)</text>
-        </g>
-      </svg>
-
-      {/* Floating tooltip */}
-      {hovered && (
-        <div
-          className="pointer-events-none absolute z-50 rounded-xl border border-indigo-100 bg-white p-3 shadow-xl"
-          style={{
-            width: 204,
-            left: mousePos.x > (containerRef.current?.offsetWidth ?? 400) * 0.62
-              ? mousePos.x - 216
-              : mousePos.x + 14,
-            top: Math.max(4, mousePos.y - 115),
-          }}
-        >
-          <p className="mb-2 border-b border-gray-100 pb-1.5 text-xs font-bold text-gray-900">{hovered.name}</p>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">مصرف واقعی</span>
-              <span className="font-semibold text-gray-800">{hovered.actualKwh.toLocaleString('fa-IR')} kWh</span>
+        {Math.abs(curPct - optPct) > 4 && (
+          <div className="absolute" style={{ left: `${curPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 15 }}>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-blue-500 shadow">
+              <div className="h-2.5 w-2.5 rounded-full bg-white" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-indigo-500">● نقطه بهینه</span>
-              <span className="font-semibold text-indigo-700">{hovered.contractedKwh.toLocaleString('fa-IR')} kWh</span>
+            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-blue-500">فعلی</div>
+          </div>
+        )}
+
+        {hovPct !== null && (
+          <div className="pointer-events-none absolute inset-y-0 w-px bg-gray-700/40" style={{ left: `${hovPct}%` }} />
+        )}
+
+        {selectedPct !== null && (
+          <div className="pointer-events-none absolute"
+            style={{ left: `${selectedPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 30 }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-violet-600 shadow-lg ring-2 ring-violet-300">
+              <span className="text-xs font-bold text-white">✓</span>
             </div>
-            {hovered.excessKwh > 0 && (
-              <>
-                <div className="border-t border-red-50 pt-1" />
-                <div className="flex justify-between">
-                  <span className="text-red-500">مازاد مصرف</span>
-                  <span className="font-semibold text-red-700">+{hovered.excessKwh.toLocaleString('fa-IR')} kWh</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-red-500">جریمه (×۱.۳)</span>
-                  <span className="font-semibold text-red-700">{hovered.penaltyRial.toLocaleString('fa-IR')} ریال</span>
-                </div>
-              </>
-            )}
-            {hovered.deficitKwh > 0 && (
-              <>
-                <div className="border-t border-amber-50 pt-1" />
-                <div className="flex justify-between">
-                  <span className="text-amber-500">کسری</span>
-                  <span className="font-semibold text-amber-700">-{hovered.deficitKwh.toLocaleString('fa-IR')} kWh</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-500">بستانکاری (×۰.۷۵)</span>
-                  <span className="font-semibold text-emerald-700">{hovered.creditRial.toLocaleString('fa-IR')} ریال</span>
-                </div>
-              </>
-            )}
-            {hovered.excessKwh === 0 && hovered.deficitKwh === 0 && (
-              <p className="mt-1 rounded-lg bg-emerald-50 px-2 py-1 text-center font-semibold text-emerald-600">
-                ★ در نقطه بهینه هستید!
+            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-violet-500">انتخاب</div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-between text-[10px] text-gray-300">
+        <span>{minKw.toFixed(0)} kW</span>
+        <span>{maxKw.toFixed(0)} kW</span>
+      </div>
+
+      <div className="min-h-[72px] rounded-xl px-4 py-3 transition-all"
+        style={{ background: 'rgba(248,250,252,0.95)', border: '1px solid rgba(209,250,229,0.5)' }}>
+        {hovered ? (
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
+            <div>
+              <p className="text-gray-400">ظرفیت انتخابی</p>
+              <p className="text-sm font-bold text-gray-900">{hovered.contractCapacityKw.toFixed(1)} kW</p>
+              <p className="text-[10px] text-gray-400">{hovered.contractedEnergyKwh.toFixed(0)} kWh/ماه</p>
+            </div>
+            <div>
+              <p className="text-gray-400">هزینه با متین</p>
+              <p className="font-bold text-blue-700">{hovered.withMatinBillRial.toLocaleString('fa-IR')} ریال</p>
+            </div>
+            <div>
+              <p className={hovered.savingRial >= 0 ? 'text-emerald-500' : 'text-red-400'}>صرفه‌جویی</p>
+              <p className={`text-sm font-bold ${hovered.savingRial >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                {hovered.savingRial >= 0 ? '+' : ''}{hovered.savingRial.toLocaleString('fa-IR')} ریال
               </p>
+              {data.withoutMatinBillRial > 0 && (
+                <p className="text-[10px] text-gray-400">
+                  {((hovered.savingRial / data.withoutMatinBillRial) * 100).toFixed(1)}٪
+                </p>
+              )}
+            </div>
+            {isAtOptimal && (
+              <div className="flex items-center">
+                <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">★ بهینه‌ترین انتخاب!</span>
+              </div>
             )}
+          </div>
+        ) : (
+          <p className="py-3 text-center text-xs text-gray-400">نشانگر موس را روی خط بکشید تا سود هر ظرفیت را ببینید</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-right" dir="rtl">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+          <p className="text-[10px] font-semibold text-emerald-500">بهینه‌ترین ظرفیت</p>
+          <p className="mt-0.5 text-sm font-bold text-emerald-700">{optKw.toFixed(1)} kW</p>
+          <p className="text-[10px] text-emerald-400">صرفه: {data.optimalSavingRial.toLocaleString('fa-IR')} ر</p>
+        </div>
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+          <p className="text-[10px] font-semibold text-blue-500">قرارداد فعلی شما</p>
+          <p className="mt-0.5 text-sm font-bold text-blue-700">{curKw.toFixed(1)} kW</p>
+          <p className="text-[10px] text-blue-400">صرفه: {data.savingAtCurrentContractRial.toLocaleString('fa-IR')} ر</p>
+        </div>
+        <div className={`rounded-xl border p-3 ${improve > 0 ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
+          <p className={`text-[10px] font-semibold ${improve > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>پتانسیل بهبود</p>
+          <p className={`mt-0.5 text-sm font-bold ${improve > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+            {improve > 0 ? `+${improve.toLocaleString('fa-IR')} ر` : 'در نقطه بهینه!'}
+          </p>
+        </div>
+      </div>
+
+      {selected && (
+        <div className="rounded-xl border-2 border-violet-200 p-4" style={{ background: 'rgba(245,243,255,0.95)' }} dir="rtl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-violet-500">ظرفیت انتخاب‌شده</p>
+              <p className="mt-0.5 text-lg font-bold text-violet-900">{selected.contractCapacityKw.toFixed(1)} kW</p>
+              <p className="text-[10px] text-violet-400">
+                {selected.contractedEnergyKwh.toFixed(0)} kWh/ماه · صرفه:{' '}
+                {selected.savingRial >= 0 ? '+' : ''}{selected.savingRial.toLocaleString('fa-IR')} ریال
+              </p>
+            </div>
+            <button onClick={() => setSelectedIdx(null)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-violet-500 transition-colors hover:bg-violet-100">
+              پاک کردن
+            </button>
           </div>
         </div>
       )}
+      {!selected && (
+        <p className="text-center text-[10px] text-gray-300">روی هر نقطه از خط کلیک کنید تا آن ظرفیت را انتخاب کنید</p>
+      )}
     </div>
   )
+}
+
+const INIT = {
+  year: String(jalaliYear()), month: '1',
+  consumptionMode: 'total' as 'split' | 'total',
+  totalKwh: '', peakKwh: '', midKwh: '', lowKwh: '',
+  contractDemandKw: '', actualDemandKw: '',
+  bilateralKwh: '0', bilateralRate: '0',
+  exchangeKwh: '0', exchangeRate: '0',
+  greenLawKwh: '0', greenRate: '0',
 }
 
 export default function CustomerBills() {
+  const navigate = useNavigate()
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
   const [selectedSubId, setSelectedSubId] = useState<number | ''>('')
-  const [form, setForm] = useState({
-    year: String(CURRENT_JALALI_YEAR), month: '1',
-    peakKwh: '', midKwh: '', lowKwh: '', fridayPeakKwh: '0',
-  })
-  const [result, setResult]   = useState<BillAnalysisResult | null>(null)
+  const [form, setForm]       = useState(INIT)
+  const [result, setResult]   = useState<AdvancedBillAnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [history, setHistory] = useState<any[]>([])
-  const [histLoading, setHistLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'analyze' | 'history'>('analyze')
+  const [showDetails, setShowDetails] = useState(false)
+  const [curveData, setCurveData]       = useState<OptimalPurchaseCurveResult | null>(null)
+  const [curveLoading, setCurveLoading] = useState(false)
+  const [energyTypes, setETypes]        = useState<IdTitle[]>([])
+  const [showOrderModal, setShowOM]     = useState(false)
+  const [orderKwh, setOrderKwh]         = useState('')
+  const [orderETypeId, setOrderEType]   = useState<number | ''>('')
+  const [orderPR, setOrderPR]           = useState(false)
+  const [orderCreating, setOrderCr]     = useState(false)
 
   useEffect(() => {
-    customerApi.getSubscriptions().then((r) => {
+    customerApi.getSubscriptions().then(r => {
       if (r.code === 200) {
         const arr = toArr(r.result)
         setSubscriptions(arr)
         if (arr.length === 1) setSelectedSubId(arr[0].id)
       }
     })
+    lookupApi.getEnergyTypes().then(r => { if (r.code === 200) setETypes(toArr(r.result)) })
   }, [])
 
-  useEffect(() => {
-    if (!selectedSubId) return
-    setHistLoading(true)
-    customerApi.getBillHistory(selectedSubId as number)
-      .then((r) => { if (r.code === 200) setHistory(toArr(r.result)); else setHistory([]) })
-      .finally(() => setHistLoading(false))
-  }, [selectedSubId])
+  const set = (k: keyof typeof INIT) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm(p => ({ ...p, [k]: e.target.value }))
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(p => ({ ...p, [k]: e.target.value }))
-
-  const handleAnalyze = async () => {
-    if (!selectedSubId) { toast.error('ابتدا اشتراک را انتخاب کنید'); return }
-    if (!form.peakKwh || !form.midKwh || !form.lowKwh) { toast.error('مصارف TOU را وارد کنید'); return }
-    setLoading(true); setResult(null)
+  const handleCreateOrder = async () => {
+    if (!orderETypeId || !orderKwh) { toast.error('نوع انرژی و مقدار را وارد کنید'); return }
+    setOrderCr(true)
     try {
-      const res = await customerApi.manualBillAnalysis({
-        subscriptionId: selectedSubId as number, year: +form.year, month: +form.month,
-        peakKwh: +form.peakKwh, midKwh: +form.midKwh, lowKwh: +form.lowKwh, fridayPeakKwh: +form.fridayPeakKwh,
+      const r = await customerApi.createOrder({
+        subscriptionId: selectedSubId as number,
+        requestedKwh: +orderKwh,
+        energyTypeId: orderETypeId as number,
+        isPriceRequest: orderPR,
       })
+      if (r.code === 200) {
+        toast.success('سفارش با موفقیت ثبت شد')
+        setShowOM(false)
+        navigate('/customer/orders', { state: { newOrderId: r.result, analysis: result } })
+      } else { toast.error(r.message ?? r.caption ?? 'خطا در ثبت سفارش') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setOrderCr(false) }
+  }
+
+  const handleSubmit = async () => {
+    if (!selectedSubId) { toast.error('ابتدا اشتراک را انتخاب کنید'); return }
+    if (form.consumptionMode === 'split' && (!form.peakKwh || !form.midKwh || !form.lowKwh))
+      { toast.error('مصارف اوج/میان/کم‌بار را وارد کنید'); return }
+    if (form.consumptionMode === 'total' && !form.totalKwh)
+      { toast.error('مصرف کل را وارد کنید'); return }
+
+    const req = {
+      subscriptionId: selectedSubId as number,
+      year: +form.year, month: +form.month,
+      consumptionMode: form.consumptionMode,
+      ...(form.consumptionMode === 'total'
+        ? { totalKwh: +form.totalKwh }
+        : { peakKwh: +form.peakKwh, midKwh: +form.midKwh, lowKwh: +form.lowKwh }),
+      contractDemandKw: +form.contractDemandKw || 0,
+      actualDemandKw:   +form.actualDemandKw   || 0,
+      bilateralKwh: +form.bilateralKwh, bilateralRate: +form.bilateralRate,
+      exchangeKwh:  +form.exchangeKwh,  exchangeRate:  +form.exchangeRate,
+      greenLawKwh:  +form.greenLawKwh,  greenRate:     +form.greenRate,
+      saveReport: true,
+    }
+
+    setLoading(true); setResult(null); setShowDetails(false); setCurveData(null); setCurveLoading(false)
+    try {
+      const res = await customerApi.advancedBillAnalysis(req)
       if (res.code === 200 && res.result) {
-        setResult(res.result as BillAnalysisResult); toast.success('تحلیل قبض انجام شد')
-        const h = await customerApi.getBillHistory(selectedSubId as number)
-        if (h.code === 200 && Array.isArray(h.result)) setHistory(h.result)
+        const analysisResult = res.result as AdvancedBillAnalysisResult
+        setResult(analysisResult)
+        toast.success('تحلیل قبض انجام شد')
+        // Automatically compute optimal purchase curve in the background
+        setCurveLoading(true)
+        customerApi.manualOptimalPurchaseCurve({
+          subscriptionId: selectedSubId as number,
+          year: +form.year, month: +form.month,
+          peakKwh: analysisResult.peakKwh, midKwh: analysisResult.midKwh,
+          lowKwh: analysisResult.lowKwh, fridayPeakKwh: 0,
+        }).then(cr => {
+          if (cr.code === 200 && cr.result) setCurveData(cr.result as OptimalPurchaseCurveResult)
+        }).finally(() => setCurveLoading(false))
       } else { toast.error(res.message ?? res.caption ?? 'خطا در تحلیل') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setLoading(false) }
   }
 
   const selectedSub = subscriptions.find(s => s.id === selectedSubId)
-  const maxBill = result ? Math.max(result.withoutMatinBillRial, result.withMatinBillRial, 1) : 1
 
   return (
     <div className="space-y-6">
@@ -359,30 +329,26 @@ export default function CustomerBills() {
           </div>
           <h3 className="font-semibold text-gray-900">انتخاب اشتراک</h3>
         </div>
-
         <div className="p-5">
           {subscriptions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-emerald-200 py-8 text-center">
               <Zap className="mx-auto mb-2 h-8 w-8 text-gray-300" />
               <p className="text-sm text-gray-500">اشتراکی یافت نشد</p>
-              <p className="mt-1 text-xs text-gray-400">ابتدا از بخش پروفایل آدرس اضافه کنید تا اشتراک تعریف شود</p>
+              <p className="mt-1 text-xs text-gray-400">ابتدا از بخش پروفایل آدرس اضافه کنید</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {subscriptions.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => { setSelectedSubId(s.id); setResult(null) }}
+              {subscriptions.map(s => (
+                <button key={s.id}
+                  onClick={() => { setSelectedSubId(s.id); setResult(null); setCurveData(null) }}
                   className={`rounded-xl p-4 text-right transition-all ${
                     selectedSubId === s.id
                       ? 'border-2 border-emerald-500 bg-emerald-50 shadow-sm'
-                      : 'border-2 border-transparent hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                  style={selectedSubId !== s.id ? { background: '#fff', border: '2px solid #e5e7eb' } : undefined}
-                >
+                      : 'border-2 border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                  }`}>
                   <p className="font-mono text-sm font-bold text-gray-900">{s.billIdentifier}</p>
                   <p className="mt-1 text-xs text-gray-500">{s.powerEntity}</p>
-                  <p className="text-xs text-gray-400 truncate">{s.mainAddress}</p>
+                  <p className="truncate text-xs text-gray-400">{s.mainAddress}</p>
                   {s.contractCapacityKw != null && (
                     <span className="mt-2 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
                       {s.contractCapacityKw.toLocaleString('fa-IR')} kW
@@ -395,74 +361,110 @@ export default function CustomerBills() {
         </div>
       </div>
 
-      {/* تب‌ها */}
       {selectedSubId !== '' && (
-        <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1">
-          <button onClick={() => setActiveTab('analyze')}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
-              activeTab === 'analyze' ? 'bg-emerald-800 shadow-sm text-white' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            <BarChart3 className="h-4 w-4" /> تحلیل قبض
-          </button>
-          <button onClick={() => setActiveTab('history')}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
-              activeTab === 'history' ? 'bg-emerald-800 shadow-sm text-white' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            <History className="h-4 w-4" /> تاریخچه قبض‌ها
-            {history.length > 0 && (
-              <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-xs text-white">{history.length}</span>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* تب تحلیل */}
-      {activeTab === 'analyze' && selectedSubId !== '' && (
         <>
-          <div className="glass-card overflow-hidden rounded-2xl">
-            {selectedSub && (
-              <div className="flex items-center gap-3 px-5 py-3"
-                style={{ background: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
-                <Zap className="h-4 w-4 text-amber-500 shrink-0" />
-                <div className="text-xs">
-                  <span className="font-semibold text-amber-800">اشتراک انتخاب‌شده: {selectedSub.billIdentifier}</span>
-                  <span className="mr-3 text-amber-600">{selectedSub.powerEntity} · {selectedSub.mainAddress}</span>
-                </div>
-              </div>
-            )}
+          {selectedSub && (
+            <div className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+              style={{ background: '#fef3c7', border: '1px solid #fde68a' }}>
+              <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="text-xs font-semibold text-amber-800">{selectedSub.billIdentifier}</span>
+              <span className="text-xs text-amber-600">{selectedSub.powerEntity} · {selectedSub.mainAddress}</span>
+            </div>
+          )}
 
-            <div className="p-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* فرم ورودی */}
+          <div className="glass-card overflow-hidden rounded-2xl">
+            <div className="flex items-center gap-3 px-5 py-4"
+              style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+              <FlaskConical className="h-4 w-4 text-emerald-700" />
+              <h3 className="font-semibold text-gray-900">ورودی‌های تحلیل قبض</h3>
+            </div>
+
+            <div className="space-y-6 p-5">
+              {/* دوره */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">سال (شمسی) *</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-600">سال شمسی *</label>
                   <select value={form.year} onChange={set('year')}
-                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                    {YEAR_OPTIONS.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
+                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                    {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">ماه مصرف *</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-600">ماه *</label>
                   <select value={form.month} onChange={set('month')}
-                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                    className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
                     {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="mt-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">مصرف به تفکیک TOU (kWh)</p>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Input label="اوج بار *"    value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
-                  <Input label="میان بار *"   value={form.midKwh}        onChange={set('midKwh')}        placeholder="kWh" inputMode="numeric" />
-                  <Input label="کم بار *"     value={form.lowKwh}        onChange={set('lowKwh')}        placeholder="kWh" inputMode="numeric" />
-                  <Input label="اوج جمعه"     value={form.fridayPeakKwh} onChange={set('fridayPeakKwh')} placeholder="kWh" inputMode="numeric" />
+              {/* مصرف */}
+              <div>
+                <p className="mb-2 text-xs font-bold text-gray-500">مصرف برق (kWh)</p>
+                <div className="mb-3 flex gap-2">
+                  {(['total', 'split'] as const).map(mode => (
+                    <button key={mode} onClick={() => setForm(p => ({ ...p, consumptionMode: mode }))}
+                      className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all ${
+                        form.consumptionMode === mode
+                          ? 'bg-emerald-700 text-white shadow-sm'
+                          : 'border border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}>
+                      {mode === 'total' ? 'مصرف کل' : 'به تفکیک TOU'}
+                    </button>
+                  ))}
+                </div>
+                {form.consumptionMode === 'total' ? (
+                  <Input label="مصرف کل *" value={form.totalKwh} onChange={set('totalKwh')}
+                    placeholder="kWh — سیستم بر اساس ساعات TOU توزیع می‌کند" inputMode="numeric" />
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Input label="اوج بار *"  value={form.peakKwh} onChange={set('peakKwh')} placeholder="kWh" inputMode="numeric" />
+                    <Input label="میان بار *" value={form.midKwh}  onChange={set('midKwh')}  placeholder="kWh" inputMode="numeric" />
+                    <Input label="کم بار *"   value={form.lowKwh}  onChange={set('lowKwh')}  placeholder="kWh" inputMode="numeric" />
+                  </div>
+                )}
+              </div>
+
+              {/* دیماند */}
+              <div>
+                <p className="mb-2 text-xs font-bold text-gray-500">دیماند (kW)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="دیماند قراردادی" value={form.contractDemandKw} onChange={set('contractDemandKw')} placeholder="kW" inputMode="numeric" />
+                  <Input label="دیماند مصرفی"    value={form.actualDemandKw}   onChange={set('actualDemandKw')}   placeholder="kW" inputMode="numeric" />
                 </div>
               </div>
 
-              <div className="mt-5 flex justify-end">
-                <Button loading={loading} onClick={handleAnalyze}>
+              {/* انرژی بازار */}
+              <div>
+                <p className="mb-2 text-xs font-bold text-gray-500">انرژی خریداری‌شده از بازار</p>
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-blue-700">قرارداد دوجانبه</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input label="انرژی (kWh)"    value={form.bilateralKwh}  onChange={set('bilateralKwh')}  placeholder="0" inputMode="numeric" />
+                      <Input label="نرخ (ریال/kWh)" value={form.bilateralRate} onChange={set('bilateralRate')} placeholder="0" inputMode="numeric" />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-emerald-700">بورس برق</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input label="انرژی (kWh)"    value={form.exchangeKwh}  onChange={set('exchangeKwh')}  placeholder="0" inputMode="numeric" />
+                      <Input label="نرخ (ریال/kWh)" value={form.exchangeRate} onChange={set('exchangeRate')} placeholder="0" inputMode="numeric" />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-amber-700">قانون جهش تولید (برق سبز)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input label="انرژی (kWh)"    value={form.greenLawKwh} onChange={set('greenLawKwh')} placeholder="0" inputMode="numeric" />
+                      <Input label="نرخ (ریال/kWh)" value={form.greenRate}   onChange={set('greenRate')}   placeholder="0" inputMode="numeric" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button loading={loading} onClick={handleSubmit}>
                   <BarChart3 className="h-4 w-4" /> تحلیل قبض
                 </Button>
               </div>
@@ -470,251 +472,447 @@ export default function CustomerBills() {
           </div>
 
           {/* نتایج */}
-          {result && (
-            <div className="space-y-4">
-              {/* سربرگ */}
-              <div
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-4 text-white"
-                style={{ background: 'linear-gradient(135deg, #065f46 0%, #064e3b 100%)' }}
-              >
-                <div>
-                  <p className="text-xs text-emerald-300">دوره مصرف</p>
-                  <p className="mt-0.5 text-lg font-bold">{result.monthName} {result.year}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-emerald-300">مصرف کل</p>
-                  <p className="mt-0.5 font-bold">{kwh(result.totalConsumption)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-emerald-300">قدرت قراردادی</p>
-                  <p className="mt-0.5 font-bold">{result.contractCapacityKw.toLocaleString('fa-IR')} kW</p>
-                </div>
-              </div>
-
-              {/* خلاصه مالی */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl p-4" style={{ background: 'rgba(254,242,242,0.8)', border: '1px solid rgba(252,165,165,0.4)' }}>
-                  <p className="text-xs font-semibold text-red-500">بدون قرارداد متین</p>
-                  <p className="mt-1.5 text-xl font-bold text-red-700">{rial(result.withoutMatinBillRial)}</p>
-                  <Bar value={result.withoutMatinBillRial} max={maxBill} color="bg-red-400" />
-                </div>
-                <div className="rounded-2xl p-4" style={{ background: 'rgba(239,246,255,0.8)', border: '1px solid rgba(147,197,253,0.4)' }}>
-                  <p className="text-xs font-semibold text-blue-500">با قرارداد دوجانبه متین</p>
-                  <p className="mt-1.5 text-xl font-bold text-blue-700">{rial(result.withMatinBillRial)}</p>
-                  <Bar value={result.withMatinBillRial} max={maxBill} color="bg-blue-400" />
-                </div>
-                <div className="rounded-2xl p-4" style={{ background: 'rgba(236,253,245,0.8)', border: '1px solid rgba(167,243,208,0.4)' }}>
-                  <p className="text-xs font-semibold text-emerald-600">صرفه‌جویی</p>
-                  <p className="mt-1.5 text-xl font-bold text-emerald-700">{rial(result.savingRial)}</p>
-                  <p className="text-sm font-semibold text-emerald-600">{result.savingPercent.toLocaleString('fa-IR')}٪ کاهش</p>
-                </div>
-              </div>
-
-              {/* تفکیک باندها */}
-              <div className="glass-card overflow-hidden rounded-2xl">
-                <div className="flex items-center gap-3 px-5 py-4"
-                  style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                  <BarChart3 className="h-4 w-4 text-emerald-700" />
-                  <h3 className="font-semibold text-gray-900">تحلیل مصرف به تفکیک TOU</h3>
-                </div>
-                <div className="space-y-3 p-5">
-                  {result.bands.map((b, i) => <BandRow key={i} band={b} />)}
-                </div>
-              </div>
-
-              {/* نمودار نقطه بهینه */}
-              {result.bands.length > 0 && (
-                <div className="glass-card overflow-hidden rounded-2xl">
-                  <div className="flex items-center gap-3 px-5 py-4"
-                    style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    <Target className="h-4 w-4 text-indigo-600" />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">نمودار نقطه بهینه مصرف</h3>
-                      <p className="text-xs text-gray-400">موس را روی هر نوار ببرید تا جزئیات را ببینید</p>
+          {result && (() => {
+            const r = result
+            const maxB = Math.max(r.costWithoutMatin, r.costWithMatin, 1)
+            return (
+              <div className="space-y-4">
+                {/* هدر */}
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-4 text-white"
+                  style={{ background: 'linear-gradient(135deg,#065f46 0%,#064e3b 100%)' }}>
+                  <div>
+                    <p className="text-xs text-emerald-300">دوره مصرف</p>
+                    <p className="mt-0.5 text-lg font-bold">{r.monthName} {r.year}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-emerald-300">مصرف کل</p>
+                    <p className="mt-0.5 font-bold">{fmt(r.totalKwh)} kWh</p>
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-emerald-200">اوج {r.peakHoursPerDay}h</span>
+                    <span className="text-emerald-200">میان {r.midHoursPerDay}h</span>
+                    <span className="text-emerald-200">کم {r.lowHoursPerDay}h</span>
+                  </div>
+                  {r.greenPercent > 0 && (
+                    <div className="rounded-lg bg-emerald-800/60 px-3 py-1.5 text-xs">
+                      مشمول جهش: {fmt(r.greenSubjectKwh)} kWh ({(r.greenPercent * 100).toFixed(0)}٪)
                     </div>
-                  </div>
-                  <div className="p-5">
-                    <TouOptimalChart bands={result.bands} />
-                  </div>
+                  )}
                 </div>
-              )}
 
-              {/* جزئیات محاسبه */}
-              <div className="glass-card overflow-hidden rounded-2xl">
-                <div className="flex items-center gap-3 px-5 py-4"
-                  style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                  <Zap className="h-4 w-4 text-emerald-700" />
-                  <h3 className="font-semibold text-gray-900">جزئیات صورتحساب</h3>
-                </div>
-                <div className="p-5">
+                {/* ── خروجی نهایی — مثل تب Excel ── */}
+                <div className="overflow-hidden rounded-2xl" style={{ border: '2px solid #fbbf24' }}>
+                  <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5">
+                    <span className="text-sm font-bold text-amber-900">خروجی نهایی</span>
+                  </div>
                   <table className="w-full text-sm">
-                    <tbody className="divide-y divide-emerald-50">
-                      <tr className="hover:bg-emerald-50/30">
-                        <td className="py-2.5 text-gray-500">قرارداد متین (نرخ × انرژی)</td>
-                        <td className="py-2.5 text-left text-xs text-gray-400">
-                          {result.contractRateRialPerKwh.toLocaleString('fa-IR')} ر/kWh × {kwh(result.contractedEnergyKwh)}
-                        </td>
-                        <td className="py-2.5 text-left font-bold text-blue-700">{rial(result.matinBillRial)}</td>
+                    <tbody>
+                      <tr style={{ background: '#fefce8' }}>
+                        <td className="px-4 py-3 font-semibold text-gray-700">جمع کل هزینه برق قبل از قرارداد</td>
+                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-red-700 ltr">{rial(r.costWithoutMatin)}</td>
                       </tr>
-                      <tr className="hover:bg-emerald-50/30">
-                        <td className="py-2.5 text-gray-500">جریمه مازاد (×۱.۳ نرخ بازار)</td>
-                        <td></td>
-                        <td className="py-2.5 text-left font-bold text-red-600">+ {rial(result.totalDifferentialRial)}</td>
+                      <tr style={{ background: '#fefce8', borderTop: '1px solid #fde68a' }}>
+                        <td className="px-4 py-3 font-semibold text-gray-700">جمع کل هزینه برق بعد از قرارداد</td>
+                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-emerald-700 ltr">{rial(r.costWithMatin)}</td>
                       </tr>
-                      <tr className="hover:bg-emerald-50/30">
-                        <td className="py-2.5 text-gray-500">بستانکاری کسری (×۰.۷۵ پشتیبان)</td>
-                        <td></td>
-                        <td className="py-2.5 text-left font-bold text-emerald-600">- {rial(result.totalCreditRial)}</td>
-                      </tr>
-                      {result.article16Rial > 0 && (
-                        <tr className="hover:bg-emerald-50/30">
-                          <td className="py-2.5 text-gray-500">ماده ۱۶</td><td></td>
-                          <td className="py-2.5 text-left font-bold text-gray-700">+ {rial(result.article16Rial)}</td>
-                        </tr>
-                      )}
-                      {result.fuelFeeRial > 0 && (
-                        <tr className="hover:bg-emerald-50/30">
-                          <td className="py-2.5 text-gray-500">هزینه سوخت</td><td></td>
-                          <td className="py-2.5 text-left font-bold text-gray-700">+ {rial(result.fuelFeeRial)}</td>
-                        </tr>
-                      )}
-                      <tr style={{ background: '#f8fafc' }} className="font-bold">
-                        <td className="py-3 text-gray-900">جمع کل با متین</td><td></td>
-                        <td className="py-3 text-left text-blue-700">{rial(result.withMatinBillRial)}</td>
+                      <tr style={{ background: '#fef9c3', borderTop: '1px solid #fde047' }}>
+                        <td className="px-4 py-3 font-bold text-gray-900">صرفه‌جویی حاصل از قرارداد</td>
+                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-blue-700 ltr">{rial(r.netSaving)}</td>
                       </tr>
                     </tbody>
                   </table>
+                </div>
 
-                  <div className="mt-4 rounded-xl p-3" style={{ background: 'rgba(236,253,245,0.5)', border: '1px solid rgba(167,243,208,0.3)' }}>
-                    <p className="mb-1.5 text-xs font-semibold text-gray-500">نرخ‌های بازار {result.monthName} {result.year}</p>
-                    <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-                      <div><span className="text-gray-400">اوج: </span><span className="font-semibold">{result.marketPeakRate.toLocaleString('fa-IR')}</span></div>
-                      <div><span className="text-gray-400">میان: </span><span className="font-semibold">{result.marketMidRate.toLocaleString('fa-IR')}</span></div>
-                      <div><span className="text-gray-400">کم: </span><span className="font-semibold">{result.marketLowRate.toLocaleString('fa-IR')}</span></div>
-                      <div><span className="text-gray-400">پشتیبان: </span><span className="font-semibold">{result.backupRate.toLocaleString('fa-IR')}</span></div>
+                {/* ── نمودار مقایسه هزینه ── */}
+                {(() => {
+                  const bars = [
+                    { label: 'بهای انرژی', before: r.energyBeforeRial, after: r.energyAfterRial },
+                    ...(r.article16BeforeRial > 0 || r.article16AfterRial > 0 ? [{ label: 'ماده ۱۶', before: r.article16BeforeRial, after: r.article16AfterRial }] : []),
+                    ...(r.regulatoryBeforeRial > 0 || r.regulatoryAfterRial > 0 ? [{ label: 'مقررات', before: r.regulatoryBeforeRial, after: r.regulatoryAfterRial }] : []),
+                    ...((r.bilateralBillRial + r.exchangeBillRial + r.greenBillRial) > 0 ? [{ label: 'صورتحساب‌ها', before: 0, after: r.bilateralBillRial + r.exchangeBillRial + r.greenBillRial }] : []),
+                  ]
+                  const maxVal = Math.max(...bars.flatMap(b => [b.before, b.after]), 1)
+                  const W = 560
+                  const barH = 22
+                  const gap = 10
+                  const rowH = barH * 2 + gap + 20
+                  const chartH = bars.length * rowH + 20
+                  const labelW = 90
+
+                  return (
+                    <div className="glass-card overflow-hidden rounded-2xl">
+                      <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
+                        <BarChart3 className="h-4 w-4 text-emerald-700" />
+                        <span className="text-sm font-bold text-gray-700">نمودار مقایسه هزینه (ریال)</span>
+                        <div className="mr-auto flex items-center gap-4 text-xs">
+                          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-red-400"></span>بدون قرارداد</span>
+                          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500"></span>با قرارداد</span>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto p-4">
+                        <svg width="100%" viewBox={`0 0 ${W} ${chartH}`} style={{ direction: 'ltr', minWidth: 320 }}>
+                          {bars.map((b, i) => {
+                            const y = i * rowH + 10
+                            const beforeW = (b.before / maxVal) * (W - labelW - 10)
+                            const afterW  = (b.after  / maxVal) * (W - labelW - 10)
+                            return (
+                              <g key={b.label}>
+                                <text x={labelW - 6} y={y + barH / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">{b.label}</text>
+                                {/* before bar */}
+                                <rect x={labelW} y={y} width={Math.max(beforeW, 2)} height={barH} rx={4} fill="#f87171" opacity={0.85} />
+                                {b.before > 0 && (
+                                  <text x={labelW + beforeW + 4} y={y + barH / 2 + 4} fontSize={9} fill="#b91c1c">
+                                    {(b.before / 1e9).toFixed(1)}G
+                                  </text>
+                                )}
+                                {/* after bar */}
+                                <rect x={labelW} y={y + barH + 4} width={Math.max(afterW, 2)} height={barH} rx={4} fill="#34d399" opacity={0.85} />
+                                {b.after > 0 && (
+                                  <text x={labelW + afterW + 4} y={y + barH + 4 + barH / 2 + 4} fontSize={9} fill="#065f46">
+                                    {(b.after / 1e9).toFixed(1)}G
+                                  </text>
+                                )}
+                              </g>
+                            )
+                          })}
+                        </svg>
+                      </div>
                     </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-xs">
-                      <div><span className="text-gray-400">ساعات اوج: </span><span className="font-semibold">{result.peakHoursPerDay}</span></div>
-                      <div><span className="text-gray-400">ساعات میان: </span><span className="font-semibold">{result.midHoursPerDay}</span></div>
-                      <div><span className="text-gray-400">ساعات کم: </span><span className="font-semibold">{result.lowHoursPerDay}</span></div>
+                  )
+                })()}
+
+                {/* ── نمودار بهینه خرید ظرفیت ── */}
+                {(curveData || curveLoading) && (
+                  <div className="glass-card overflow-hidden rounded-2xl">
+                    <div className="flex items-center gap-3 px-5 py-4"
+                      style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <Activity className="h-4 w-4 text-violet-600" />
+                      <div>
+                        <h3 className="font-semibold text-gray-900">نمودار بهینه خرید ظرفیت</h3>
+                        <p className="text-xs text-gray-400">بهترین ظرفیت قرارداد با متین را بیابید — نشانگر موس را روی خط بکشید</p>
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {curveLoading ? (
+                        <div className="flex justify-center py-8">
+                          <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
+                        </div>
+                      ) : curveData ? (
+                        <OptimalPurchaseLineChart data={curveData} />
+                      ) : null}
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* بنر نتیجه */}
-              {result.savingRial > 0 && (
-                <div className="rounded-2xl px-6 py-5 text-white"
-                  style={{ background: 'linear-gradient(135deg, #065f46, #047857)' }}>
-                  <div className="flex items-center gap-3">
+                {/* کارت‌های خلاصه */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl p-4" style={{ background: 'rgba(254,242,242,0.8)', border: '1px solid rgba(252,165,165,0.4)' }}>
+                    <p className="text-xs font-semibold text-red-500">بدون قرارداد متین</p>
+                    <p className="mt-1.5 text-xl font-bold text-red-700">{rial(r.costWithoutMatin)}</p>
+                    <Bar value={r.costWithoutMatin} max={maxB} color="bg-red-400" />
+                  </div>
+                  <div className="rounded-2xl p-4" style={{ background: 'rgba(236,253,245,0.8)', border: '1px solid rgba(167,243,208,0.4)' }}>
+                    <p className="text-xs font-semibold text-emerald-600">با قرارداد متین</p>
+                    <p className="mt-1.5 text-xl font-bold text-emerald-700">{rial(r.costWithMatin)}</p>
+                    <Bar value={r.costWithMatin} max={maxB} color="bg-emerald-400" />
+                  </div>
+                  <div className="rounded-2xl p-4" style={{ background: 'rgba(239,246,255,0.8)', border: '1px solid rgba(147,197,253,0.4)' }}>
+                    <p className="text-xs font-semibold text-blue-600">صرفه‌جویی</p>
+                    <p className="mt-1.5 text-xl font-bold text-blue-700">{rial(r.netSaving)}</p>
+                    <p className="text-sm font-semibold text-blue-600">{r.savingPercent.toLocaleString('fa-IR')}٪ کاهش</p>
+                  </div>
+                </div>
+
+                {/* صورتحساب دو ستون */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl p-4" style={{ background: 'rgba(254,242,242,0.5)', border: '1px solid rgba(252,165,165,0.3)' }}>
+                    <p className="mb-3 text-xs font-bold text-red-600">هزینه بدون قرارداد متین</p>
+                    <table className="w-full text-xs">
+                      <tbody className="divide-y divide-red-100">
+                        <tr>
+                          <td className="py-1.5 text-gray-500">بهای انرژی</td>
+                          <td className="py-1.5 text-left font-mono text-gray-700">{fmt(r.energyBeforeRial)}</td>
+                        </tr>
+                        {r.article16BeforeRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-gray-500">مابه التفاوت ماده ۱۶</td>
+                            <td className="py-1.5 text-left font-mono text-purple-600">{fmt(r.article16BeforeRial)}</td>
+                          </tr>
+                        )}
+                        {r.regulatoryBeforeRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-gray-500">مابه التفاوت اجرای مقررات</td>
+                            <td className="py-1.5 text-left font-mono text-orange-600">{fmt(r.regulatoryBeforeRial)}</td>
+                          </tr>
+                        )}
+                        <tr style={{ background: 'rgba(254,242,242,0.8)' }}>
+                          <td className="py-2 font-bold text-red-700">جمع کل</td>
+                          <td className="py-2 text-left font-bold font-mono text-red-700">{rial(r.costWithoutMatin)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="rounded-xl p-4" style={{ background: 'rgba(236,253,245,0.5)', border: '1px solid rgba(167,243,208,0.3)' }}>
+                    <p className="mb-3 text-xs font-bold text-emerald-700">هزینه با قرارداد متین</p>
+                    <table className="w-full text-xs">
+                      <tbody className="divide-y divide-emerald-100">
+                        <tr>
+                          <td className="py-1.5 text-gray-500">بهای انرژی شبکه</td>
+                          <td className="py-1.5 text-left font-mono text-gray-700">{fmt(r.energyAfterRial)}</td>
+                        </tr>
+                        {r.article16AfterRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-gray-500">مابه التفاوت ماده ۱۶</td>
+                            <td className="py-1.5 text-left font-mono text-purple-600">{fmt(r.article16AfterRial)}</td>
+                          </tr>
+                        )}
+                        {r.regulatoryAfterRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-gray-500">مابه التفاوت اجرای مقررات</td>
+                            <td className="py-1.5 text-left font-mono text-orange-600">{fmt(r.regulatoryAfterRial)}</td>
+                          </tr>
+                        )}
+                        {r.creditRial < 0 && (
+                          <tr>
+                            <td className="py-1.5 text-emerald-600">بستانکاری</td>
+                            <td className="py-1.5 text-left font-mono font-semibold text-emerald-700">{fmt(r.creditRial)}</td>
+                          </tr>
+                        )}
+                        {r.bilateralBillRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-blue-600">صورتحساب دوجانبه</td>
+                            <td className="py-1.5 text-left font-mono text-blue-700">{fmt(r.bilateralBillRial)}</td>
+                          </tr>
+                        )}
+                        {r.exchangeBillRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-indigo-600">صورتحساب بورس</td>
+                            <td className="py-1.5 text-left font-mono text-indigo-700">{fmt(r.exchangeBillRial)}</td>
+                          </tr>
+                        )}
+                        {r.greenBillRial > 0 && (
+                          <tr>
+                            <td className="py-1.5 text-amber-600">صورتحساب برق سبز</td>
+                            <td className="py-1.5 text-left font-mono text-amber-700">{fmt(r.greenBillRial)}</td>
+                          </tr>
+                        )}
+                        <tr style={{ background: 'rgba(236,253,245,0.8)' }}>
+                          <td className="py-2 font-bold text-emerald-700">جمع کل</td>
+                          <td className="py-2 text-left font-bold font-mono text-emerald-700">{rial(r.costWithMatin)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* بنر نتیجه */}
+                {r.netSaving > 0 ? (
+                  <div className="flex items-center gap-3 rounded-2xl px-6 py-5 text-white"
+                    style={{ background: 'linear-gradient(135deg,#065f46,#047857)' }}>
                     <TrendingDown className="h-6 w-6 shrink-0" />
                     <div>
-                      <p className="font-bold text-lg">با برق متین {rial(result.savingRial)} صرفه‌جویی می‌کنید!</p>
-                      <p className="mt-0.5 text-emerald-100 text-sm">
-                        معادل {result.savingPercent.toLocaleString('fa-IR')}٪ کاهش هزینه نسبت به نرخ پشتیبان دولتی
-                      </p>
+                      <p className="text-lg font-bold">با برق متین {rial(r.netSaving)} صرفه‌جویی می‌کنید!</p>
+                      <p className="mt-0.5 text-sm text-emerald-100">معادل {r.savingPercent.toLocaleString('fa-IR')}٪ کاهش هزینه</p>
                     </div>
                   </div>
-                </div>
-              )}
-              {result.savingRial < 0 && (
-                <div className="flex items-center gap-3 rounded-2xl px-6 py-4"
-                  style={{ background: 'rgba(254,243,199,0.7)', border: '1px solid rgba(252,211,77,0.3)' }}>
-                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-                  <p className="text-sm font-medium text-amber-700">در این ماه هزینه با قرارداد دوجانبه بیشتر از نرخ پشتیبان است. احتمالاً مازاد مصرف زیاد بوده.</p>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-3 rounded-2xl px-6 py-4"
+                    style={{ background: 'rgba(254,243,199,0.7)', border: '1px solid rgba(252,211,77,0.3)' }}>
+                    <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+                    <p className="text-sm font-medium text-amber-700">در این ماه هزینه با قرارداد بیشتر از بدون قرارداد است.</p>
+                  </div>
+                )}
+
+                {/* دکمه ثبت سفارش */}
+                <button
+                  onClick={() => { setOrderKwh(String(result.totalKwh)); setOrderEType(''); setOrderPR(false); setShowOM(true) }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-bold text-white shadow-md transition hover:opacity-90 active:scale-[0.99]"
+                  style={{ background: 'linear-gradient(135deg,#065f46 0%,#047857 100%)' }}>
+                  ثبت سفارش خرید برق
+                </button>
+
+                {/* جزئیات فنی (قابل بسط) */}
+                <button onClick={() => setShowDetails(p => !p)}
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100">
+                  <span>جزئیات محاسبه</span>
+                  {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+
+                {showDetails && (
+                  <div className="glass-card overflow-hidden rounded-2xl">
+                    <div className="space-y-5 p-5">
+                      <div>
+                        <p className="mb-2 text-xs font-bold text-gray-500">نرخ‌ها (ریال/kWh)</p>
+                        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid #e5e7eb' }}>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 text-gray-500">
+                                <th className="px-3 py-2 text-right font-semibold">بازه</th>
+                                <th className="px-3 py-2 text-left font-semibold">تعرفه صنعتی</th>
+                                <th className="px-3 py-2 text-left font-semibold text-orange-500">حداکثر بازار (×ضریب)</th>
+                                <th className="px-3 py-2 text-left font-semibold text-blue-500">متوسط بازار</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {[
+                                { l: 'اوج بار',  t: r.tariffPeakRial, m: r.maxWholePeak },
+                                { l: 'میان بار', t: r.tariffMidRial,  m: r.maxWholeMid  },
+                                { l: 'کم بار',   t: r.tariffLowRial,  m: r.maxWholeLow  },
+                              ].map(row => (
+                                <tr key={row.l} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2 font-semibold text-gray-700">{row.l}</td>
+                                  <td className="px-3 py-2 text-left font-mono text-gray-800">{fmt(row.t)}</td>
+                                  <td className="px-3 py-2 text-left font-mono font-bold text-orange-600">{fmt(row.m)}</td>
+                                  <td className="px-3 py-2 text-left font-mono text-blue-600">{fmt(r.avgMarket)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-xs font-bold text-gray-500">توزیع انرژی (kWh)</p>
+                        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid #e5e7eb' }}>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 text-gray-500">
+                                <th className="px-3 py-2 text-right font-semibold">بازه</th>
+                                <th className="px-3 py-2 text-left font-semibold">مصرف</th>
+                                <th className="px-3 py-2 text-left font-semibold text-blue-500">انرژی بازار</th>
+                                <th className="px-3 py-2 text-left font-semibold text-emerald-600">باقیمانده شبکه</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {[
+                                { l: 'اوج بار',  c: r.peakKwh, m: r.marketEnergyPeak, rem: r.remainingPeak },
+                                { l: 'میان بار', c: r.midKwh,  m: r.marketEnergyMid,  rem: r.remainingMid  },
+                                { l: 'کم بار',   c: r.lowKwh,  m: r.marketEnergyLow,  rem: r.remainingLow  },
+                              ].map(row => (
+                                <tr key={row.l} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2 font-semibold text-gray-700">{row.l}</td>
+                                  <td className="px-3 py-2 text-left font-mono text-gray-600">{fmt(row.c)}</td>
+                                  <td className="px-3 py-2 text-left font-mono font-semibold text-blue-600">{fmt(row.m)}</td>
+                                  <td className="px-3 py-2 text-left font-mono font-bold text-emerald-700">{fmt(row.rem)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {loading && (
+            <div className="flex flex-col items-center py-16 text-center">
+              <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+              <p className="font-semibold text-gray-500">در حال تحلیل قبض...</p>
             </div>
           )}
-
           {!result && !loading && (
             <div className="flex flex-col items-center py-16 text-center">
               <BarChart3 className="mb-3 h-12 w-12 text-gray-300" />
-              <p className="font-semibold text-gray-500">مصارف TOU را وارد کنید تا تحلیل انجام شود</p>
-              <p className="mt-1 text-sm text-gray-400">مقایسه دقیق هزینه با و بدون قرارداد دوجانبه متین</p>
+              <p className="font-semibold text-gray-500">فرم را تکمیل کنید تا تحلیل انجام شود</p>
+              <p className="mt-1 text-sm text-gray-400">مقایسه دقیق هزینه بر اساس نرخ تعرفه و انرژی خریداری‌شده از بازار</p>
             </div>
           )}
         </>
-      )}
-
-      {/* تب تاریخچه */}
-      {activeTab === 'history' && selectedSubId !== '' && (
-        <div className="glass-card overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between px-5 py-4"
-            style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-            <div className="flex items-center gap-3">
-              <History className="h-4 w-4 text-emerald-700" />
-              <h3 className="font-semibold text-gray-900">تاریخچه تحلیل‌های قبض</h3>
-            </div>
-            <button
-              onClick={() => {
-                setHistLoading(true)
-                customerApi.getBillHistory(selectedSubId as number)
-                  .then((r) => { if (r.code === 200) setHistory(toArr(r.result)) })
-                  .finally(() => setHistLoading(false))
-              }}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 ${histLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          <div className="p-5">
-            {histLoading ? (
-              <div className="flex h-24 items-center justify-center">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-              </div>
-            ) : history.length === 0 ? (
-              <div className="flex flex-col items-center py-10 text-gray-400">
-                <History className="mb-2 h-8 w-8 text-gray-300" />
-                <p className="text-sm">هنوز تحلیلی برای این اشتراک ثبت نشده است</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-xs text-gray-400" style={{ borderColor: 'rgba(209,250,229,0.5)' }}>
-                      <th className="pb-3 text-right font-semibold">دوره</th>
-                      <th className="pb-3 text-left font-semibold">بدون متین</th>
-                      <th className="pb-3 text-left font-semibold">با متین</th>
-                      <th className="pb-3 text-left font-semibold">صرفه‌جویی</th>
-                      <th className="pb-3 text-left font-semibold">تاریخ ثبت</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y" style={{ borderColor: 'rgba(209,250,229,0.3)' }}>
-                    {history.map((h: any, i: number) => {
-                      const saving = (h.costWithoutMatin ?? 0) - (h.costWithMatin ?? 0)
-                      const pct = h.costWithoutMatin > 0 ? (saving / h.costWithoutMatin * 100).toFixed(1) : '0'
-                      return (
-                        <tr key={i} className="transition-colors hover:bg-emerald-50/30">
-                          <td className="py-3 font-semibold text-gray-900">{h.month ? MONTHS[h.month] : '—'} {h.year}</td>
-                          <td className="py-3 text-left font-mono text-red-600 font-semibold">
-                            {h.costWithoutMatin != null ? h.costWithoutMatin.toLocaleString('fa-IR') + ' ر' : '—'}
-                          </td>
-                          <td className="py-3 text-left font-mono text-blue-600 font-semibold">
-                            {h.costWithMatin != null ? h.costWithMatin.toLocaleString('fa-IR') + ' ر' : '—'}
-                          </td>
-                          <td className="py-3 text-left">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${+pct > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                              {+pct > 0 ? '+' : ''}{pct}٪
-                            </span>
-                          </td>
-                          <td className="py-3 text-left text-xs text-gray-400">{h.createdAt?.split('T')[0] ?? '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
       )}
 
       {selectedSubId === '' && subscriptions.length > 0 && (
         <div className="flex flex-col items-center py-16 text-center">
           <Zap className="mb-3 h-10 w-10 text-gray-300" />
           <p className="font-semibold text-gray-500">یک اشتراک را از بالا انتخاب کنید</p>
+        </div>
+      )}
+
+      {/* ── Order Confirmation Modal ── */}
+      {showOrderModal && result && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" dir="rtl">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-emerald-600" />
+                <h2 className="font-bold text-gray-900">تایید و ثبت سفارش</h2>
+              </div>
+              <button onClick={() => setShowOM(false)} className="text-gray-400 hover:text-gray-600">
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
+
+            {/* Analysis summary */}
+            <div className="mx-5 mt-4 overflow-hidden rounded-xl" style={{ border: '2px solid #fbbf24' }}>
+              <div className="bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">
+                مبنای سفارش — تحلیل {result.monthName} {result.year}
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-amber-100 text-center text-xs">
+                <div className="px-3 py-2.5" style={{ direction: 'rtl' }}>
+                  <p className="text-gray-400">بدون قرارداد</p>
+                  <p className="mt-0.5 font-bold text-red-600">{(result.costWithoutMatin / 1e9).toFixed(2)} G ریال</p>
+                </div>
+                <div className="px-3 py-2.5" style={{ direction: 'rtl' }}>
+                  <p className="text-gray-400">با قرارداد متین</p>
+                  <p className="mt-0.5 font-bold text-emerald-600">{(result.costWithMatin / 1e9).toFixed(2)} G ریال</p>
+                </div>
+                <div className="px-3 py-2.5 bg-amber-50/60" style={{ direction: 'rtl' }}>
+                  <p className="text-gray-400">صرفه‌جویی</p>
+                  <p className="mt-0.5 font-bold text-blue-700">{result.savingPercent.toFixed(1)}٪</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">نوع انرژی درخواستی *</label>
+                <select
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                  value={orderETypeId}
+                  onChange={e => setOrderEType(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">انتخاب کنید...</option>
+                  {energyTypes.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  مقدار درخواستی (kWh) *
+                  <span className="mr-2 font-normal text-gray-400 text-xs">— از تحلیل: {result.totalKwh.toLocaleString('fa-IR')} kWh</span>
+                </label>
+                <input
+                  type="number" min="0"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                  value={orderKwh}
+                  onChange={e => setOrderKwh(e.target.value)}
+                />
+              </div>
+
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50">
+                <input type="checkbox" className="h-4 w-4 rounded accent-emerald-600"
+                  checked={orderPR}
+                  onChange={e => setOrderPR(e.target.checked)} />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">فقط استعلام قیمت</p>
+                  <p className="text-xs text-gray-500">بدون تعهد خرید — برای اطلاع از قیمت</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t px-5 py-4">
+              <button onClick={() => setShowOM(false)}
+                className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                انصراف
+              </button>
+              <button onClick={handleCreateOrder} disabled={orderCreating}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                {orderCreating ? 'در حال ثبت...' : 'تایید و ثبت سفارش'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

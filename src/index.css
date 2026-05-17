@@ -3,15 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --app-bg: #ffffff;
+    --app-surface: rgba(255, 255, 255, 0.8);
+    --app-surface-solid: #ffffff;
+    --app-border: #e1e3e4;
+    --app-border-strong: #bfc9c3;
+    --app-text: #191c1d;
+    --app-text-muted: #404944;
+    --app-primary: #003527;
+    --app-primary-hover: #064e3b;
+    --app-primary-soft: #edeeef;
+    --app-primary-soft-hover: #e7e8e9;
+    --app-primary-accent: #95d3ba;
+    --app-shadow: 0 8px 32px 0 rgba(6, 78, 59, 0.05);
+  }
+
   * {
     font-family: 'Vazirmatn', system-ui, sans-serif;
     box-sizing: border-box;
   }
 
   body {
-    background: #f3f4f6;
+    background: var(--app-bg);
     min-height: 100vh;
-    color: #0f172a;
+    color: var(--app-text);
     direction: rtl;
   }
 
@@ -28,15 +44,16 @@
 
 @layer components {
   .glass-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: var(--app-shadow);
   }
 
   .glass-card-solid {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    box-shadow: var(--app-shadow);
   }
 }
 
@@ -58,5 +75,12 @@
   .sidebar-scroll::-webkit-scrollbar-thumb {
     background: rgba(6, 95, 70, 0.22);
     border-radius: 4px;
+  }
+
+  .app-surface {
+    background: var(--app-surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: var(--app-shadow);
   }
 }

@@ -322,7 +322,7 @@ export default function AdminRealCustomers() {
       </Modal>
 
       <CustomerDetailPanel open={detailProfileId !== null} profileId={detailProfileId}
-        customerTitle={detailTitle} onClose={() => setDetailProfileId(null)} />
+        customerTitle={detailTitle} customerType="real" onClose={() => setDetailProfileId(null)} />
 
       {/* Bottom analytics row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

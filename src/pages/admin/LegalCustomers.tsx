@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Building2, Plus, Pencil, Trash2, Eye, Trash, UserCheck, UserX, Home, Briefcase, MoreHorizontal } from 'lucide-react'
+import { Search, Building2, Plus, Pencil, Trash2, Eye, Trash, UserCheck, UserX, Briefcase, MoreHorizontal } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validateMobile } from '../../utils/validators'
 import { adminApi } from '../../api/admin'
@@ -7,7 +7,7 @@ import { lookupApi } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
 import { StatCard } from '../../components/ui/Card'
 import { RegionHeatMap } from '../../components/ui/Charts'
-import Input from '../../components/ui/Input'
+import Input, { DatePicker } from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
@@ -17,6 +17,7 @@ import type { AdminLegalCustomer } from '../../types'
 const emptyForm: AdminLegalCustomer = {
   id: 0, nationalId: '', companyName: '', ceoFullName: '', economicCode: '',
   ceoMobile: '', familiarityType: 0, customerTypeId: 2, isActive: true,
+  registerNumber: '', ceoNationalId: '', gazetteDate: '',
 }
 
 const familiarityOptions = [
@@ -283,9 +284,12 @@ export default function AdminLegalCustomers() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="نام شرکت *" value={form.companyName} onChange={f('companyName')} placeholder="نام کامل شرکت" />
           <Input label="شناسه ملی *" value={form.nationalId} onChange={fNum('nationalId')} placeholder="۱۱ رقم" maxLength={12} inputMode="numeric" />
-          <Input label="نام مدیرعامل *" value={form.ceoFullName} onChange={f('ceoFullName')} placeholder="نام و نام خانوادگی" />
-          <Input label="موبایل مدیرعامل" value={form.ceoMobile ?? ''} onChange={fNum('ceoMobile')} placeholder="09xxxxxxxxx" maxLength={11} inputMode="numeric" />
+          <Input label="شماره ثبت شرکت" value={form.registerNumber ?? ''} onChange={f('registerNumber')} placeholder="شماره ثبت از اداره ثبت شرکت‌ها" />
           <Input label="کد اقتصادی" value={form.economicCode ?? ''} onChange={f('economicCode')} placeholder="کد اقتصادی" />
+          <Input label="نام مدیرعامل *" value={form.ceoFullName} onChange={f('ceoFullName')} placeholder="نام و نام خانوادگی" />
+          <Input label="کد ملی مدیرعامل" value={form.ceoNationalId ?? ''} onChange={fNum('ceoNationalId')} placeholder="۱۰ رقم" maxLength={10} inputMode="numeric" />
+          <Input label="موبایل مدیرعامل" value={form.ceoMobile ?? ''} onChange={fNum('ceoMobile')} placeholder="09xxxxxxxxx" maxLength={11} inputMode="numeric" />
+          <DatePicker label="تاریخ آگهی روزنامه رسمی" value={form.gazetteDate ?? null} onChange={(v) => setForm(prev => ({ ...prev, gazetteDate: v ?? '' }))} />
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">نحوه آشنایی</label>
             <select value={form.familiarityType ?? 0} onChange={f('familiarityType')}

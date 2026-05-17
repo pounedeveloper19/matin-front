@@ -19,6 +19,7 @@ import { toArr } from '../../utils'
 const emptyForm: AdminContract = {
   id: 0, contractNumber: '', contractRate: 0, statusId: 1,
   subscriptionId: 0, startDate: null, endDate: null, amount: 0, typeId: 1,
+  contractPowerKw: null, contractVolumeKwh: null, contractAmountRial: null, paymentDeadline: null,
 }
 
 const avatarColors = [
@@ -92,7 +93,14 @@ export default function AdminContracts() {
   const openDelete = (row: AdminContract) => { setForm(row); setModal('delete') }
 
   const handleSave = async () => {
-    if (!form.subscriptionId) { toast.error('لطفاً انشعاب را انتخاب کنید'); return }
+    if (!form.subscriptionId) { toast.error('لطفاً شناسه را انتخاب کنید'); return }
+    if (
+      form.contractVolumeKwh != null && form.contractPowerKw != null &&
+      form.contractVolumeKwh > form.contractPowerKw * 720
+    ) {
+      toast.error(`حجم قرارداد نمی‌تواند از ظرفیت ماهانه (${(form.contractPowerKw * 720).toLocaleString('fa-IR')} kWh) بیشتر باشد`)
+      return
+    }
     setSaving(true)
     try {
       const res = modal === 'create' ? await adminApi.createContract(form) : await adminApi.updateContract(form)
@@ -199,6 +207,34 @@ export default function AdminContracts() {
         <Badge variant={contractStatusVariant(row.status ?? '')}>{row.status ?? '—'}</Badge>
       ),
     },
+    {
+      key: 'contractPowerKw',
+      header: 'قدرت (kW)',
+      render: (row: AdminContract) => row.contractPowerKw != null
+        ? <span className="text-xs font-semibold text-blue-700">{row.contractPowerKw.toLocaleString('fa-IR')}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'contractVolumeKwh',
+      header: 'حجم (kWh)',
+      render: (row: AdminContract) => row.contractVolumeKwh != null
+        ? <span className="text-xs font-semibold text-violet-700">{row.contractVolumeKwh.toLocaleString('fa-IR')}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'contractAmountRial',
+      header: 'مبلغ قرارداد',
+      render: (row: AdminContract) => row.contractAmountRial != null
+        ? <span className="text-xs font-semibold text-emerald-700">{row.contractAmountRial.toLocaleString('fa-IR')} ﷼</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'paymentDeadline',
+      header: 'مهلت پرداخت',
+      render: (row: AdminContract) => row.paymentDeadline
+        ? <span className="text-xs text-amber-700 font-semibold">{row.paymentDeadline}</span>
+        : <span className="text-gray-300">—</span>,
+    },
     { key: 'startDate', header: 'شروع', render: (row: AdminContract) => <span className="text-xs text-gray-600">{row.startDate ?? '—'}</span> },
     { key: 'endDate', header: 'پایان', render: (row: AdminContract) => <span className="text-xs text-gray-600">{row.endDate ?? '—'}</span> },
     {
@@ -208,16 +244,37 @@ export default function AdminContracts() {
       render: (row: AdminContract) => (
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setPrintData({
-              contractNumber: row.contractNumber,
-              customerName: row.customerName,
-              customerIdentifier: row.customerNationalId,
-              startDate: row.startDate,
-              endDate: row.endDate,
-              contractRate: row.contractRate,
-              status: row.status,
-              warrantyAmount: row.amount,
-            })}
+            onClick={async () => {
+              try {
+                const res = await adminApi.getContractPrintData(row.id)
+                if (res.code === 200 && res.result) {
+                  const d = res.result as any
+                  setPrintData({
+                    contractNumber: d.contractNumber,
+                    customerName: d.companyName ?? row.customerName,
+                    customerIdentifier: d.nationalId ?? row.customerNationalId,
+                    registerNumber: d.registerNumber,
+                    ceoFullName: d.ceoFullName,
+                    ceoNationalId: d.ceoNationalId,
+                    gazetteDate: d.gazetteDate,
+                    subscription: d.subscription,
+                    address: d.address,
+                    postalCode: d.postalCode,
+                    startDate: d.startDate,
+                    endDate: d.endDate,
+                    contractRate: d.contractRate,
+                    contractPowerKw: d.contractPowerKw,
+                    contractVolumeKwh: d.contractVolumeKwh,
+                    contractAmountRial: d.contractAmountRial,
+                    status: d.status,
+                    warrantyAmount: d.warrantyAmount,
+                    warrantyType: d.warrantyType,
+                  })
+                } else {
+                  toast.error('خطا در دریافت اطلاعات قرارداد')
+                }
+              } catch { toast.error('خطا در ارتباط با سرور') }
+            }}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-colors"
           >
             <Printer className="h-3.5 w-3.5" />
@@ -293,16 +350,35 @@ export default function AdminContracts() {
           {modal === 'edit' && (
             <Input label="شماره قرارداد" value={form.contractNumber} disabled onChange={() => {}} />
           )}
-          <Input label="نرخ قرارداد" type="number" value={form.contractRate}
+          <Input label="نرخ قرارداد (ریال/kWh)" type="number" value={form.contractRate}
             onChange={(e) => setForm({ ...form, contractRate: +e.target.value })} />
           <Select label="مشتری" value={selectedCustomer} loading={subsLoading}
             options={customerOptions.map(name => ({ value: name, label: name }))}
             onChange={(v) => { setSelectedCustomer(String(v)); setForm({ ...form, subscriptionId: 0 }) }} />
-          <Select label="انشعاب" value={form.subscriptionId || ''} loading={subsLoading}
+          <Select label="شناسه" value={form.subscriptionId || ''} loading={subsLoading}
             disabled={!selectedCustomer}
             options={filteredSubs.map(s => ({ value: s.id, label: `${s.billIdentifier} — ${s.address}` }))}
             onChange={(v) => setForm({ ...form, subscriptionId: +v })} />
-          <Input label="مبلغ ضمانت" type="number" value={form.amount || ''}
+
+          {/* ── New contract fields ── */}
+          <Input label="قدرت قرارداد (kW)" type="number" value={form.contractPowerKw ?? ''}
+            placeholder="مثلاً ۵۰۰"
+            onChange={(e) => setForm({ ...form, contractPowerKw: e.target.value === '' ? null : +e.target.value })} />
+          <div>
+            <Input label="حجم قرارداد (kWh)" type="number" value={form.contractVolumeKwh ?? ''}
+              placeholder={form.contractPowerKw ? `حداکثر ${(form.contractPowerKw * 720).toLocaleString('fa-IR')}` : 'مثلاً ۳۶۰۰۰۰'}
+              onChange={(e) => setForm({ ...form, contractVolumeKwh: e.target.value === '' ? null : +e.target.value })} />
+            {form.contractVolumeKwh != null && form.contractPowerKw != null && form.contractVolumeKwh > form.contractPowerKw * 720 && (
+              <p className="mt-1 text-xs text-red-500">حجم از ظرفیت ماهانه ({(form.contractPowerKw * 720).toLocaleString('fa-IR')} kWh) بیشتر است</p>
+            )}
+          </div>
+          <Input label="مبلغ قرارداد (ریال)" type="number" value={form.contractAmountRial ?? ''}
+            placeholder="مبلغ کل قرارداد"
+            onChange={(e) => setForm({ ...form, contractAmountRial: e.target.value === '' ? null : +e.target.value })} />
+          <DatePicker label="مهلت پرداخت" value={form.paymentDeadline ?? null}
+            onChange={(v) => setForm({ ...form, paymentDeadline: v })} />
+
+          <Input label="مبلغ ضمانت (ریال)" type="number" value={form.amount || ''}
             onChange={(e) => setForm({ ...form, amount: +e.target.value })} />
           <DatePicker label="تاریخ شروع" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} />
           <DatePicker label="تاریخ پایان" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} />

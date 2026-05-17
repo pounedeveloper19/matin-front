@@ -1,124 +1,232 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
 import {
-  LayoutDashboard, User, FileText, Zap, MessageSquare,
+  LayoutDashboard, User, FileText, Zap,
   Users, Building2, Building, LogOut, Bolt,
-  BarChart2, Tag, Clock, Receipt, UserCheck, Megaphone, Headset,
+  BarChart2, Tag, Clock, Receipt, UserCheck,
+  Megaphone, Headset, Shield, ChevronDown, ChevronLeft,
+  ShoppingCart, CreditCard,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { lookupApi } from '../api/lookup'
+import type { NavMenuItem } from '../types'
 
-const customerNav = [
-  { to: '/customer/dashboard', label: 'داشبورد',          icon: LayoutDashboard },
-  { to: '/customer/profile',   label: 'پروفایل',          icon: User },
-  { to: '/customer/contracts', label: 'قراردادها',         icon: FileText },
-  { to: '/customer/bills',     label: 'تحلیل قبض',        icon: Zap },
-  { to: '/customer/tickets',   label: 'تیکت‌ها',          icon: Headset },
-]
-
-const adminNav = [
-  { to: '/admin/dashboard',       label: 'داشبورد',              icon: LayoutDashboard },
-  { to: '/admin/legal-customers', label: 'مشتریان حقوقی',       icon: Building2 },
-  { to: '/admin/real-customers',  label: 'مشتریان حقیقی',       icon: Users },
-  { to: '/admin/contracts',       label: 'قراردادها',             icon: FileText },
-  { to: '/admin/market-rates',    label: 'نرخ‌های بازار',        icon: BarChart2 },
-  { to: '/admin/tariffs',         label: 'تعرفه‌ها',              icon: Tag },
-  { to: '/admin/tou-schedule',    label: 'برنامه TOU',            icon: Clock },
-  { to: '/admin/bill-reports',    label: 'گزارش قبض‌ها',         icon: Receipt },
-  { to: '/admin/tickets',         label: 'تیکت‌های پشتیبانی',   icon: Headset },
-  { to: '/admin/announcements',   label: 'اعلانات',               icon: Megaphone },
-  { to: '/admin/pending-users',   label: 'درخواست‌های ثبت‌نام', icon: UserCheck },
-  { to: '/admin/power-entities',  label: 'شرکت‌های برق',         icon: Building },
-]
-
-interface SidebarProps {
-  role: 'admin' | 'customer'
+const iconMap: Record<string, LucideIcon> = {
+  LayoutDashboard, User, FileText, Zap,
+  Users, Building2, Building, Bolt,
+  BarChart2, Tag, Clock, Receipt,
+  UserCheck, Megaphone, Headset, Shield,
+  ShoppingCart, CreditCard,
 }
 
+const customerFallback: NavMenuItem[] = [
+  { id: 1, title: 'داشبورد',    path: '/customer/dashboard', icon: 'LayoutDashboard', isSelectable: true, children: [] },
+  { id: 2, title: 'پروفایل',    path: '/customer/profile',   icon: 'User',            isSelectable: true, children: [] },
+  { id: 3, title: 'قراردادها',  path: '/customer/contracts', icon: 'FileText',        isSelectable: true, children: [] },
+  { id: 4, title: 'تحلیل قبض',  path: '/customer/bills',     icon: 'Zap',             isSelectable: true, children: [] },
+  { id: 6, title: 'سفارشات',    path: '/customer/orders',    icon: 'ShoppingCart',    isSelectable: true, children: [] },
+  { id: 5, title: 'تیکت‌ها',    path: '/customer/tickets',   icon: 'Headset',         isSelectable: true, children: [] },
+]
+
+const adminFallback: NavMenuItem[] = [
+  { id: 11, title: 'داشبورد',          path: '/admin/dashboard',       icon: 'LayoutDashboard', isSelectable: true, children: [] },
+  { id: 12, title: 'مشتریان حقوقی',    path: '/admin/legal-customers', icon: 'Building2',       isSelectable: true, children: [] },
+  { id: 13, title: 'مشتریان حقیقی',    path: '/admin/real-customers',  icon: 'Users',           isSelectable: true, children: [] },
+  { id: 14, title: 'قراردادها',         path: '/admin/contracts',       icon: 'FileText',        isSelectable: true, children: [] },
+  { id: 15, title: 'نرخ‌های بازار',     path: '/admin/market-rates',    icon: 'BarChart2',       isSelectable: true, children: [] },
+  { id: 16, title: 'تعرفه‌ها',          path: '/admin/tariffs',         icon: 'Tag',             isSelectable: true, children: [] },
+  { id: 17, title: 'برنامه TOU',        path: '/admin/tou-schedule',    icon: 'Clock',           isSelectable: true, children: [] },
+  { id: 27, title: 'سفارشات',           path: '/admin/orders',          icon: 'ShoppingCart',    isSelectable: true, children: [] },
+  { id: 33, title: 'گزارشات',           path: null,                     icon: 'BarChart2',       isSelectable: false, children: [
+    { id: 18, title: 'گزارش قبض‌ها',    path: '/admin/bill-reports',              icon: 'Receipt',      isSelectable: true, children: [] },
+    { id: 32, title: 'گزارش قراردادها', path: '/admin/reports/contracts',         icon: 'FileText',     isSelectable: true, children: [] },
+    { id: 34, title: 'گزارش سفارشات',  path: '/admin/reports/orders',            icon: 'ShoppingCart', isSelectable: true, children: [] },
+    { id: 35, title: 'گزارش پرداخت‌ها', path: '/admin/reports/payments',          icon: 'CreditCard',   isSelectable: true, children: [] },
+  ]},
+  { id: 19, title: 'تیکت‌ها',           path: '/admin/tickets',         icon: 'Headset',         isSelectable: true, children: [] },
+  { id: 20, title: 'اعلانات',           path: '/admin/announcements',   icon: 'Megaphone',       isSelectable: true, children: [] },
+  { id: 23, title: 'کدهای تعرفه',       path: '/admin/tariff-codes',    icon: 'Tag',             isSelectable: true, children: [] },
+  { id: 26, title: 'مدیریت امنیت',      path: null,                     icon: 'Shield',          isSelectable: false, children: [
+    { id: 21, title: 'درخواست‌های ثبت‌نام', path: '/admin/pending-users', icon: 'UserCheck', isSelectable: true, children: [] },
+    { id: 24, title: 'مدیریت کاربران',      path: '/admin/users',         icon: 'Users',     isSelectable: true, children: [] },
+    { id: 25, title: 'نقش‌ها و دسترسی‌ها',  path: '/admin/roles',         icon: 'Shield',    isSelectable: true, children: [] },
+  ]},
+]
+
+// پیدا کردن تمام pathهای زیرمجموعه یه گروه
+function collectPaths(item: NavMenuItem): string[] {
+  const paths: string[] = []
+  if (item.path) paths.push(item.path)
+  item.children.forEach(c => paths.push(...collectPaths(c)))
+  return paths
+}
+
+// آیا مسیر فعلی زیرمجموعه یه گروه هست؟
+function isGroupActive(item: NavMenuItem, pathname: string): boolean {
+  return collectPaths(item).some(p => pathname.startsWith(p))
+}
+
+interface SidebarProps { role: 'admin' | 'customer' }
+
 export default function Sidebar({ role }: SidebarProps) {
-  const { user, logout } = useAuth()
-  const nav = role === 'admin' ? adminNav : customerNav
+  const { user, logout }   = useAuth()
+  const location           = useLocation()
+  const [navItems, setNavItems]       = useState<NavMenuItem[]>([])
+  const [menuLoading, setMenuLoading] = useState(true)
+  const [expanded, setExpanded]       = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    lookupApi.getMyMenu()
+      .then(r => {
+        const raw = Array.isArray(r.result) ? r.result : (r.result as any)?.$values ?? []
+        const items: NavMenuItem[] = raw.length > 0 ? raw : (role === 'admin' ? adminFallback : customerFallback)
+        setNavItems(items)
+
+        // باز کردن خودکار گروه‌هایی که مسیر فعلی توشونه
+        const auto = new Set<number>()
+        items.forEach(item => {
+          if (!item.isSelectable && isGroupActive(item, location.pathname)) auto.add(item.id)
+        })
+        setExpanded(auto)
+      })
+      .catch(() => setNavItems(role === 'admin' ? adminFallback : customerFallback))
+      .finally(() => setMenuLoading(false))
+  }, [role])
+
+  // وقتی مسیر تغییر می‌کنه گروه مربوطه رو باز کن
+  useEffect(() => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      navItems.forEach(item => {
+        if (!item.isSelectable && isGroupActive(item, location.pathname)) next.add(item.id)
+      })
+      return next
+    })
+  }, [location.pathname, navItems])
+
+  const toggle = (id: number) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // رندر بازگشتی آیتم‌های منو
+  const renderItem = (item: NavMenuItem, depth = 0) => {
+    const Icon = iconMap[item.icon] ?? Shield
+    const indent = depth * 12
+
+    if (!item.isSelectable) {
+      // ── گروه قابل باز/بسته شدن ──
+      const open    = expanded.has(item.id)
+      const active  = isGroupActive(item, location.pathname)
+      return (
+        <li key={item.id}>
+          <button
+            onClick={() => toggle(item.id)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 hover:bg-emerald-800 hover:text-white"
+            style={{
+              paddingRight: `${12 + indent}px`,
+              color: active ? '#064e3b' : '#416656',
+              background: active ? 'rgba(6,78,59,0.07)' : 'transparent',
+            }}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+              style={active ? { background: 'rgba(149,211,186,0.25)' } : undefined}>
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="flex-1 truncate text-right">{item.title}</span>
+            {open
+              ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              : <ChevronLeft className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            }
+          </button>
+
+          {open && item.children.length > 0 && (
+            <ul className="mt-0.5 space-y-0.5 border-r border-emerald-100 mr-5">
+              {item.children.map(c => renderItem(c, depth + 1))}
+            </ul>
+          )}
+        </li>
+      )
+    }
+
+    // ── صفحه واقعی ──
+    return (
+      <li key={item.id}>
+        <NavLink
+          to={item.path as string}
+          className={({ isActive }) =>
+            ['flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+              isActive ? 'text-white shadow-sm' : 'hover:bg-emerald-800 hover:text-white'].join(' ')
+          }
+          style={({ isActive }) => ({
+            paddingRight: `${12 + indent}px`,
+            background: isActive ? '#064e3b' : 'transparent',
+            color: isActive ? '#ffffff' : '#416656',
+          })}
+        >
+          {({ isActive }) => (
+            <>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                style={isActive ? { background: 'rgba(149,211,186,0.2)' } : undefined}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="truncate">{item.title}</span>
+              {isActive && <span className="mr-auto h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: '#95d3ba' }} />}
+            </>
+          )}
+        </NavLink>
+      </li>
+    )
+  }
 
   return (
     <aside
       className="flex h-full w-64 shrink-0 flex-col sidebar-scroll overflow-y-auto"
       style={{
-        background: '#ffffff',
-        boxShadow: '-6px 0 30px rgba(15, 23, 42, 0.08)',
-        borderLeft: '1px solid #e5e7eb',
+        background: 'rgba(255,255,255,0.8)',
+        backdropFilter: 'blur(20px)',
+        boxShadow: '-6px 0 30px rgba(6,78,59,0.06)',
+        borderLeft: '1px solid #e1e3e4',
       }}
     >
       {/* Logo */}
-      <div className="flex flex-col items-center px-5 py-6 text-center" style={{ borderBottom: '1px solid #f1f5f9' }}>
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: '#065f46' }}
-        >
+      <div className="flex flex-col items-center px-5 py-6 text-center" style={{ borderBottom: '1px solid #e1e3e4' }}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: '#064e3b' }}>
           <Bolt className="h-5 w-5 text-emerald-50" />
         </div>
         <div className="mt-3">
-          <p className="text-base font-bold text-slate-800 leading-tight">توزیع نیروی برق</p>
-          <p className="mt-1 text-[11px] text-emerald-700/70">مدیریت هوشمند انرژی</p>
+          <p className="text-base font-bold leading-tight" style={{ color: '#003527' }}>توزیع نیروی برق</p>
+          <p className="mt-1 text-[11px]" style={{ color: '#416656' }}>مدیریت هوشمند انرژی</p>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4">
-        <ul className="space-y-0.5">
-          {nav.map(({ to, label, icon: Icon }) => (
-            <li key={to}>
-              <NavLink
-                to={to}
-                className={({ isActive }) =>
-                  [
-                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                    isActive
-                      ? 'bg-emerald-800 text-white shadow-sm'
-                      : 'text-emerald-700 hover:bg-emerald-800 hover:text-white',
-                  ].join(' ')
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={[
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all',
-                        isActive ? 'bg-emerald-700/50' : 'bg-transparent',
-                      ].join(' ')}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="truncate">{label}</span>
-                    {isActive && (
-                      <span className="mr-auto h-1.5 w-1.5 rounded-full bg-emerald-300 shrink-0" />
-                    )}
-                  </>
-                )}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
+        {menuLoading ? (
+          <div className="flex h-32 items-center justify-center">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+          </div>
+        ) : (
+          <ul className="space-y-0.5">
+            {navItems.map(item => renderItem(item))}
+          </ul>
+        )}
       </nav>
 
       {/* User footer */}
-      <div className="px-3 pb-4" style={{ borderTop: '1px solid #f1f5f9' }}>
-        <div
-          className="mb-2 mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5"
-          style={{ background: '#f8fafc' }}
-        >
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-emerald-50"
-            style={{ background: '#047857' }}
-          >
+      <div className="px-3 pb-4" style={{ borderTop: '1px solid #e1e3e4' }}>
+        <div className="mb-2 mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: '#edeeef' }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-emerald-50"
+            style={{ background: '#064e3b' }}>
             {user?.fullName?.charAt(0) ?? 'U'}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-700">{user?.fullName}</p>
-            <p className="text-[11px] text-emerald-700/70">{role === 'admin' ? 'مدیر سیستم' : 'مشتری'}</p>
+            <p className="truncate text-sm font-medium" style={{ color: '#294e3f' }}>{user?.fullName}</p>
+            <p className="text-[11px]" style={{ color: '#416656' }}>{role === 'admin' ? 'مدیر سیستم' : 'مشتری'}</p>
           </div>
         </div>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-emerald-700 transition-all hover:bg-emerald-800 hover:text-white"
-        >
+        <button onClick={logout}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all hover:bg-emerald-900 hover:text-white"
+          style={{ color: '#416656' }}>
           <LogOut className="h-4 w-4" />
           خروج از سیستم
         </button>

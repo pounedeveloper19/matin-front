@@ -26,9 +26,9 @@ interface StatCardProps {
 
 const colorMap = {
   green: {
-    icon: 'bg-emerald-100 text-emerald-600',
+    icon: 'text-emerald-700',
     value: 'text-primary-800',
-    trend: 'text-emerald-600 bg-emerald-50',
+    trend: 'text-emerald-700',
     dot: 'bg-emerald-400',
   },
   blue: {
@@ -71,12 +71,18 @@ export function StatCard({ title, value, icon, color = 'green', subtitle, trend 
             <p className="mt-1.5 text-xs text-gray-400 truncate">{subtitle}</p>
           )}
           {trend && (
-            <span className={clsx('mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', c.trend)}>
+            <span
+              className={clsx('mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', c.trend)}
+              style={color === 'green' ? { background: '#edeeef' } : undefined}
+            >
               {trend}
             </span>
           )}
         </div>
-        <div className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', c.icon)}>
+        <div
+          className={clsx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', c.icon)}
+          style={color === 'green' ? { background: '#c3ecd7' } : undefined}
+        >
           {icon}
         </div>
       </div>

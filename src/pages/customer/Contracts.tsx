@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, Upload, CheckCircle, Clock, XCircle, Pencil, Printer, Shield, Zap, Calendar } from 'lucide-react'
+import { FileText, Upload, CheckCircle, Clock, XCircle, Pencil, Printer, Shield, Zap, Calendar, BatteryCharging, BarChart2, CreditCard, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi } from '../../api/lookup'
@@ -122,12 +122,37 @@ export default function CustomerContracts() {
                   <StatusIcon statusId={c.statusId} />
                   <Badge variant={contractStatusVariant(c.status)}>{c.status}</Badge>
                   <button
-                    onClick={() => setPrintData({
-                      contractNumber: c.contractNumber, subscription: c.subscription,
-                      address: c.address, startDate: c.startDate, endDate: c.endDate,
-                      contractRate: c.contractRate, status: c.status,
-                      warrantyAmount: c.warrantyAmount, warrantyType: c.warrantyType,
-                    })}
+                    onClick={async () => {
+                      try {
+                        const res = await customerApi.getContractPrintData(c.id)
+                        if (res.code === 200 && res.result) {
+                          const d = res.result as any
+                          setPrintData({
+                            contractNumber: d.contractNumber,
+                            customerName: d.companyName,
+                            customerIdentifier: d.nationalId,
+                            registerNumber: d.registerNumber,
+                            ceoFullName: d.ceoFullName,
+                            ceoNationalId: d.ceoNationalId,
+                            gazetteDate: d.gazetteDate,
+                            subscription: d.subscription,
+                            address: d.address,
+                            postalCode: d.postalCode,
+                            startDate: d.startDate,
+                            endDate: d.endDate,
+                            contractRate: d.contractRate,
+                            contractPowerKw: d.contractPowerKw,
+                            contractVolumeKwh: d.contractVolumeKwh,
+                            contractAmountRial: d.contractAmountRial,
+                            status: d.status,
+                            warrantyAmount: d.warrantyAmount,
+                            warrantyType: d.warrantyType,
+                          })
+                        } else {
+                          toast.error('خطا در دریافت اطلاعات قرارداد')
+                        }
+                      } catch { toast.error('خطا در ارتباط با سرور') }
+                    }}
                     className="rounded-lg p-1.5 text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                     title="مشاهده / چاپ"
                   >
@@ -159,13 +184,60 @@ export default function CustomerContracts() {
                   </div>
                   <p className="text-sm font-semibold text-gray-700">
                     {c.contractRate?.toLocaleString('fa-IR')}
-                    <span className="text-[10px] text-gray-400 mr-1">ریال</span>
+                    <span className="text-[10px] text-gray-400 mr-1">ریال/kWh</span>
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 p-3">
                   <p className="text-[10px] text-gray-400 mb-1">آدرس</p>
                   <p className="text-xs text-gray-600 truncate">{c.address || '—'}</p>
                 </div>
+
+                {/* ── New contract fields ── */}
+                {c.contractPowerKw != null && (
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(219,234,254,0.4)', border: '1px solid rgba(147,197,253,0.3)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <BatteryCharging className="h-3 w-3 text-blue-500" />
+                      <p className="text-[10px] text-blue-500">قدرت قرارداد</p>
+                    </div>
+                    <p className="text-sm font-bold text-blue-700">
+                      {c.contractPowerKw.toLocaleString('fa-IR')}
+                      <span className="text-[10px] font-normal text-blue-400 mr-1">kW</span>
+                    </p>
+                  </div>
+                )}
+                {c.contractVolumeKwh != null && (
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(237,233,254,0.4)', border: '1px solid rgba(196,181,253,0.3)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <BarChart2 className="h-3 w-3 text-violet-500" />
+                      <p className="text-[10px] text-violet-500">حجم قرارداد</p>
+                    </div>
+                    <p className="text-sm font-bold text-violet-700">
+                      {c.contractVolumeKwh.toLocaleString('fa-IR')}
+                      <span className="text-[10px] font-normal text-violet-400 mr-1">kWh</span>
+                    </p>
+                  </div>
+                )}
+                {c.contractAmountRial != null && (
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(209,250,229,0.4)', border: '1px solid rgba(110,231,183,0.3)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <CreditCard className="h-3 w-3 text-emerald-600" />
+                      <p className="text-[10px] text-emerald-600">مبلغ قرارداد</p>
+                    </div>
+                    <p className="text-sm font-bold text-emerald-700">
+                      {c.contractAmountRial.toLocaleString('fa-IR')}
+                      <span className="text-[10px] font-normal text-emerald-400 mr-1">ریال</span>
+                    </p>
+                  </div>
+                )}
+                {c.paymentDeadline && (
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(255,251,235,0.5)', border: '1px solid rgba(252,211,77,0.3)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AlertCircle className="h-3 w-3 text-amber-500" />
+                      <p className="text-[10px] text-amber-600">مهلت پرداخت</p>
+                    </div>
+                    <p className="text-sm font-bold text-amber-700">{c.paymentDeadline}</p>
+                  </div>
+                )}
               </div>
 
               {/* Warranty section */}

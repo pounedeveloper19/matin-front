@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { validateBillIdentifier } from '../../utils/validators'
-import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2 } from 'lucide-react'
+import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi } from '../../api/lookup'
@@ -11,7 +11,7 @@ import Input, { Select } from '../../components/ui/Input'
 import FileUpload from '../../components/ui/FileUpload'
 import type {
   AddressResult, CustomerAgent, CustomerReal, CustomerLegal,
-  SubscriptionResult, AddSubscriptionRequest,
+  SubscriptionResult, AddSubscriptionRequest, TariffCode, TariffCodeOption, CustomerTariffInfo,
 } from '../../types'
 
 const toArr = (v: any): any[] => Array.isArray(v) ? v : (v?.$values ?? [])
@@ -36,6 +36,14 @@ export default function CustomerProfile() {
   const [cities, setCities]               = useState<IdTitle[]>([])
   const [powerEntities, setPowerEntities] = useState<IdName[]>([])
   const [lookupsLoading, setLookupsLoading] = useState(true)
+
+  const [tariffCodes, setTariffCodes]           = useState<TariffCode[]>([])
+  const [tariffOptions, setTariffOptions]       = useState<TariffCodeOption[]>([])
+  const [tariffInfo, setTariffInfo]             = useState<CustomerTariffInfo | null>(null)
+  const [selectedTariffCodeId, setSelectedTariffCodeId] = useState<number>(0)
+  const [selectedOptionId, setSelectedOptionId]         = useState<number | null>(null)
+  const [savingTariff, setSavingTariff]         = useState(false)
+  const [editingTariff, setEditingTariff]       = useState(false)
 
   const [editModal, setEditModal]       = useState(false)
   const [addrModal, setAddrModal]       = useState(false)
@@ -69,8 +77,14 @@ export default function CustomerProfile() {
             setProfile({ type: 'real', ...p }); setRealForm(p)
           } else if (raw.type === 'legal') {
             const p: CustomerLegal = { companyName: raw.companyName ?? '', nationalId: raw.nationalId ?? '', economicCode: raw.economicCode ?? '', ceo_FullName: raw.ceo_FullName ?? '', ceo_Mobile: raw.ceo_Mobile ?? '' }
-            setProfile({ type: 'legal', ...p }); setLegalForm(p)
+            setProfile({ type: 'legal', ...p, registerNumber: raw.registerNumber ?? null, ceoNationalId: raw.ceoNationalId ?? null, gazetteDate: raw.gazetteDate ?? null }); setLegalForm(p)
           } else { toast.error('نوع پروفایل قابل تشخیص نیست') }
+          if (raw.tariff) {
+            const t = raw.tariff as CustomerTariffInfo
+            setTariffInfo(t)
+            setSelectedTariffCodeId(t.tariffCodeId ?? 0)
+            setSelectedOptionId(t.tariffCodeOptionId ?? null)
+          }
         } else if (r.code !== 200) { toast.error(r.message ?? r.caption ?? 'خطا در دریافت اطلاعات پروفایل') }
       } else { toast.error('خطا در ارتباط با سرور هنگام دریافت پروفایل') }
 
@@ -84,10 +98,11 @@ export default function CustomerProfile() {
 
   useEffect(() => {
     loadAll()
-    Promise.all([lookupApi.getCities(), lookupApi.getPowerEntities()])
-      .then(([c, p]) => {
+    Promise.all([lookupApi.getCities(), lookupApi.getPowerEntities(), lookupApi.getTariffCodes()])
+      .then(([c, p, tc]) => {
         if (c.code === 200 && Array.isArray(c.result)) setCities(c.result as IdTitle[])
         if (p.code === 200 && Array.isArray(p.result)) setPowerEntities(p.result as IdName[])
+        if (tc.code === 200) setTariffCodes(toArr(tc.result))
       })
       .finally(() => setLookupsLoading(false))
   }, [])
@@ -164,6 +179,33 @@ export default function CustomerProfile() {
     finally { setSaving(false) }
   }
 
+  useEffect(() => {
+    if (!selectedTariffCodeId) { setTariffOptions([]); return }
+    lookupApi.getTariffCodeOptions(selectedTariffCodeId).then((r) => {
+      if (r.code === 200) setTariffOptions(toArr(r.result))
+    })
+  }, [selectedTariffCodeId])
+
+  const handleSaveTariff = async () => {
+    setSavingTariff(true)
+    try {
+      const res = await customerApi.updateTariffCode(selectedOptionId)
+      if (res.type === 'Success' || res.code === 200) {
+        toast.success('کد تعرفه ذخیره شد')
+        setEditingTariff(false)
+        const selected = tariffOptions.find(o => o.id === selectedOptionId)
+        const code = tariffCodes.find(c => c.id === selectedTariffCodeId)
+        setTariffInfo(selected ? {
+          tariffCodeOptionId: selected.id,
+          tariffCodeId: selectedTariffCodeId,
+          tariffCodeTitle: code?.title ?? null,
+          tariffCodeOptionTitle: selected.title,
+        } : null)
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در ذخیره') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSavingTariff(false) }
+  }
+
   const handleIdentityUploaded = async (fileId: string) => {
     try {
       const res = await customerApi.updateIdentityDoc(fileId)
@@ -187,11 +229,14 @@ export default function CustomerProfile() {
           { label: 'موبایل',       value: profile.mobile },
         ]
       : [
-          { label: 'نام شرکت',        value: profile.companyName },
-          { label: 'شناسه ملی',       value: profile.nationalId },
-          { label: 'کد اقتصادی',      value: profile.economicCode },
-          { label: 'نام مدیرعامل',    value: profile.ceo_FullName },
-          { label: 'موبایل مدیرعامل', value: profile.ceo_Mobile },
+          { label: 'نام شرکت',              value: profile.companyName },
+          { label: 'شناسه ملی',             value: profile.nationalId },
+          { label: 'شماره ثبت شرکت',        value: (profile as any).registerNumber },
+          { label: 'کد اقتصادی',            value: profile.economicCode },
+          { label: 'نام مدیرعامل',          value: profile.ceo_FullName },
+          { label: 'کد ملی مدیرعامل',       value: (profile as any).ceoNationalId },
+          { label: 'موبایل مدیرعامل',       value: profile.ceo_Mobile },
+          { label: 'تاریخ آگهی روزنامه رسمی', value: (profile as any).gazetteDate },
         ]
     : []
 
@@ -366,6 +411,65 @@ export default function CustomerProfile() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* کد تعرفه */}
+      <div className="glass-card overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <Tag className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">کد تعرفه</h3>
+              <p className="text-xs text-gray-400">گزینه تعرفه‌ای که در محاسبات قبض اعمال می‌شود</p>
+            </div>
+          </div>
+          {tariffInfo && !editingTariff && (
+            <Button variant="secondary" size="sm" onClick={() => setEditingTariff(true)}>
+              <Pencil className="h-3.5 w-3.5" /> ویرایش
+            </Button>
+          )}
+        </div>
+        <div className="p-5">
+          {tariffInfo && !editingTariff ? (
+            /* حالت نمایش — تعرفه ست شده */
+            <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={fieldRow}>
+              <Tag className="h-4 w-4 text-violet-500 shrink-0" />
+              <div>
+                <p className="text-[10px] text-gray-400">تعرفه انتخاب‌شده</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {tariffInfo.tariffCodeTitle}
+                  {tariffInfo.tariffCodeOptionTitle && (
+                    <span className="mr-1 text-violet-600">— {tariffInfo.tariffCodeOptionTitle}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* حالت ویرایش / انتخاب اول */
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Select label="کد تعرفه" value={selectedTariffCodeId || ''} loading={lookupsLoading}
+                  options={tariffCodes.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` }))}
+                  onChange={(v) => { setSelectedTariffCodeId(+v); setSelectedOptionId(null) }} />
+                <Select label="گزینه تعرفه" value={selectedOptionId ?? ''} loading={lookupsLoading}
+                  options={tariffOptions.map(o => ({ value: o.id, label: o.title }))}
+                  onChange={(v) => setSelectedOptionId(+v || null)}
+                  disabled={!selectedTariffCodeId || tariffOptions.length === 0} />
+              </div>
+              <div className="flex justify-end gap-3">
+                {editingTariff && (
+                  <Button variant="secondary" onClick={() => setEditingTariff(false)}>انصراف</Button>
+                )}
+                <Button loading={savingTariff} onClick={handleSaveTariff} disabled={!selectedOptionId}>
+                  ذخیره کد تعرفه
+                </Button>
+              </div>
             </div>
           )}
         </div>

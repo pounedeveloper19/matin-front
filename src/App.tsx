@@ -6,6 +6,8 @@ import CustomerDashboard from './pages/customer/Dashboard'
 import CustomerProfile from './pages/customer/Profile'
 import CustomerContracts from './pages/customer/Contracts'
 import CustomerBills from './pages/customer/Bills'
+import BillOptimal from './pages/customer/BillOptimal'
+import BillHistory from './pages/customer/BillHistory'
 import CustomerTickets from './pages/customer/Tickets'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminLegalCustomers from './pages/admin/LegalCustomers'
@@ -19,6 +21,14 @@ import AdminPendingUsers from './pages/admin/AdminPendingUsers'
 import AdminTickets from './pages/admin/AdminTickets'
 import AdminAnnouncements from './pages/admin/AdminAnnouncements'
 import AdminPowerEntities from './pages/admin/AdminPowerEntities'
+import AdminTariffCodes from './pages/admin/AdminTariffCodes'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminRoles from './pages/admin/AdminRoles'
+import AdminOrders from './pages/admin/AdminOrders'
+import AdminReportContracts from './pages/admin/reports/AdminReportContracts'
+import AdminReportOrders from './pages/admin/reports/AdminReportOrders'
+import AdminReportPayments from './pages/admin/reports/AdminReportPayments'
+import CustomerOrders from './pages/customer/Orders'
 import Register from './pages/Register'
 
 function ProtectedRoute({ children, role }: { children: JSX.Element; role?: 'admin' | 'customer' }) {
@@ -55,7 +65,10 @@ export default function App() {
         <Route path="profile" element={<CustomerProfile />} />
         <Route path="contracts" element={<CustomerContracts />} />
         <Route path="bills" element={<CustomerBills />} />
+        <Route path="bills/optimal" element={<BillOptimal />} />
+        <Route path="bills/history" element={<BillHistory />} />
         <Route path="tickets" element={<CustomerTickets />} />
+        <Route path="orders" element={<CustomerOrders />} />
       </Route>
 
       {/* Admin */}
@@ -80,6 +93,13 @@ export default function App() {
         <Route path="announcements"   element={<AdminAnnouncements />} />
         <Route path="pending-users"   element={<AdminPendingUsers />} />
         <Route path="power-entities"  element={<AdminPowerEntities />} />
+        <Route path="tariff-codes"    element={<AdminTariffCodes />} />
+        <Route path="users"           element={<AdminUsers />} />
+        <Route path="roles"           element={<AdminRoles />} />
+        <Route path="orders"             element={<AdminOrders />} />
+        <Route path="reports/contracts" element={<AdminReportContracts />} />
+        <Route path="reports/orders"    element={<AdminReportOrders />} />
+        <Route path="reports/payments"  element={<AdminReportPayments />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

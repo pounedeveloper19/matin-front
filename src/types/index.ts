@@ -68,6 +68,9 @@ export interface CustomerLegal {
   ceo_Mobile: string
   familiarityType?: number
   customerTypeId?: number
+  registerNumber?: string | null
+  ceoNationalId?: string | null
+  gazetteDate?: string | null
 }
 
 export interface AddressResult {
@@ -124,6 +127,10 @@ export interface ContractResult {
   warrantyType: string
   warrantyTypeId: number
   warrantyFileId: string | null
+  contractPowerKw: number | null
+  contractVolumeKwh: number | null
+  contractAmountRial: number | null
+  paymentDeadline: string | null
 }
 
 export interface SubmitWarrantyRequest {
@@ -154,6 +161,10 @@ export interface AdminContract {
   customerName?: string
   status?: string
   warrantyFileId?: string | null
+  contractPowerKw?: number | null
+  contractVolumeKwh?: number | null
+  contractAmountRial?: number | null
+  paymentDeadline?: string | null
 }
 
 // Bills
@@ -202,6 +213,22 @@ export interface BillAnalysisResult {
   withMatinBillRial: number
   savingRial: number
   savingPercent: number
+}
+
+export interface OptimalPurchaseCurvePoint {
+  contractCapacityKw: number
+  contractedEnergyKwh: number
+  savingRial: number
+  withMatinBillRial: number
+}
+
+export interface OptimalPurchaseCurveResult {
+  currentContractCapacityKw: number
+  savingAtCurrentContractRial: number
+  optimalContractCapacityKw: number
+  optimalSavingRial: number
+  withoutMatinBillRial: number
+  points: OptimalPurchaseCurvePoint[]
 }
 
 export interface ManualBillRequest {
@@ -276,6 +303,84 @@ export interface AdminTicketSummary {
   messageCount: number
 }
 
+// TariffCode / TariffCodeOption
+export interface TariffCode {
+  id: number
+  code: string
+  title: string
+  optionCount?: number
+}
+
+export interface TariffCodeOption {
+  id: number
+  tariffCodeId: number
+  tariffCode?: string
+  tariffCodeCode?: string
+  title: string
+  penaltyMultiplier: number
+  creditMultiplier: number
+}
+
+export interface AdvancedBillAnalysisResult {
+  monthName: string
+  year: number
+  month: number
+  // مصرف برق
+  peakKwh: number
+  midKwh: number
+  lowKwh: number
+  totalKwh: number
+  // ساعات TOU
+  peakHoursPerDay: number
+  midHoursPerDay: number
+  lowHoursPerDay: number
+  // نرخ تعرفه صنعتی
+  tariffPeakRial: number
+  tariffMidRial: number
+  tariffLowRial: number
+  // حداکثر نرخ عمده‌فروشی (1.3 × بازار)
+  maxWholePeak: number
+  maxWholeMid: number
+  maxWholeLow: number
+  // متوسط بازار و نرخ قانون جهش
+  avgMarket: number
+  greenLawRate: number
+  greenPercent: number
+  greenSubjectKwh: number
+  // انرژی بازار و باقیمانده
+  marketEnergyPeak: number
+  marketEnergyMid: number
+  marketEnergyLow: number
+  remainingPeak: number
+  remainingMid: number
+  remainingLow: number
+  // اجزای هزینه قبل از قرارداد
+  energyBeforeRial: number
+  article16BeforeRial: number
+  regulatoryBeforeRial: number
+  // اجزای هزینه بعد از قرارداد
+  energyAfterRial: number
+  article16AfterRial: number
+  regulatoryAfterRial: number
+  creditRial: number
+  // صورتحساب‌های بازار
+  bilateralBillRial: number
+  exchangeBillRial: number
+  greenBillRial: number
+  // نتایج نهایی
+  costWithoutMatin: number
+  costWithMatin: number
+  netSaving: number
+  savingPercent: number
+}
+
+export interface CustomerTariffInfo {
+  tariffCodeOptionId: number
+  tariffCodeId: number
+  tariffCodeTitle: string | null
+  tariffCodeOptionTitle: string | null
+}
+
 // Admin Subscription
 export interface AdminSubscription {
   id: number
@@ -298,6 +403,9 @@ export interface AdminLegalCustomer {
   familiarityType?: number
   customerTypeId?: number
   isActive?: boolean
+  registerNumber?: string
+  ceoNationalId?: string
+  gazetteDate?: string
 }
 
 export interface AdminRealCustomer {
@@ -327,17 +435,16 @@ export interface MonthlyMarketRate {
   id: number
   year: number
   month: number
-  marketPeak: number
-  marketMid: number
-  marketLow: number
-  backupRate: number
+  marketAvg: number           // متوسط قیمت بازار برق
+  marketPeak: number          // حداکثر - اوج بار
+  marketMid: number           // حداکثر - میان بار
+  marketLow: number           // حداکثر - کم بار
   boardPeak: number
   boardMid: number
   boardLow: number
   greenBoardRate: number
-  article16Rate: number
-  fuelFee: number
-  industrialTariffBase: number
+  openBoardRate: number
+  industrialTariffBase: number  // نرخ قانون جهش تولید (تعرفه صنعتی)
   executiveTariffBase: number
 }
 
@@ -398,6 +505,231 @@ export interface PendingUser {
   mainAddress?: string | null
   hasIdentityDoc?: boolean
   hasAddress?: boolean
+}
+
+// User Management (Admin)
+export interface AdminUser {
+  id: number
+  fullName: string
+  mobile: string
+  isActive: boolean | null
+  customerProfileId: number | null
+  roleId: number | null
+  roleTitle: string | null
+  customerName: string | null
+}
+
+export interface AdminRole {
+  id: number
+  title: string
+  description: string | null
+}
+
+export interface NavMenuItem {
+  id: number
+  title: string
+  path: string | null      // null برای گروه‌ها
+  icon: string
+  isSelectable: boolean    // false = گروه، true = صفحه
+  children: NavMenuItem[]
+}
+
+export interface SiteMapItem {
+  id: number
+  title: string
+  parentId: number | null
+  isInMenu: boolean
+  isSelectable: boolean
+  description: string | null
+  controlKey: string | null
+}
+
+export interface SetUserRoleRequest {
+  userId: number
+  roleId: number | null
+}
+
+export interface UpdateUserRequest {
+  id: number
+  fullName: string
+  mobile: string
+  password?: string
+}
+
+export interface CreateAdminUserRequest {
+  fullName: string
+  mobile: string
+  password: string
+  roleId: number | null
+}
+
+export interface SetPermissionsRequest {
+  roleId: number
+  siteMapIds: number[]
+}
+
+// Optimal Purchase Curve
+export interface OptimalPurchaseCurvePoint {
+  contractCapacityKw: number
+  contractedEnergyKwh: number
+  savingRial: number
+  withMatinBillRial: number
+}
+
+export interface OptimalPurchaseCurveResult {
+  currentContractCapacityKw: number
+  savingAtCurrentContractRial: number
+  optimalContractCapacityKw: number
+  optimalSavingRial: number
+  withoutMatinBillRial: number
+  points: OptimalPurchaseCurvePoint[]
+}
+
+// Orders & Payments
+export interface OrderResult {
+  id: number
+  billId: number
+  billIdentifier: string
+  requestedKwh: number
+  energyType: string
+  energyTypeId: number
+  priceAtMoment: number
+  status: string
+  statusId: number
+  orderDate: string | null
+  isPriceRequest: boolean
+  paymentCount: number
+  lastPaymentStatusId?: number | null
+}
+
+export interface PaymentResult {
+  id: number
+  amount: number
+  method: string
+  methodId: number
+  status: string
+  statusId: number
+  referenceNumber: string | null
+  receiptFileId?: string | null
+  createdAt: string | null
+}
+
+export interface OrderDetailResult extends OrderResult {
+  payments: PaymentResult[]
+}
+
+export interface AdminOrderResult {
+  id: number
+  billId: number
+  billIdentifier: string
+  customerName: string
+  requestedKwh: number
+  energyType: string
+  energyTypeId: number
+  priceAtMoment: number
+  status: string
+  statusId: number
+  orderDate: string | null
+  isPriceRequest: boolean
+  paymentCount: number
+  paidAmount: number
+  payments?: PaymentResult[]
+}
+
+export interface CreateOrderRequest {
+  subscriptionId: number
+  requestedKwh: number
+  energyTypeId: number
+  isPriceRequest: boolean
+}
+
+export interface SubmitPaymentRequest {
+  orderId: number
+  amount: number
+  methodId: number
+  referenceNumber?: string
+  receiptFileId?: string
+}
+
+export interface UpdateOrderStatusRequest {
+  orderId: number
+  statusId: number
+  priceAtMoment?: number
+}
+
+export interface ConfirmPaymentRequest {
+  paymentId: number
+  statusId: number
+}
+
+// Reports
+export interface ContractReportItem {
+  id: number
+  contractNumber: string | null
+  customerName: string
+  billIdentifier: string
+  status: string
+  statusId: number
+  startDate: string | null
+  endDate: string | null
+  contractRate: number
+  contractPowerKw: number | null
+  contractVolumeKwh: number | null
+  contractAmountRial: number | null
+  paymentDeadline: string | null
+}
+
+export interface OrderReportItem {
+  id: number
+  billIdentifier: string
+  customerName: string
+  energyType: string
+  energyTypeId: number
+  requestedKwh: number
+  priceAtMoment: number
+  status: string
+  statusId: number
+  orderDate: string | null
+  isPriceRequest: boolean
+  paymentCount: number
+  paidAmount: number
+}
+
+export interface PaymentReportItem {
+  id: number
+  orderId: number
+  billIdentifier: string
+  customerName: string
+  amount: number
+  method: string
+  methodId: number
+  status: string
+  statusId: number
+  referenceNumber: string | null
+  receiptFileId: string | null
+  createdAt: string | null
+}
+
+interface ReportByStatus {
+  statusId: number
+  status: string
+  count: number
+  totalAmount?: number
+}
+
+export interface ContractReportResult {
+  items: ContractReportItem[]
+  summary: { total: number; byStatus: ReportByStatus[]; totalAmountRial: number }
+}
+
+export interface OrderReportResult {
+  items: OrderReportItem[]
+  summary: { total: number; byStatus: ReportByStatus[]; totalRequestedKwh: number; totalPaidRial: number }
+}
+
+export interface PaymentReportResult {
+  items: PaymentReportItem[]
+  summary: { total: number; byStatus: (ReportByStatus & { totalAmount: number })[]; totalAmountRial: number; confirmedAmountRial: number }
 }
 
 // Bill Analysis Report (admin)

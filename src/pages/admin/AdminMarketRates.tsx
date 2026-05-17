@@ -21,9 +21,9 @@ const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => jalaliYear() - 2 + i)
 
 const empty: MonthlyMarketRate = {
   id: 0, year: jalaliYear(), month: 1,
-  marketPeak: 0, marketMid: 0, marketLow: 0, backupRate: 0,
+  marketAvg: 0, marketPeak: 0, marketMid: 0, marketLow: 0,
   boardPeak: 0, boardMid: 0, boardLow: 0,
-  greenBoardRate: 0, article16Rate: 0, fuelFee: 0,
+  greenBoardRate: 0, openBoardRate: 0,
   industrialTariffBase: 0, executiveTariffBase: 0,
 }
 
@@ -97,7 +97,7 @@ export default function AdminMarketRates() {
       { name: 'میان', color: '#f59e0b', data: sorted.map(d => d.marketMid)  },
       { name: 'کم',   color: '#10b981', data: sorted.map(d => d.marketLow)  },
     ]
-    return { avgPeak: avg('marketPeak'), avgMid: avg('marketMid'), avgLow: avg('marketLow'), avgBackup: avg('backupRate'), latest, maxRate, chartLabels, chartSeries }
+    return { avgPeak: avg('marketPeak'), avgMid: avg('marketMid'), avgLow: avg('marketLow'), avgMarketAvg: avg('marketAvg'), latest, maxRate, chartLabels, chartSeries }
   }, [data])
 
   const f = (key: keyof MonthlyMarketRate) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -109,10 +109,10 @@ export default function AdminMarketRates() {
   const columns = [
     { key: 'year',       header: 'سال' },
     { key: 'month',      header: 'ماه', render: (r: MonthlyMarketRate) => JALALI_MONTHS[r.month] },
-    { key: 'marketPeak', header: 'نرخ اوج بار (ریال/kWh)' },
-    { key: 'marketMid',  header: 'نرخ میان بار' },
-    { key: 'marketLow',  header: 'نرخ کم بار' },
-    { key: 'backupRate', header: 'نرخ پشتیبان' },
+    { key: 'marketAvg',  header: 'متوسط بازار (ریال/kWh)' },
+    { key: 'marketPeak', header: 'حداکثر اوج بار' },
+    { key: 'marketMid',  header: 'حداکثر میان بار' },
+    { key: 'marketLow',  header: 'حداکثر کم بار' },
     {
       key: 'actions', header: 'عملیات', className: 'w-24',
       render: (row: MonthlyMarketRate) => (
@@ -130,10 +130,10 @@ export default function AdminMarketRates() {
       {/* Stat cards */}
       {stats && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard title="میانگین اوج بار"  value={stats.avgPeak.toLocaleString('fa-IR')}  icon={<TrendingUp className="h-5 w-5" />} color="red"   subtitle="ریال/kWh" />
-          <StatCard title="میانگین میان بار" value={stats.avgMid.toLocaleString('fa-IR')}   icon={<Activity className="h-5 w-5" />}   color="amber" subtitle="ریال/kWh" />
-          <StatCard title="میانگین کم بار"   value={stats.avgLow.toLocaleString('fa-IR')}   icon={<Zap className="h-5 w-5" />}         color="green" subtitle="ریال/kWh" />
-          <StatCard title="میانگین پشتیبان"  value={stats.avgBackup.toLocaleString('fa-IR')} icon={<BarChart2 className="h-5 w-5" />}  color="blue"  subtitle="ریال/kWh" />
+          <StatCard title="میانگین اوج بار"       value={stats.avgPeak.toLocaleString('fa-IR')}      icon={<TrendingUp className="h-5 w-5" />} color="red"   subtitle="ریال/kWh" />
+          <StatCard title="میانگین میان بار"      value={stats.avgMid.toLocaleString('fa-IR')}       icon={<Activity className="h-5 w-5" />}   color="amber" subtitle="ریال/kWh" />
+          <StatCard title="میانگین کم بار"        value={stats.avgLow.toLocaleString('fa-IR')}       icon={<Zap className="h-5 w-5" />}         color="green" subtitle="ریال/kWh" />
+          <StatCard title="میانگین متوسط بازار"   value={stats.avgMarketAvg.toLocaleString('fa-IR')} icon={<BarChart2 className="h-5 w-5" />}   color="blue"  subtitle="ریال/kWh" />
         </div>
       )}
 
@@ -147,10 +147,10 @@ export default function AdminMarketRates() {
             <span className="text-xs text-gray-400">{JALALI_MONTHS[stats.latest.month]} {stats.latest.year}</span>
           </div>
           {[
-            { label: 'اوج بار',  value: stats.latest.marketPeak, color: '#ef4444' },
-            { label: 'میان بار', value: stats.latest.marketMid,  color: '#f59e0b' },
-            { label: 'کم بار',   value: stats.latest.marketLow,  color: '#10b981' },
-            { label: 'پشتیبان',  value: stats.latest.backupRate, color: '#6366f1' },
+            { label: 'اوج بار',       value: stats.latest.marketPeak, color: '#ef4444' },
+            { label: 'میان بار',      value: stats.latest.marketMid,  color: '#f59e0b' },
+            { label: 'کم بار',        value: stats.latest.marketLow,  color: '#10b981' },
+            { label: 'متوسط بازار',   value: stats.latest.marketAvg,  color: '#6366f1' },
           ].map(({ label, value, color }) => (
             <div key={label} className="flex items-center gap-3">
               <span className="w-20 text-right text-xs text-gray-500 shrink-0">{label}</span>
@@ -226,18 +226,17 @@ export default function AdminMarketRates() {
               {JALALI_MONTHS.slice(1).map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
             </select>
           </div>
-          <Input label="نرخ اوج بار (ریال/kWh)" type="number" min={0} value={form.marketPeak}           onChange={f('marketPeak')} />
-          <Input label="نرخ میان بار"             type="number" min={0} value={form.marketMid}            onChange={f('marketMid')} />
-          <Input label="نرخ کم بار"               type="number" min={0} value={form.marketLow}            onChange={f('marketLow')} />
-          <Input label="نرخ پشتیبان"              type="number" min={0} value={form.backupRate}           onChange={f('backupRate')} />
-          <Input label="تابلوی اوج"               type="number" min={0} value={form.boardPeak}            onChange={f('boardPeak')} />
-          <Input label="تابلوی میان"              type="number" min={0} value={form.boardMid}             onChange={f('boardMid')} />
-          <Input label="تابلوی کم"                type="number" min={0} value={form.boardLow}             onChange={f('boardLow')} />
-          <Input label="نرخ سبز تابلو"            type="number" min={0} value={form.greenBoardRate}       onChange={f('greenBoardRate')} />
-          <Input label="ماده ۱۶ (ریال/kWh)"       type="number" min={0} value={form.article16Rate}        onChange={f('article16Rate')} />
-          <Input label="هزینه سوخت"               type="number" min={0} value={form.fuelFee}              onChange={f('fuelFee')} />
-          <Input label="تعرفه پایه صنعتی"         type="number" min={0} value={form.industrialTariffBase} onChange={f('industrialTariffBase')} />
-          <Input label="تعرفه پایه اجرایی"        type="number" min={0} value={form.executiveTariffBase}  onChange={f('executiveTariffBase')} />
+          <Input label="متوسط قیمت بازار (ریال/kWh)" type="number" min={0} value={form.marketAvg}           onChange={f('marketAvg')} />
+          <Input label="حداکثر اوج بار"            type="number" min={0} value={form.marketPeak}           onChange={f('marketPeak')} />
+          <Input label="حداکثر میان بار"           type="number" min={0} value={form.marketMid}            onChange={f('marketMid')} />
+          <Input label="حداکثر کم بار"             type="number" min={0} value={form.marketLow}            onChange={f('marketLow')} />
+          <Input label="تابلوی اول بورس - اوج"     type="number" min={0} value={form.boardPeak}            onChange={f('boardPeak')} />
+          <Input label="تابلوی اول بورس - میان"    type="number" min={0} value={form.boardMid}             onChange={f('boardMid')} />
+          <Input label="تابلوی اول بورس - کم"      type="number" min={0} value={form.boardLow}             onChange={f('boardLow')} />
+          <Input label="تابلوی سبز بورس"           type="number" min={0} value={form.greenBoardRate}       onChange={f('greenBoardRate')} />
+          <Input label="تابلوی آزاد بورس"          type="number" min={0} value={form.openBoardRate}        onChange={f('openBoardRate')} />
+          <Input label="تعرفه صنعتی (نرخ جهش)"    type="number" min={0} value={form.industrialTariffBase} onChange={f('industrialTariffBase')} />
+          <Input label="تعرفه دستگاه‌های اجرایی"  type="number" min={0} value={form.executiveTariffBase}  onChange={f('executiveTariffBase')} />
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>

@@ -31,7 +31,7 @@ export default function Layout({ role }: LayoutProps) {
   const title = pageTitles[pathname] ?? 'برق متین'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f3f4f6]">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       <Sidebar role={role} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header title={title} role={role} />

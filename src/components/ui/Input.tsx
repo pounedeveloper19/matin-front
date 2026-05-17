@@ -38,10 +38,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               prefix ? 'pr-10 pl-4' : 'px-4',
               error
                 ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100',
+                : 'focus:border-emerald-500 focus:ring-emerald-100',
               'disabled:cursor-not-allowed disabled:opacity-60',
               className
             )}
+            style={!error ? { background: '#ffffff', borderColor: '#bfc9c3', color: '#191c1d' } : undefined}
             {...props}
           />
         </div>
@@ -82,10 +83,11 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
         className={clsx(
           'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
           'focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:bg-white',
-          error ? 'border-red-300 focus:ring-red-100' : 'border-gray-200',
+          error ? 'border-red-300 focus:ring-red-100' : '',
           (disabled || loading) && 'cursor-not-allowed opacity-60',
           className
         )}
+        style={!error ? { background: '#ffffff', borderColor: '#bfc9c3', color: '#191c1d' } : undefined}
         {...props}
       >
         <option value="">{loading ? 'در حال بارگذاری...' : placeholder}</option>
@@ -132,7 +134,7 @@ export function DatePicker({ label, error, hint, value, onChange, disabled }: Da
         inputClass={clsx(
           'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',
           'focus:outline-none focus:ring-2 focus:ring-primary-100',
-          error ? 'border-red-300' : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100',
+          error ? 'border-red-300' : 'focus:border-emerald-500 focus:ring-emerald-100',
           disabled && 'cursor-not-allowed opacity-60'
         )}
       />

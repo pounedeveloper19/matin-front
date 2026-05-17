@@ -8,7 +8,9 @@ import type {
   ContractResult,
   SubmitWarrantyRequest,
   BillAnalysisResult,
+  OptimalPurchaseCurveResult,
   ManualBillRequest,
+  AdvancedBillAnalysisResult,
   TicketSummary,
   TicketMessage,
   AddressResult,
@@ -19,6 +21,10 @@ import type {
   AnnouncementItem,
   CreateTicketRequest,
   AddTicketMessageRequest,
+  OrderResult,
+  OrderDetailResult,
+  CreateOrderRequest,
+  SubmitPaymentRequest,
 } from '../types'
 
 export const customerApi = {
@@ -38,6 +44,9 @@ export const customerApi = {
 
   registerLegal: (data: CustomerLegal) =>
     client.post<ExecutionResult>('/CustomerProfile/RegisterLegalCustomer', data).then((r) => r.data),
+
+  getContractPrintData: (contractId: number) =>
+    client.get<ExecutionResult<any>>('/AdminContract/GetContractPrintData', { params: { contractId } }).then((r) => r.data),
 
   // Addresses
   getAddresses: () =>
@@ -80,9 +89,20 @@ export const customerApi = {
   // Bill Analysis
   manualBillAnalysis: (data: ManualBillRequest) =>
     client.post<ExecutionResult<BillAnalysisResult>>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
+  manualOptimalPurchaseCurve: (data: ManualBillRequest) =>
+    client.post<ExecutionResult<OptimalPurchaseCurveResult>>('/BillCalculation/ManualOptimalPurchaseCurve', data).then((r) => r.data),
+  advancedBillAnalysis: (data: object) =>
+    client.post<ExecutionResult<AdvancedBillAnalysisResult>>('/BillCalculation/AdvancedAnalysis', data).then((r) => r.data),
+
+  getSubscriptionRate: (subscriptionId: number, year: number, month: number) =>
+    client.get<ExecutionResult>(`/BillCalculation/GetSubscriptionRate/${subscriptionId}/${year}/${month}`).then((r) => r.data),
 
   getBillHistory: (subscriptionId: number) =>
     client.get<ExecutionResult>(`/BillCalculation/GetBillHistory/${subscriptionId}`).then((r) => r.data),
+
+  // Tariff code selection
+  updateTariffCode: (tariffCodeOptionId: number | null) =>
+    client.put<ExecutionResult>('/CustomerProfile/UpdateTariffCode', { tariffCodeOptionId }).then((r) => r.data),
 
   // Address delete
   deleteAddress: (id: number) =>
@@ -100,6 +120,19 @@ export const customerApi = {
 
   addTicketMessage: (data: AddTicketMessageRequest) =>
     client.post<ExecutionResult>('/CustomerProfile/AddTicketMessage', data).then((r) => r.data),
+
+  // Orders
+  getMyOrders: () =>
+    client.get<ExecutionResult<OrderResult[]>>('/Order/GetMyOrders').then((r) => r.data),
+
+  getOrderDetail: (id: number) =>
+    client.get<ExecutionResult<OrderDetailResult>>(`/Order/GetOrderDetail/${id}`).then((r) => r.data),
+
+  createOrder: (data: CreateOrderRequest) =>
+    client.post<ExecutionResult<number>>('/Order/CreateOrder', data).then((r) => r.data),
+
+  submitPayment: (data: SubmitPaymentRequest) =>
+    client.post<ExecutionResult>('/Order/SubmitPayment', data).then((r) => r.data),
 
   // Announcements
   getAnnouncements: () =>
