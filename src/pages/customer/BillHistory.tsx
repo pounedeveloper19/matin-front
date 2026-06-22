@@ -38,20 +38,20 @@ export default function BillHistory() {
 
   return (
     <div className="space-y-6">
-      {/* انتخاب اشتراک */}
+      {/* انتخاب شناسه */}
       <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 px-5 py-4"
           style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
             <Zap className="h-4 w-4" />
           </div>
-          <h3 className="font-semibold text-gray-900">انتخاب اشتراک</h3>
+          <h3 className="font-semibold text-gray-900">انتخاب شناسه</h3>
         </div>
         <div className="p-5">
           {subscriptions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-emerald-200 py-8 text-center">
               <Zap className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500">اشتراکی یافت نشد</p>
+              <p className="text-sm text-gray-500">شناسه‌ای یافت نشد</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -115,7 +115,7 @@ export default function BillHistory() {
               ) : history.length === 0 ? (
                 <div className="flex flex-col items-center py-10 text-gray-400">
                   <History className="mb-2 h-8 w-8 text-gray-300" />
-                  <p className="text-sm">هنوز تحلیلی برای این اشتراک ثبت نشده است</p>
+                  <p className="text-sm">هنوز تحلیلی برای این شناسه ثبت نشده است</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -170,7 +170,7 @@ export default function BillHistory() {
       {selectedSubId === '' && subscriptions.length > 0 && (
         <div className="flex flex-col items-center py-16 text-center">
           <Zap className="mb-3 h-10 w-10 text-gray-300" />
-          <p className="font-semibold text-gray-500">یک اشتراک را از بالا انتخاب کنید</p>
+          <p className="font-semibold text-gray-500">یک شناسه را از بالا انتخاب کنید</p>
         </div>
       )}
     </div>

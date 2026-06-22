@@ -3,13 +3,14 @@ import {
   BarChart2, FileText, ShoppingCart, CreditCard,
   RefreshCw, Download, Search,
 } from 'lucide-react'
+import { DatePicker } from '../../components/ui/Input'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { uploadApi } from '../../api/upload'
 import type {
-  ContractReportItem, ContractReportResult,
-  OrderReportItem, OrderReportResult,
-  PaymentReportItem, PaymentReportResult,
+  ContractReportResult,
+  OrderReportResult,
+  PaymentReportResult,
 } from '../../types'
 
 const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
@@ -116,7 +117,7 @@ export default function AdminReports() {
   const exportContracts = () => {
     if (!contractData) return
     exportCSV(
-      ['#', 'شماره قرارداد', 'مشتری', 'اشتراک', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ (ریال/kWh)', 'توان (kW)', 'حجم (kWh)', 'مبلغ کل (ریال)'],
+      ['#', 'شماره قرارداد', 'مشتری', 'شناسه', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ (ریال/kWh)', 'توان (kW)', 'حجم (kWh)', 'مبلغ کل (ریال)'],
       contractData.items.map((c, i) => [i + 1, c.contractNumber, c.customerName, c.billIdentifier, c.status, c.startDate, c.endDate, c.contractRate, c.contractPowerKw, c.contractVolumeKwh, c.contractAmountRial]),
       'contracts-report.csv',
     )
@@ -125,7 +126,7 @@ export default function AdminReports() {
   const exportOrders = () => {
     if (!orderData) return
     exportCSV(
-      ['#', 'اشتراک', 'مشتری', 'نوع انرژی', 'درخواستی (kWh)', 'قیمت (ریال/kWh)', 'پرداخت تایید شده (ریال)', 'وضعیت', 'تاریخ'],
+      ['#', 'شناسه', 'مشتری', 'نوع انرژی', 'درخواستی (kWh)', 'قیمت (ریال/kWh)', 'پرداخت تایید شده (ریال)', 'وضعیت', 'تاریخ'],
       orderData.items.map((o, i) => [i + 1, o.billIdentifier, o.customerName, o.energyType, o.requestedKwh, o.priceAtMoment, o.paidAmount, o.status, o.orderDate]),
       'orders-report.csv',
     )
@@ -134,7 +135,7 @@ export default function AdminReports() {
   const exportPayments = () => {
     if (!payData) return
     exportCSV(
-      ['#', 'ش.سفارش', 'مشتری', 'اشتراک', 'مبلغ (ریال)', 'روش', 'وضعیت', 'شماره مرجع', 'تاریخ'],
+      ['#', 'ش.سفارش', 'مشتری', 'شناسه', 'مبلغ (ریال)', 'روش', 'وضعیت', 'شماره مرجع', 'تاریخ'],
       payData.items.map((p, i) => [i + 1, p.orderId, p.customerName, p.billIdentifier, p.amount, p.method, p.status, p.referenceNumber, p.createdAt]),
       'payments-report.csv',
     )
@@ -186,7 +187,7 @@ export default function AdminReports() {
                   <div className="relative">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                     <input className="w-full rounded-xl border border-gray-200 py-2 pr-8 pl-3 text-sm focus:border-indigo-400 focus:outline-none"
-                      placeholder="شماره قرارداد، مشتری، اشتراک..."
+                      placeholder="شماره قرارداد، مشتری، شناسه..."
                       value={cFilters.search}
                       onChange={e => setCFilters(p => ({ ...p, search: e.target.value }))} />
                   </div>
@@ -216,7 +217,7 @@ export default function AdminReports() {
 
                   <TableWrap>
                     <thead>
-                      <THead cols={['#','شماره قرارداد','مشتری','اشتراک','وضعیت','تاریخ شروع','تاریخ پایان','نرخ ریال/kWh','توان kW','حجم kWh','مبلغ ریال']} />
+                      <THead cols={['#','شماره قرارداد','مشتری','شناسه','وضعیت','تاریخ شروع','تاریخ پایان','نرخ ریال/kWh','توان kW','حجم kWh','مبلغ ریال']} />
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {contractData.items.length === 0
@@ -281,7 +282,7 @@ export default function AdminReports() {
 
                   <TableWrap>
                     <thead>
-                      <THead cols={['#','اشتراک','مشتری','نوع انرژی','درخواستی kWh','قیمت ریال/kWh','پرداخت شده ریال','وضعیت','تاریخ']} />
+                      <THead cols={['#','شناسه','مشتری','نوع انرژی','درخواستی kWh','قیمت ریال/kWh','پرداخت شده ریال','وضعیت','تاریخ']} />
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {orderData.items.length === 0
@@ -342,7 +343,7 @@ export default function AdminReports() {
 
                   <TableWrap>
                     <thead>
-                      <THead cols={['#','ش.سفارش','مشتری','اشتراک','مبلغ ریال','روش','وضعیت','شماره مرجع','تاریخ','فیش']} />
+                      <THead cols={['#','ش.سفارش','مشتری','شناسه','مبلغ ریال','روش','وضعیت','شماره مرجع','تاریخ','فیش']} />
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {payData.items.length === 0
@@ -412,13 +413,7 @@ function FilterSelect({ label, value, onChange, children }: {
 }
 
 function FilterDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-gray-600">{label}</label>
-      <input type="date" className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-        value={value} onChange={e => onChange(e.target.value)} />
-    </div>
-  )
+  return <DatePicker label={label} value={value || null} onChange={v => onChange(v)} />
 }
 
 function ApplyBtn({ loading, onApply }: { loading: boolean; onApply: () => void }) {

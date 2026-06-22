@@ -1,17 +1,22 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Tag, ChevronLeft } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Plus, Pencil, Trash2, Tag, ChevronLeft, DollarSign, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
-import type { TariffCode, TariffCodeOption } from '../../types'
+import type { TariffCode, TariffCodeOption, TariffCodeOptionRate } from '../../types'
 
 const emptyCode: TariffCode = { id: 0, code: '', title: '' }
 const emptyOption: TariffCodeOption = {
   id: 0, tariffCodeId: 0, title: '',
   penaltyMultiplier: 1.3, creditMultiplier: 0.75,
 }
+const currentShamsiYear = new Date().getFullYear() - 621
+const emptyRate = (optionId: number): TariffCodeOptionRate => ({
+  id: 0, tariffCodeOptionId: optionId, year: currentShamsiYear,
+  rateRialPerKwh: 0, ratePeakRialPerKwh: 0, rateLowRialPerKwh: 0,
+})
 
 export default function AdminTariffCodes() {
   const [codes, setCodes]                   = useState<TariffCode[]>([])
@@ -25,6 +30,15 @@ export default function AdminTariffCodes() {
   const [optionModal, setOptionModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [codeForm, setCodeForm]       = useState<TariffCode>(emptyCode)
   const [optionForm, setOptionForm]   = useState<TariffCodeOption>(emptyOption)
+
+  // ── TariffCodeOptionRate state ─────────────────────────────────────────
+  const [selectedOption, setSelectedOption] = useState<TariffCodeOption | null>(null)
+  const [rates, setRates]                   = useState<TariffCodeOptionRate[]>([])
+  const [ratesLoading, setRatesLoading]     = useState(false)
+  const [rateModal, setRateModal]           = useState<'create' | 'edit' | 'delete' | null>(null)
+  const [rateForm, setRateForm]             = useState<TariffCodeOptionRate>(emptyRate(0))
+  const [rateSaving, setRateSaving]         = useState(false)
+  const rateRef = useRef<HTMLDivElement>(null)
 
   const fetchCodes = useCallback(async () => {
     setCodesLoading(true)
@@ -42,11 +56,25 @@ export default function AdminTariffCodes() {
     } finally { setOptionsLoading(false) }
   }, [])
 
+  const fetchRates = useCallback(async (optionId: number) => {
+    setRatesLoading(true)
+    try {
+      const r = await adminApi.getTariffCodeOptionRates({ Search_TariffCodeOptionId: optionId, pageSize: 200 })
+      setRates((r.result as any)?.data ?? [])
+    } finally { setRatesLoading(false) }
+  }, [])
+
   useEffect(() => { fetchCodes() }, [fetchCodes])
   useEffect(() => {
     if (selectedCode) fetchOptions(selectedCode.id)
-    else setOptions([])
+    else { setOptions([]); setSelectedOption(null) }
   }, [selectedCode, fetchOptions])
+  useEffect(() => {
+    if (selectedOption) {
+      fetchRates(selectedOption.id)
+      setTimeout(() => rateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    } else { setRates([]) }
+  }, [selectedOption, fetchRates])
 
   // ── Code CRUD
   const handleSaveCode = async () => {
@@ -71,7 +99,7 @@ export default function AdminTariffCodes() {
       if (res.type === 'Success') {
         toast.success('کد تعرفه حذف شد')
         setCodeModal(null)
-        if (selectedCode?.id === codeForm.id) setSelectedCode(null)
+        if (selectedCode?.id === codeForm.id) { setSelectedCode(null); setSelectedOption(null) }
         fetchCodes()
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
@@ -112,10 +140,40 @@ export default function AdminTariffCodes() {
       const res = await adminApi.deleteTariffCodeOption(optionForm.id)
       if (res.type === 'Success') {
         toast.success('گزینه حذف شد')
-        setOptionModal(null); if (selectedCode) fetchOptions(selectedCode.id)
+        setOptionModal(null)
+        if (selectedOption?.id === optionForm.id) setSelectedOption(null)
+        if (selectedCode) fetchOptions(selectedCode.id)
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
+  }
+
+  // ── Rate CRUD
+  const handleSaveRate = async () => {
+    if (rateForm.rateRialPerKwh <= 0) { toast.error('نرخ باید بزرگتر از صفر باشد'); return }
+    setRateSaving(true)
+    try {
+      const res = rateModal === 'create'
+        ? await adminApi.createTariffCodeOptionRate(rateForm)
+        : await adminApi.updateTariffCodeOptionRate(rateForm)
+      if (res.type === 'Success' || res.code === 200) {
+        toast.success(rateModal === 'create' ? 'نرخ ثبت شد' : 'نرخ ویرایش شد')
+        setRateModal(null); if (selectedOption) fetchRates(selectedOption.id)
+      } else { toast.error(res.message ?? 'خطا') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setRateSaving(false) }
+  }
+
+  const handleDeleteRate = async () => {
+    setRateSaving(true)
+    try {
+      const res = await adminApi.deleteTariffCodeOptionRate(rateForm.id)
+      if (res.type === 'Success' || res.code === 200) {
+        toast.success('نرخ حذف شد')
+        setRateModal(null); if (selectedOption) fetchRates(selectedOption.id)
+      } else { toast.error(res.message ?? 'خطا') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setRateSaving(false) }
   }
 
   return (
@@ -219,7 +277,8 @@ export default function AdminTariffCodes() {
           ) : (
             <div className="divide-y divide-gray-50">
               {options.map(opt => (
-                <div key={opt.id} className="px-5 py-3 hover:bg-gray-50 transition-colors">
+                <div key={opt.id}
+                  className={`px-5 py-3 transition-colors ${selectedOption?.id === opt.id ? 'bg-violet-50 border-r-2 border-violet-500' : 'hover:bg-gray-50'}`}>
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-800">{opt.title}</p>
@@ -232,7 +291,17 @@ export default function AdminTariffCodes() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => setSelectedOption(selectedOption?.id === opt.id ? null : opt)}
+                        className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors ${
+                          selectedOption?.id === opt.id
+                            ? 'bg-violet-100 text-violet-700'
+                            : 'bg-gray-100 text-gray-500 hover:bg-violet-50 hover:text-violet-600'
+                        }`}
+                      >
+                        <DollarSign className="h-3 w-3" /> نرخ‌ها
+                      </button>
                       <button onClick={() => openEditOption(opt)}
                         className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
                         <Pencil className="h-3.5 w-3.5" />
@@ -249,6 +318,59 @@ export default function AdminTariffCodes() {
           )}
         </div>
       </div>
+
+      {/* ── Rate panel */}
+      {selectedOption && (
+        <div ref={rateRef} className="rounded-2xl border border-violet-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between border-b border-violet-100 bg-violet-50 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-violet-600" />
+              <span className="font-bold text-violet-800">نرخ‌های سالانه — {selectedOption.title}</span>
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">{rates.length} رکورد</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => { setRateForm(emptyRate(selectedOption.id)); setRateModal('create') }}>
+                <Plus className="h-3.5 w-3.5" /> نرخ جدید
+              </Button>
+              <button onClick={() => setSelectedOption(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {ratesLoading ? (
+            <div className="flex h-24 items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+            </div>
+          ) : rates.length === 0 ? (
+            <div className="py-10 text-center text-sm text-gray-400">نرخی برای این گزینه ثبت نشده</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {rates.map(r => (
+                <div key={r.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="rounded-lg bg-violet-100 px-3 py-1 font-mono text-sm font-bold text-violet-700">{r.year}</span>
+                    <span className="text-xs text-gray-500">میان: <span className="font-bold text-gray-800">{r.rateRialPerKwh.toLocaleString('fa-IR')}</span></span>
+                    <span className="text-xs text-red-500">اوج: <span className="font-bold">{r.ratePeakRialPerKwh.toLocaleString('fa-IR')}</span></span>
+                    <span className="text-xs text-blue-500">کم: <span className="font-bold">{r.rateLowRialPerKwh.toLocaleString('fa-IR')}</span></span>
+                    <span className="text-[10px] text-gray-400">ریال/kWh</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { setRateForm(r); setRateModal('edit') }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => { setRateForm(r); setRateModal('delete') }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Code modals */}
       <Modal open={codeModal === 'create' || codeModal === 'edit'}
@@ -314,6 +436,44 @@ export default function AdminTariffCodes() {
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setOptionModal(null)}>انصراف</Button>
           <Button variant="danger" loading={saving} onClick={handleDeleteOption}><Trash2 className="h-4 w-4" /> حذف</Button>
+        </div>
+      </Modal>
+
+      {/* ── Rate modals */}
+      <Modal open={rateModal === 'create' || rateModal === 'edit'}
+        onClose={() => setRateModal(null)}
+        title={rateModal === 'create' ? 'نرخ جدید' : 'ویرایش نرخ'} size="md">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Input label="سال شمسی" type="number" value={rateForm.year}
+              onChange={e => setRateForm(f => ({ ...f, year: +e.target.value }))}
+              disabled hint="سال شمسی جاری به صورت خودکار تنظیم شده" />
+          </div>
+          <Input label="نرخ میان‌بار — مبنای ماده ۱۶ (ریال/kWh) *" type="number" value={rateForm.rateRialPerKwh || ''}
+            placeholder="مثلاً ۵۴۹۰"
+            onChange={e => setRateForm(f => ({ ...f, rateRialPerKwh: +e.target.value }))} />
+          <Input label="نرخ اوج‌بار (ریال/kWh) *" type="number" value={rateForm.ratePeakRialPerKwh || ''}
+            placeholder="مثلاً ۹۲۹۲"
+            onChange={e => setRateForm(f => ({ ...f, ratePeakRialPerKwh: +e.target.value }))} />
+          <Input label="نرخ کم‌بار (ریال/kWh) *" type="number" value={rateForm.rateLowRialPerKwh || ''}
+            placeholder="مثلاً ۲۹۳"
+            onChange={e => setRateForm(f => ({ ...f, rateLowRialPerKwh: +e.target.value }))} />
+        </div>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setRateModal(null)}>انصراف</Button>
+          <Button loading={rateSaving} onClick={handleSaveRate}>
+            {rateModal === 'create' ? 'ثبت' : 'ذخیره'}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={rateModal === 'delete'} onClose={() => setRateModal(null)} title="حذف نرخ" size="sm">
+        <p className="text-sm text-gray-600">
+          آیا از حذف نرخ سال <span className="font-bold text-gray-900">{rateForm.year}</span> اطمینان دارید؟
+        </p>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setRateModal(null)}>انصراف</Button>
+          <Button variant="danger" loading={rateSaving} onClick={handleDeleteRate}><Trash2 className="h-4 w-4" /> حذف</Button>
         </div>
       </Modal>
     </div>

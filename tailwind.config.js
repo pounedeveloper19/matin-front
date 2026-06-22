@@ -5,6 +5,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Vazirmatn', 'system-ui', 'sans-serif'],
+        mono: ['Vazirmatn', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       colors: {
         primary: {

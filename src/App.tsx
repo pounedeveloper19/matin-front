@@ -25,6 +25,8 @@ import AdminTariffCodes from './pages/admin/AdminTariffCodes'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminRoles from './pages/admin/AdminRoles'
 import AdminOrders from './pages/admin/AdminOrders'
+import AdminBillAnalysis from './pages/admin/AdminBillAnalysis'
+import AdminTooltips from './pages/admin/AdminTooltips'
 import AdminReportContracts from './pages/admin/reports/AdminReportContracts'
 import AdminReportOrders from './pages/admin/reports/AdminReportOrders'
 import AdminReportPayments from './pages/admin/reports/AdminReportPayments'
@@ -97,6 +99,8 @@ export default function App() {
         <Route path="users"           element={<AdminUsers />} />
         <Route path="roles"           element={<AdminRoles />} />
         <Route path="orders"             element={<AdminOrders />} />
+        <Route path="bill-analysis"      element={<AdminBillAnalysis />} />
+        <Route path="tooltips"           element={<AdminTooltips />} />
         <Route path="reports/contracts" element={<AdminReportContracts />} />
         <Route path="reports/orders"    element={<AdminReportOrders />} />
         <Route path="reports/payments"  element={<AdminReportPayments />} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { validateBillIdentifier } from '../../utils/validators'
+import { validateBillIdentifier, validateNationalCode, validateNationalId } from '../../utils/validators'
 import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
@@ -108,6 +108,11 @@ export default function CustomerProfile() {
   }, [])
 
   const handleSaveProfile = async () => {
+    if (profile?.type === 'real') {
+      if (!validateNationalCode(realForm.nationalCode)) { toast.error('کد ملی وارد شده معتبر نیست'); return }
+    } else {
+      if (!validateNationalId(legalForm.nationalId)) { toast.error('شناسه ملی باید ۱۱ رقم و معتبر باشد'); return }
+    }
     setSaving(true)
     try {
       const res = profile?.type === 'real' ? await customerApi.updateReal(realForm) : await customerApi.updateLegal(legalForm)
@@ -156,11 +161,11 @@ export default function CustomerProfile() {
     try {
       const res = await customerApi.addSubscription(subForm)
       if (res.code === 200) {
-        toast.success('اشتراک ثبت شد'); setSubModal(false)
+        toast.success('شناسه ثبت شد'); setSubModal(false)
         setSubForm({ addressId: 0, billIdentifier: '', contractCapacityKw: null })
         const updated = await customerApi.getSubscriptions()
         if (updated.code === 200) setSubscriptions(toArr(updated.result))
-      } else { toast.error(res.message ?? res.caption ?? 'خطا در ثبت اشتراک') }
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در ثبت شناسه') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -371,30 +376,30 @@ export default function CustomerProfile() {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">
-                اشتراک‌های برق
+                شناسه‌های برق
                 {subscriptions.length > 0 && (
                   <span className="mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">{subscriptions.length}</span>
                 )}
               </h3>
-              <p className="text-xs text-gray-400">هر آدرس می‌تواند چند اشتراک داشته باشد</p>
+              <p className="text-xs text-gray-400">هر آدرس می‌تواند چند شناسه داشته باشد</p>
             </div>
           </div>
           <Button variant="secondary" size="sm" disabled={addresses.length === 0}
             onClick={() => { setSubForm({ addressId: addresses[0]?.id ?? 0, billIdentifier: '', contractCapacityKw: null }); setSubModal(true) }}>
-            <Plus className="h-3.5 w-3.5" /> اشتراک جدید
+            <Plus className="h-3.5 w-3.5" /> شناسه جدید
           </Button>
         </div>
 
         <div className="p-5">
           {addresses.length === 0 ? (
             <div className="rounded-xl border border-dashed border-amber-200 py-6 text-center">
-              <p className="text-sm text-amber-700">ابتدا یک آدرس ثبت کنید تا بتوانید اشتراک اضافه کنید</p>
+              <p className="text-sm text-amber-700">ابتدا یک آدرس ثبت کنید تا بتوانید شناسه اضافه کنید</p>
             </div>
           ) : subscriptions.length === 0 ? (
             <div className="rounded-xl py-6 text-center" style={{ background: 'rgba(254,243,199,0.5)', border: '1px solid rgba(252,211,77,0.3)' }}>
               <Zap className="mx-auto mb-2 h-8 w-8 text-amber-300" />
-              <p className="text-sm font-medium text-amber-700">هنوز اشتراکی ثبت نشده است</p>
-              <p className="mt-1 text-xs text-amber-500">با کلیک روی «اشتراک جدید» شناسه قبض خود را ثبت کنید</p>
+              <p className="text-sm font-medium text-amber-700">هنوز شناسه‌ای ثبت نشده است</p>
+              <p className="mt-1 text-xs text-amber-500">با کلیک روی «شناسه جدید» شناسه قبض خود را ثبت کنید</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -529,7 +534,7 @@ export default function CustomerProfile() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="نام شرکت *"        value={legalForm.companyName}  onChange={(e) => setLegalForm({ ...legalForm, companyName: e.target.value })} />
-            <Input label="شناسه ملی *"       value={legalForm.nationalId}   onChange={(e) => setLegalForm({ ...legalForm, nationalId: e.target.value })}  inputMode="numeric" />
+            <Input label="شناسه ملی *"       value={legalForm.nationalId}   onChange={(e) => setLegalForm({ ...legalForm, nationalId: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={11} />
             <Input label="کد اقتصادی"        value={legalForm.economicCode} onChange={(e) => setLegalForm({ ...legalForm, economicCode: e.target.value })} />
             <Input label="نام مدیرعامل *"    value={legalForm.ceo_FullName} onChange={(e) => setLegalForm({ ...legalForm, ceo_FullName: e.target.value })} />
             <Input label="موبایل مدیرعامل *" value={legalForm.ceo_Mobile}   onChange={(e) => setLegalForm({ ...legalForm, ceo_Mobile: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={11} />
@@ -544,7 +549,7 @@ export default function CustomerProfile() {
       {/* مودال حذف آدرس */}
       <Modal open={deleteAddrId !== null} onClose={() => setDeleteAddrId(null)} title="حذف آدرس" size="sm">
         <p className="text-sm text-gray-600">
-          آیا از حذف این آدرس اطمینان دارید؟ آدرس‌هایی که دارای انشعاب فعال هستند قابل حذف نمی‌باشند.
+          آیا از حذف این آدرس اطمینان دارید؟ آدرس‌هایی که دارای شناسه فعال هستند قابل حذف نمی‌باشند.
         </p>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setDeleteAddrId(null)}>انصراف</Button>
@@ -574,8 +579,8 @@ export default function CustomerProfile() {
         </div>
       </Modal>
 
-      {/* مودال اشتراک جدید */}
-      <Modal open={subModal} onClose={() => setSubModal(false)} title="ثبت اشتراک جدید" size="sm">
+      {/* مودال شناسه جدید */}
+      <Modal open={subModal} onClose={() => setSubModal(false)} title="ثبت شناسه جدید" size="sm">
         <div className="space-y-4">
           <Select label="آدرس مرتبط *" value={subForm.addressId || ''}
             options={addresses.map(a => ({ value: a.id, label: `${a.mainAddress} (${a.powerEntityName})` }))}
@@ -590,7 +595,7 @@ export default function CustomerProfile() {
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSubModal(false)}>انصراف</Button>
-          <Button loading={saving} onClick={handleAddSubscription}>ثبت اشتراک</Button>
+          <Button loading={saving} onClick={handleAddSubscription}>ثبت شناسه</Button>
         </div>
       </Modal>
 
@@ -599,7 +604,7 @@ export default function CustomerProfile() {
         <div className="space-y-4">
           <Input label="نام کامل *"  value={agentForm.fullName} onChange={(e) => setAgentForm({ ...agentForm, fullName: e.target.value })} />
           <Input label="موبایل *"    value={agentForm.mobile}   onChange={(e) => setAgentForm({ ...agentForm, mobile: e.target.value })} inputMode="numeric" maxLength={11} />
-          <Input label="رمز عبور *"  type="password" value={agentForm.password} onChange={(e) => setAgentForm({ ...agentForm, password: e.target.value })} />
+          <Input label="رمز عبور *"  type="password" value={agentForm.password} onChange={(e) => setAgentForm({ ...agentForm, password: e.target.value })} maxLength={15} />
           <p className="text-xs text-gray-400">نماینده با این موبایل و رمز می‌تواند وارد سیستم شود.</p>
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">

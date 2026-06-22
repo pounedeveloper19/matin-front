@@ -12,6 +12,7 @@ import type {
   TariffSlab,
   TariffCode,
   TariffCodeOption,
+  TariffCodeOptionRate,
   HourEntry,
   AdminBillReport,
   BillAnalysisResult,
@@ -29,9 +30,18 @@ import type {
   AdminOrderResult,
   UpdateOrderStatusRequest,
   ConfirmPaymentRequest,
+  SubmitPaymentRequest,
   ContractReportResult,
   OrderReportResult,
   PaymentReportResult,
+  DashboardSummary,
+  ContractByStatus,
+  MonthCount,
+  CustomerGrowthRow,
+  DashboardMarketRate,
+  ActivityRow,
+  OptimizationResult,
+  PortfolioOptimizationResult,
 } from '../types'
 
 type PageParams = {
@@ -356,6 +366,23 @@ export const adminApi = {
   deleteTariffCodeOption: (id: number) =>
     client.delete<ExecutionResult>(`/TariffCodeOption/Delete/${id}`).then(r => r.data),
 
+  // TariffCodeOptionRate CRUD
+  getTariffCodeOptionRates: (params: PageParams = {}) =>
+    client.get<ExecutionResult<PaginationResult<TariffCodeOptionRate>>>('/TariffCodeOptionRate/List', {
+      params }).then(r => r.data),
+
+  getTariffCodeOptionRateDetail: (id: number) =>
+    client.get<ExecutionResult<TariffCodeOptionRate>>(`/TariffCodeOptionRate/Detail/${id}`).then(r => r.data),
+
+  createTariffCodeOptionRate: (data: TariffCodeOptionRate) =>
+    client.post<ExecutionResult>('/TariffCodeOptionRate/Insert', data).then(r => r.data),
+
+  updateTariffCodeOptionRate: (data: TariffCodeOptionRate) =>
+    client.put<ExecutionResult>('/TariffCodeOptionRate/Update', data).then(r => r.data),
+
+  deleteTariffCodeOptionRate: (id: number) =>
+    client.delete<ExecutionResult>(`/TariffCodeOptionRate/Delete/${id}`).then(r => r.data),
+
   // User Management
   getUsers: (params: PageParams = {}) =>
     client.get<ExecutionResult<PaginationResult<AdminUser>>>('/AdminUserManagement/List', {
@@ -409,6 +436,12 @@ export const adminApi = {
   confirmPayment: (data: ConfirmPaymentRequest) =>
     client.put<ExecutionResult>('/AdminOrder/ConfirmPayment', data).then(r => r.data),
 
+  submitPaymentForOrder: (data: SubmitPaymentRequest) =>
+    client.post<ExecutionResult>('/AdminOrder/SubmitPaymentForOrder', data).then(r => r.data),
+
+  getProformaInvoice: (orderId: number) =>
+    client.get<ExecutionResult>('/AdminOrder/GetProformaInvoice', { params: { orderId } }).then(r => r.data),
+
   // Pending registrations
   getPendingUsers: () =>
     client.get<ExecutionResult<PendingUser[]>>('/PendingUsers/List').then((r) => r.data),
@@ -428,4 +461,58 @@ export const adminApi = {
 
   getPaymentReport: (params?: { statusId?: number; methodId?: number; fromDate?: string; toDate?: string }) =>
     client.get<ExecutionResult<PaymentReportResult>>('/AdminReport/PaymentReport', { params }).then(r => r.data),
+
+  // Bill analysis (admin-side)
+  getBillAnalysisSubscriptions: (profileId: number) =>
+    client.get<ExecutionResult<any[]>>(`/AdminBillAnalysis/GetSubscriptions/${profileId}`).then(r => r.data),
+
+  adminAdvancedBillAnalysis: (data: object) =>
+    client.post<ExecutionResult<any>>('/BillCalculation/AdvancedAnalysis', data).then(r => r.data),
+
+  adminOptimalPurchaseCurve: (data: object) =>
+    client.post<ExecutionResult<any>>('/BillCalculation/ManualOptimalPurchaseCurve', data).then(r => r.data),
+
+  adminAdvancedOptimalPurchaseCurve: (data: object) =>
+    client.post<ExecutionResult<any>>('/BillCalculation/AdvancedOptimalPurchaseCurve', data).then(r => r.data),
+
+  adminGetRecommendation: (data: object) =>
+    client.post<ExecutionResult<OptimizationResult>>('/BillCalculation/GetRecommendation', data).then(r => r.data),
+
+  adminGetOptimalPortfolio: (data: object) =>
+    client.post<ExecutionResult<PortfolioOptimizationResult>>('/BillCalculation/GetOptimalPortfolio', data).then(r => r.data),
+
+  createOrderForCustomer: (data: { subscriptionId: number; requestedKwh: number; energyTypeId: number; isPriceRequest: boolean }) =>
+    client.post<ExecutionResult<number>>('/AdminOrder/CreateOrderForCustomer', data).then(r => r.data),
+
+  // Dashboard
+  getDashboardSummary: () =>
+    client.get<ExecutionResult<DashboardSummary>>('/AdminDashboard/Summary').then(r => r.data),
+
+  getDashboardContractsByStatus: () =>
+    client.get<ExecutionResult<ContractByStatus[]>>('/AdminDashboard/ContractsByStatus').then(r => r.data),
+
+  getDashboardContractGrowth: () =>
+    client.get<ExecutionResult<MonthCount[]>>('/AdminDashboard/ContractGrowth').then(r => r.data),
+
+  getDashboardCustomerGrowth: () =>
+    client.get<ExecutionResult<CustomerGrowthRow[]>>('/AdminDashboard/CustomerGrowth').then(r => r.data),
+
+  getDashboardMarketRates: () =>
+    client.get<ExecutionResult<DashboardMarketRate[]>>('/AdminDashboard/MarketRates').then(r => r.data),
+
+  getDashboardRecentActivity: () =>
+    client.get<ExecutionResult<ActivityRow[]>>('/AdminDashboard/RecentActivity').then(r => r.data),
+
+  // Tooltips
+  getTooltips: () =>
+    client.get<ExecutionResult<any[]>>('/AdminTooltip/GetList').then(r => r.data),
+
+  createTooltip: (data: { pageKey: string; fieldKey: string; title: string; content: string; isActive: boolean }) =>
+    client.post<ExecutionResult>('/AdminTooltip/Insert', data).then(r => r.data),
+
+  updateTooltip: (data: { id: number; pageKey: string; fieldKey: string; title: string; content: string; isActive: boolean }) =>
+    client.put<ExecutionResult>('/AdminTooltip/Update', data).then(r => r.data),
+
+  deleteTooltip: (id: number) =>
+    client.delete<ExecutionResult>(`/AdminTooltip/Delete/${id}`).then(r => r.data),
 }

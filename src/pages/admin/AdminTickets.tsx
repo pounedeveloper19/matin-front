@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   MessageSquare, Send, CheckCircle, XCircle, Clock,
-  AlertTriangle, RefreshCw, Plus, MousePointer,
+  AlertTriangle, RefreshCw, MousePointer,
+  Paperclip, Download, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
+import { uploadApi } from '../../api/upload'
 import Badge, { ticketStatusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { StatCard } from '../../components/ui/Card'
@@ -36,7 +38,11 @@ export default function AdminTickets() {
   const [reply, setReply]               = useState('')
   const [sending, setSending]           = useState(false)
   const [closing, setClosing]           = useState(false)
-  const msgEndRef = useRef<HTMLDivElement>(null)
+  const [attachFileId, setAttachFileId] = useState<string | null>(null)
+  const [attachFileName, setAttachName] = useState<string | null>(null)
+  const [uploading, setUploading]       = useState(false)
+  const msgEndRef  = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchTickets = () => {
     setLoading(true)
@@ -64,16 +70,36 @@ export default function AdminTickets() {
   const selectTicket = (ticket: AdminTicketSummary) => {
     setSelected(ticket)
     setReply('')
+    setAttachFileId(null)
+    setAttachName(null)
     loadMessages(ticket)
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selected) return
+    e.target.value = ''
+    setUploading(true)
+    try {
+      const res = await uploadApi.upload(file, 'Ticket', selected.id)
+      if (res.code === 200 && res.result) {
+        setAttachFileId(res.result.fileId)
+        setAttachName(res.result.originalName)
+        toast.success('فایل آپلود شد')
+      } else { toast.error(res.message ?? 'خطا در آپلود') }
+    } catch { toast.error('خطا در آپلود فایل') }
+    finally { setUploading(false) }
+  }
+
   const handleReply = async () => {
-    if (!selected || !reply.trim()) return
+    if (!selected || (!reply.trim() && !attachFileId)) return
     setSending(true)
     try {
-      const res = await adminApi.replyTicket({ ticketId: selected.id, body: reply })
+      const res = await adminApi.replyTicket({ ticketId: selected.id, body: reply, fileId: attachFileId })
       if (res.code === 200) {
         setReply('')
+        setAttachFileId(null)
+        setAttachName(null)
         await loadMessages(selected)
         fetchTickets()
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -200,7 +226,14 @@ export default function AdminTickets() {
                       </span>
                       <span className="text-[10px] text-gray-400 shrink-0">{m.createdAt?.split('T')[0]}</span>
                     </div>
-                    <p className="leading-relaxed text-gray-700">{m.body}</p>
+                    {m.body && <p className="leading-relaxed text-gray-700">{m.body}</p>}
+                    {m.fileId && (
+                      <button
+                        onClick={() => uploadApi.download(m.fileId!).catch(() => toast.error('خطا در دانلود'))}
+                        className="mt-1 flex items-center gap-1.5 self-start rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                        <Download className="h-3.5 w-3.5" /> دانلود پیوست
+                      </button>
+                    )}
                   </div>
                 ))}
                 <div ref={msgEndRef} />
@@ -208,18 +241,41 @@ export default function AdminTickets() {
 
               {/* Reply area */}
               {!isClosed ? (
-                <div className="border-t border-gray-100 bg-gray-50 p-3 flex gap-2">
-                  <textarea
-                    rows={3}
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) handleReply() }}
-                    placeholder="پاسخ خود را بنویسید... (Ctrl+Enter برای ارسال)"
-                    className="flex-1 resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  />
-                  <Button size="sm" loading={sending} onClick={handleReply} className="self-end">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-2">
+                  {attachFileName && (
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                      <span className="flex-1 truncate">{attachFileName}</span>
+                      <button onClick={() => { setAttachFileId(null); setAttachName(null) }}>
+                        <X className="h-3.5 w-3.5 hover:text-red-500" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+                    <textarea
+                      rows={2}
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) handleReply() }}
+                      placeholder="پاسخ خود را بنویسید... (Ctrl+Enter برای ارسال)"
+                      className="flex-1 resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    />
+                    <div className="flex flex-col gap-1.5 self-end">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        title="پیوست فایل"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-blue-300 hover:text-blue-600 disabled:opacity-50 transition-colors">
+                        {uploading
+                          ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                          : <Paperclip className="h-3.5 w-3.5" />}
+                      </button>
+                      <Button size="sm" loading={sending} onClick={handleReply}>
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="border-t border-gray-100 bg-emerald-50 px-4 py-3 text-center">

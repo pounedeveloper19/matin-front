@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Search, Building2, Plus, Pencil, Trash2, Eye, Trash, UserCheck, UserX, Briefcase, MoreHorizontal } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { validateMobile } from '../../utils/validators'
+import { validateMobile, validateNationalCode, validateNationalId } from '../../utils/validators'
 import { adminApi } from '../../api/admin'
 import { lookupApi } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
@@ -39,6 +39,7 @@ const avatarColors = [
 export default function AdminLegalCustomers() {
   const [data, setData] = useState<AdminLegalCustomer[]>([])
   const [total, setTotal] = useState(0)
+  const [totalAll, setTotalAll] = useState(0)
   const [totalActive, setTotalActive] = useState(0)
   const [totalInactive, setTotalInactive] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -61,6 +62,8 @@ export default function AdminLegalCustomers() {
   }, [])
 
   const fetchStats = useCallback(() => {
+    adminApi.getLegalCustomers({ pageNumber: 1, pageSize: 1 })
+      .then(r => { const res = r.result as any; setTotalAll(res?.totalRecords ?? 0) })
     adminApi.getLegalCustomers({ pageNumber: 1, pageSize: 1, Search_IsActive: 'true' })
       .then(r => { const res = r.result as any; setTotalActive(res?.totalRecords ?? 0) })
     adminApi.getLegalCustomers({ pageNumber: 1, pageSize: 1, Search_IsActive: 'false' })
@@ -122,6 +125,8 @@ export default function AdminLegalCustomers() {
     if (!form.nationalId || !form.companyName || !form.ceoFullName) {
       toast.error('فیلدهای اجباری را پر کنید'); return
     }
+    if (!validateNationalId(form.nationalId)) { toast.error('شناسه ملی باید ۱۱ رقم و معتبر باشد'); return }
+    if (form.ceoNationalId && !validateNationalCode(form.ceoNationalId)) { toast.error('کد ملی مدیرعامل معتبر نیست'); return }
     if (form.ceoMobile && !validateMobile(form.ceoMobile)) {
       toast.error('موبایل مدیرعامل باید ۱۱ رقم و با ۰۹ شروع شود'); return
     }
@@ -206,7 +211,7 @@ export default function AdminLegalCustomers() {
     <div className="space-y-6">
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard title="مجموع شرکت‌ها" value={total.toLocaleString('fa-IR')} icon={<Building2 className="h-5 w-5" />} color="green" />
+        <StatCard title="مجموع شرکت‌ها" value={totalAll.toLocaleString('fa-IR')} icon={<Building2 className="h-5 w-5" />} color="green" />
         <StatCard title="شرکت‌های فعال" value={totalActive.toLocaleString('fa-IR')} icon={<UserCheck className="h-5 w-5" />} color="blue" />
         <StatCard title="غیرفعال" value={totalInactive.toLocaleString('fa-IR')} icon={<UserX className="h-5 w-5" />} color="amber" />
         <StatCard title="انتخاب شده" value={selectedIds.length.toLocaleString('fa-IR')} icon={<Building2 className="h-5 w-5" />} color="purple" subtitle="برای عملیات گروهی" />
@@ -229,7 +234,7 @@ export default function AdminLegalCustomers() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
           <div className="flex h-[42px] overflow-hidden rounded-xl border border-gray-200 bg-white/80 text-sm">
             {(['', 'true', 'false'] as const).map((val, i) => (
-              <button key={val} onClick={() => setSearch({ ...search, isActive: val })}
+              <button key={val} onClick={() => { const s = { ...search, isActive: val }; setSearch(s); setApplied(s); setPage(1); setSelectedIds([]) }}
                 className={[
                   'flex-1 px-3 font-medium transition-colors',
                   i === 1 ? 'border-x border-gray-200' : '',
@@ -283,7 +288,7 @@ export default function AdminLegalCustomers() {
         title={modal === 'create' ? 'مشتری حقوقی جدید' : 'ویرایش مشتری حقوقی'} size="lg">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="نام شرکت *" value={form.companyName} onChange={f('companyName')} placeholder="نام کامل شرکت" />
-          <Input label="شناسه ملی *" value={form.nationalId} onChange={fNum('nationalId')} placeholder="۱۱ رقم" maxLength={12} inputMode="numeric" />
+          <Input label="شناسه ملی *" value={form.nationalId} onChange={fNum('nationalId')} placeholder="۱۱ رقم" maxLength={11} inputMode="numeric" />
           <Input label="شماره ثبت شرکت" value={form.registerNumber ?? ''} onChange={f('registerNumber')} placeholder="شماره ثبت از اداره ثبت شرکت‌ها" />
           <Input label="کد اقتصادی" value={form.economicCode ?? ''} onChange={f('economicCode')} placeholder="کد اقتصادی" />
           <Input label="نام مدیرعامل *" value={form.ceoFullName} onChange={f('ceoFullName')} placeholder="نام و نام خانوادگی" />

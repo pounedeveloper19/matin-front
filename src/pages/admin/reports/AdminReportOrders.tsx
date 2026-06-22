@@ -42,7 +42,7 @@ export default function AdminReportOrders() {
   const doExport = () => {
     if (!data) return
     exportCSV(
-      ['#', 'اشتراک', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ'],
+      ['#', 'شناسه', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ'],
       data.items.map((o, i) => [i + 1, o.billIdentifier, o.customerName, o.energyType, o.requestedKwh, o.priceAtMoment, o.paidAmount, o.status, o.orderDate]),
       'orders-report.csv',
     )
@@ -89,7 +89,7 @@ export default function AdminReportOrders() {
 
               {/* Table */}
               <TableWrap>
-                <THead cols={['#', 'اشتراک', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ']} />
+                <THead cols={['#', 'شناسه', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ']} />
                 <tbody className="divide-y divide-gray-50">
                   {data.items.length === 0
                     ? <EmptyRow cols={9} />

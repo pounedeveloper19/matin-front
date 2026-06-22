@@ -42,7 +42,7 @@ export default function AdminReportContracts() {
   const doExport = () => {
     if (!data) return
     exportCSV(
-      ['#', 'شماره قرارداد', 'مشتری', 'اشتراک', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ ریال/kWh', 'توان kW', 'حجم kWh', 'مبلغ ریال'],
+      ['#', 'شماره قرارداد', 'مشتری', 'شناسه', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ ریال/kWh', 'توان kW', 'حجم kWh', 'مبلغ ریال'],
       data.items.map((c, i) => [i + 1, c.contractNumber, c.customerName, c.billIdentifier, c.status, c.startDate, c.endDate, c.contractRate, c.contractPowerKw, c.contractVolumeKwh, c.contractAmountRial]),
       'contracts-report.csv',
     )
@@ -60,7 +60,7 @@ export default function AdminReportContracts() {
             <FilterSearch
               value={filters.search}
               onChange={v => setFilters(p => ({ ...p, search: v }))}
-              placeholder="شماره قرارداد، مشتری، اشتراک..."
+              placeholder="شماره قرارداد، مشتری، شناسه..."
             />
             <FilterSelect label="وضعیت" value={filters.statusId} onChange={v => setFilters(p => ({ ...p, statusId: v }))}>
               <option value="">همه وضعیت‌ها</option>
@@ -88,7 +88,7 @@ export default function AdminReportContracts() {
 
               {/* Table */}
               <TableWrap>
-                <THead cols={['#', 'شماره قرارداد', 'مشتری', 'اشتراک', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ ریال/kWh', 'توان kW', 'حجم kWh', 'مبلغ ریال']} />
+                <THead cols={['#', 'شماره قرارداد', 'مشتری', 'شناسه', 'وضعیت', 'تاریخ شروع', 'تاریخ پایان', 'نرخ ریال/kWh', 'توان kW', 'حجم kWh', 'مبلغ ریال']} />
                 <tbody className="divide-y divide-gray-50">
                   {data.items.length === 0
                     ? <EmptyRow cols={11} />

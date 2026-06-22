@@ -242,7 +242,7 @@ export default function AdminUsers() {
               inputMode="numeric" maxLength={11} />
             <Input label="رمز عبور جدید" type="password" value={editForm.password}
               onChange={e => setEditForm({ ...editForm, password: e.target.value })}
-              placeholder="خالی بگذارید تا تغییر نکند" />
+              placeholder="خالی بگذارید تا تغییر نکند" maxLength={15} />
           </div>
         )}
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
@@ -284,7 +284,7 @@ export default function AdminUsers() {
             onChange={e => setCreateForm({ ...createForm, mobile: e.target.value.replace(/\D/g, '') })}
             inputMode="numeric" maxLength={11} placeholder="09..." />
           <Input label="رمز عبور *" type="password" value={createForm.password}
-            onChange={e => setCreateForm({ ...createForm, password: e.target.value })} />
+            onChange={e => setCreateForm({ ...createForm, password: e.target.value })} maxLength={15} />
           <Select label="نقش" value={createForm.roleId}
             options={[{ value: '', label: '— بدون نقش —' }, ...roles.map(r => ({ value: r.id, label: r.title }))]}
             onChange={v => setCreateForm({ ...createForm, roleId: v === '' ? '' : +v })} />

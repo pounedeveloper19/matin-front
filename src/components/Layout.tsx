@@ -20,6 +20,7 @@ const pageTitles: Record<string, string> = {
   '/admin/announcements':   'اعلانات',
   '/admin/pending-users':   'درخواست‌های ثبت‌نام',
   '/admin/power-entities':  'شرکت‌های برق',
+  '/admin/bill-analysis':   'محاسبه تعرفه و سفارش',
 }
 
 interface LayoutProps {
@@ -30,12 +31,14 @@ export default function Layout({ role }: LayoutProps) {
   const { pathname } = useLocation()
   const title = pageTitles[pathname] ?? 'برق متین'
 
+  const shellBg = role === 'admin' ? '#f8f9fa' : 'var(--app-bg)'
+
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--app-bg)' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: shellBg }}>
       <Sidebar role={role} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header title={title} role={role} />
-        <main className="flex-1 overflow-y-auto p-5 lg:p-6">
+        <main className="flex-1 overflow-y-auto p-5 lg:p-6" style={role === 'admin' ? { background: '#f8f9fa' } : undefined}>
           <Outlet />
         </main>
       </div>

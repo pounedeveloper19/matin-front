@@ -435,7 +435,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
     setSubSaving(true)
     try {
       const res = await adminApi.createAdminSubscription(subForm)
-      if (res.code === 200) { toast.success('انشعاب ثبت شد'); setSubModal(null); fetchSubscriptions() }
+      if (res.code === 200) { toast.success('شناسه ثبت شد'); setSubModal(null); fetchSubscriptions() }
       else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSubSaving(false) }
@@ -445,7 +445,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
     setSubSaving(true)
     try {
       const res = await adminApi.deleteAdminSubscription(subForm.id)
-      if (res.code === 200) { toast.success('انشعاب حذف شد'); setSubModal(null); fetchSubscriptions() }
+      if (res.code === 200) { toast.success('شناسه حذف شد'); setSubModal(null); fetchSubscriptions() }
       else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSubSaving(false) }
@@ -457,7 +457,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
   const TABS: { key: Tab; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'info',          label: 'اطلاعات',    icon: User2 },
     { key: 'addresses',     label: 'آدرس‌ها',    icon: MapPin,    count: addresses.length },
-    { key: 'subscriptions', label: 'انشعاب‌ها',  icon: Zap,       count: subscriptions.length },
+    { key: 'subscriptions', label: 'شناسه‌ها',   icon: Zap,       count: subscriptions.length },
     { key: 'tou',           label: 'برنامه TOU', icon: Clock },
     { key: 'bill',          label: 'تحلیل قبض',  icon: BarChart3 },
     { key: 'documents',     label: 'مدارک',       icon: FileText },
@@ -572,13 +572,13 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
             {tab === 'subscriptions' && (
               <div className="space-y-3">
                 <div className="flex justify-end">
-                  <Button size="sm" onClick={openCreateSub}><Plus className="h-4 w-4" /> انشعاب جدید</Button>
+                  <Button size="sm" onClick={openCreateSub}><Plus className="h-4 w-4" /> شناسه جدید</Button>
                 </div>
                 {subLoading ? (
                   <div className="py-8 text-center text-sm text-gray-400">در حال بارگذاری...</div>
                 ) : subscriptions.length === 0 ? (
                   <div className="py-10 text-center text-sm text-gray-400">
-                    <Zap className="mx-auto mb-2 h-8 w-8 opacity-30" />انشعابی ثبت نشده
+                    <Zap className="mx-auto mb-2 h-8 w-8 opacity-30" />شناسه‌ای ثبت نشده
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -941,7 +941,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
       </Modal>
 
       {/* ── Subscription modals */}
-      <Modal open={subModal === 'create'} onClose={() => setSubModal(null)} title="انشعاب جدید" size="md">
+      <Modal open={subModal === 'create'} onClose={() => setSubModal(null)} title="شناسه جدید" size="md">
         <div className="space-y-4">
           <Select label="آدرس *" value={subForm.addressId} placeholder="انتخاب آدرس"
             options={addresses.map(a => ({ value: a.id, label: a.mainAddress }))}
@@ -955,13 +955,13 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSubModal(null)}>انصراف</Button>
-          <Button loading={subSaving} onClick={handleSaveSub}>ثبت انشعاب</Button>
+          <Button loading={subSaving} onClick={handleSaveSub}>ثبت شناسه</Button>
         </div>
       </Modal>
 
-      <Modal open={subModal === 'delete'} onClose={() => setSubModal(null)} title="حذف انشعاب" size="sm">
+      <Modal open={subModal === 'delete'} onClose={() => setSubModal(null)} title="حذف شناسه" size="sm">
         <p className="text-sm text-gray-600">
-          آیا از حذف انشعاب <span className="font-bold text-gray-900">«{subForm.billIdentifier}»</span> اطمینان دارید؟
+          آیا از حذف شناسه <span className="font-bold text-gray-900">«{subForm.billIdentifier}»</span> اطمینان دارید؟
         </p>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSubModal(null)}>انصراف</Button>

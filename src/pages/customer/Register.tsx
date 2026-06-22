@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, User, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
+import { validateNationalCode, validateNationalId } from '../../utils/validators'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 
@@ -31,6 +32,7 @@ export default function CustomerRegister() {
       toast.error('لطفاً تمام فیلدهای اجباری را پر کنید')
       return
     }
+    if (!validateNationalCode(real.nationalCode)) { toast.error('کد ملی وارد شده معتبر نیست'); return }
     setSaving(true)
     try {
       const res = await customerApi.registerReal({ ...real, customerTypeId: 1 })
@@ -49,6 +51,7 @@ export default function CustomerRegister() {
       toast.error('لطفاً تمام فیلدهای اجباری را پر کنید')
       return
     }
+    if (!validateNationalId(legal.nationalId)) { toast.error('شناسه ملی باید ۱۱ رقم و معتبر باشد'); return }
     setSaving(true)
     try {
       const res = await customerApi.registerLegal({ ...legal, customerTypeId: 2 })
@@ -129,7 +132,7 @@ export default function CustomerRegister() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input label="نام *" value={real.firstName} onChange={e => setReal(p => ({ ...p, firstName: e.target.value }))} placeholder="نام" />
               <Input label="نام خانوادگی *" value={real.lastName} onChange={e => setReal(p => ({ ...p, lastName: e.target.value }))} placeholder="نام خانوادگی" />
-              <Input label="کد ملی *" value={real.nationalCode} onChange={e => setReal(p => ({ ...p, nationalCode: e.target.value }))} placeholder="۱۰ رقم" maxLength={10} inputMode="numeric" />
+              <Input label="کد ملی *" value={real.nationalCode} onChange={e => setReal(p => ({ ...p, nationalCode: e.target.value.replace(/\D/g, '') }))} placeholder="۱۰ رقم" maxLength={10} inputMode="numeric" />
               <Input label="موبایل *" value={real.mobile} onChange={e => setReal(p => ({ ...p, mobile: e.target.value }))} placeholder="09xxxxxxxxx" maxLength={11} inputMode="numeric" />
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">نحوه آشنایی</label>
@@ -150,7 +153,7 @@ export default function CustomerRegister() {
             <h3 className="mb-4 text-base font-semibold text-gray-900">اطلاعات شرکت</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input label="نام شرکت *" value={legal.companyName} onChange={e => setLegal(p => ({ ...p, companyName: e.target.value }))} placeholder="نام کامل شرکت" />
-              <Input label="شناسه ملی *" value={legal.nationalId} onChange={e => setLegal(p => ({ ...p, nationalId: e.target.value }))} placeholder="۱۱ رقم" maxLength={12} inputMode="numeric" />
+              <Input label="شناسه ملی *" value={legal.nationalId} onChange={e => setLegal(p => ({ ...p, nationalId: e.target.value.replace(/\D/g, '') }))} placeholder="۱۱ رقم" maxLength={11} inputMode="numeric" />
               <Input label="کد اقتصادی" value={legal.economicCode} onChange={e => setLegal(p => ({ ...p, economicCode: e.target.value }))} placeholder="کد اقتصادی" />
               <Input label="نام مدیرعامل *" value={legal.ceo_FullName} onChange={e => setLegal(p => ({ ...p, ceo_FullName: e.target.value }))} placeholder="نام و نام خانوادگی" />
               <Input label="موبایل مدیرعامل" value={legal.ceo_Mobile} onChange={e => setLegal(p => ({ ...p, ceo_Mobile: e.target.value }))} placeholder="09xxxxxxxxx" maxLength={11} inputMode="numeric" />

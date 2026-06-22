@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Download } from 'lucide-react'
+import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Download, Upload, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi, type IdTitle } from '../../api/lookup'
 import { uploadApi } from '../../api/upload'
+import FileUpload from '../../components/ui/FileUpload'
+import ProformaInvoicePrintModal, { type ProformaInvoiceData } from '../../components/ui/ProformaInvoicePrintModal'
 import type { AdminOrderResult } from '../../types'
 import { toArr } from '../../utils'
 
@@ -36,6 +38,20 @@ export default function AdminOrders() {
   const [statusForm, setStatusForm] = useState({ statusId: '', priceAtMoment: '' })
   const [saving, setSaving]         = useState(false)
 
+  const [payMethods, setPayMethods] = useState<IdTitle[]>([])
+  const [payForm, setPayForm]       = useState({ methodId: '', amount: '', referenceNumber: '', receiptFileId: '' })
+  const [paySubmitting, setPaySubmitting] = useState(false)
+
+  const [proformaData, setProformaData] = useState<ProformaInvoiceData | null>(null)
+
+  const openProforma = async (orderId: number) => {
+    try {
+      const res = await adminApi.getProformaInvoice(orderId)
+      if (res.code === 200 && res.result) setProformaData(res.result as ProformaInvoiceData)
+      else toast.error('خطا در دریافت اطلاعات پیش‌فاکتور')
+    } catch { toast.error('خطا در ارتباط با سرور') }
+  }
+
   const load = useCallback(() => {
     setLoading(true)
     adminApi.getAdminOrders({
@@ -56,6 +72,7 @@ export default function AdminOrders() {
 
   useEffect(() => {
     lookupApi.getOrderStatuses().then(r => { if (r.code === 200) setStatuses(toArr(r.result)) })
+    lookupApi.getPaymentMethods().then(r => { if (r.code === 200) setPayMethods(toArr(r.result)) })
   }, [])
 
   const openDetail = (id: number) => {
@@ -64,6 +81,9 @@ export default function AdminOrders() {
         if (r.code === 200 && r.result) {
           setDetail(r.result)
           setShowDetail(true)
+          const d = r.result
+          const autoAmount = d.priceAtMoment > 0 ? String(Math.round(d.priceAtMoment * d.requestedKwh)) : ''
+          setPayForm(p => ({ ...p, amount: autoAmount }))
         } else {
           toast.error(r.message ?? r.caption ?? 'خطا در بارگذاری جزئیات')
         }
@@ -101,6 +121,31 @@ export default function AdminOrders() {
         } else alert(r.message || 'خطا')
       })
       .finally(() => setSaving(false))
+  }
+
+  const handleSubmitPayment = () => {
+    if (!detail) return
+    if (!payForm.methodId) { toast.error('روش پرداخت را انتخاب کنید'); return }
+    if (!payForm.amount || Number(payForm.amount) <= 0) { toast.error('مبلغ پرداخت را وارد کنید'); return }
+    setPaySubmitting(true)
+    adminApi.submitPaymentForOrder({
+      orderId: detail.id,
+      amount: Number(payForm.amount),
+      methodId: Number(payForm.methodId),
+      referenceNumber: payForm.referenceNumber || undefined,
+      receiptFileId: payForm.receiptFileId || undefined,
+    })
+      .then(r => {
+        if (r.code === 200) {
+          toast.success('فیش پرداخت ثبت شد')
+          setPayForm({ methodId: '', amount: '', referenceNumber: '', receiptFileId: '' })
+          openDetail(detail.id)
+        } else {
+          toast.error(r.message ?? r.caption ?? 'خطا در ثبت فیش')
+        }
+      })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
+      .finally(() => setPaySubmitting(false))
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -153,7 +198,7 @@ export default function AdminOrders() {
                     <tr className="border-b text-xs text-gray-400" style={{ borderColor: 'rgba(209,250,229,0.5)' }}>
                       <th className="pb-3 text-right font-semibold">تاریخ</th>
                       <th className="pb-3 text-right font-semibold">مشتری</th>
-                      <th className="pb-3 text-right font-semibold">اشتراک</th>
+                      <th className="pb-3 text-right font-semibold">شناسه</th>
                       <th className="pb-3 text-left font-semibold">نوع انرژی</th>
                       <th className="pb-3 text-left font-semibold">مقدار (kWh)</th>
                       <th className="pb-3 text-left font-semibold">قیمت (ریال/kWh)</th>
@@ -195,6 +240,13 @@ export default function AdminOrders() {
                               className="rounded-lg px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50">
                               وضعیت
                             </button>
+                            {!o.isPriceRequest && (
+                              <button onClick={() => openProforma(o.id)}
+                                className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                title="پیش‌فاکتور">
+                                <Printer className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -228,21 +280,21 @@ export default function AdminOrders() {
       {/* Order Detail Modal */}
       {showDetail && detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b px-5 py-4">
+          <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl" style={{ maxHeight: '90vh' }}>
+            <div className="flex shrink-0 items-center justify-between border-b px-5 py-4">
               <h2 className="font-bold text-gray-900">جزئیات سفارش #{detail.id}</h2>
               <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="overflow-y-auto p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-gray-50 p-3">
                   <p className="text-xs text-gray-500 mb-0.5">مشتری</p>
                   <p className="font-semibold text-gray-900">{detail.customerName || '—'}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 p-3">
-                  <p className="text-xs text-gray-500 mb-0.5">اشتراک</p>
+                  <p className="text-xs text-gray-500 mb-0.5">شناسه</p>
                   <p className="font-mono font-semibold text-gray-900">{detail.billIdentifier}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 p-3">
@@ -336,6 +388,61 @@ export default function AdminOrders() {
                 </div>
               )}
 
+              {/* Admin payment slip upload */}
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Upload className="h-4 w-4 text-blue-500" />
+                  <p className="text-sm font-semibold text-blue-800">ثبت فیش پرداخت (ادمین)</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-600">روش پرداخت</label>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      value={payForm.methodId}
+                      onChange={e => setPayForm(p => ({ ...p, methodId: e.target.value }))}>
+                      <option value="">انتخاب کنید...</option>
+                      {payMethods.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-600">مبلغ (ریال)</label>
+                    <input
+                      type="number" min="0"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      placeholder="مبلغ پرداختی"
+                      value={payForm.amount}
+                      onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">کد رهگیری (اختیاری)</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="شماره رهگیری یا مرجع"
+                    value={payForm.referenceNumber}
+                    onChange={e => setPayForm(p => ({ ...p, referenceNumber: e.target.value }))}
+                  />
+                </div>
+                <FileUpload
+                  label="فایل فیش (اختیاری)"
+                  fileId={payForm.receiptFileId || null}
+                  onUploaded={id => setPayForm(p => ({ ...p, receiptFileId: id }))}
+                  onDeleted={() => setPayForm(p => ({ ...p, receiptFileId: '' }))}
+                />
+                <button
+                  onClick={handleSubmitPayment}
+                  disabled={paySubmitting}
+                  className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                  {paySubmitting
+                    ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> در حال ثبت...</>
+                    : <><Upload className="h-4 w-4" /> ثبت فیش پرداخت</>
+                  }
+                </button>
+              </div>
+
               <button onClick={() => { setShowDetail(false); openStatus(detail) }}
                 className="w-full rounded-xl border border-emerald-300 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
                 تغییر وضعیت / قیمت
@@ -391,6 +498,12 @@ export default function AdminOrders() {
           </div>
         </div>
       )}
+
+      <ProformaInvoicePrintModal
+        open={!!proformaData}
+        data={proformaData}
+        onClose={() => setProformaData(null)}
+      />
     </div>
   )
 }

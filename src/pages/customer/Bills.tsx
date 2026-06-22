@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap, TrendingDown, AlertTriangle, BarChart3, FlaskConical, ChevronDown, ChevronUp, ShoppingCart, Activity } from 'lucide-react'
+import { Zap, TrendingDown, AlertTriangle, BarChart3, FlaskConical, ChevronDown, ChevronUp, ShoppingCart, Activity, FileDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi, type IdTitle } from '../../api/lookup'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult } from '../../types'
-import { toArr } from '../../utils'
+import HelpTooltip from '../../components/ui/HelpTooltip'
+import BillAnalysisPrintModal from '../../components/ui/BillAnalysisPrintModal'
+import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult, PortfolioOptimizationResult } from '../../types'
+import { toArr, constraintLabel } from '../../utils'
 
 const MONTHS = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
 
@@ -19,6 +21,11 @@ function jalaliYear(): number {
 const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => jalaliYear() - 2 + i)
 const rial = (n: number) => n.toLocaleString('fa-IR') + ' ریال'
 const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+const smartRial = (n: number): string => {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + ' میلیارد ریال'
+  if (n >= 1e6) return Math.round(n / 1e6).toLocaleString('fa-IR') + ' میلیون ریال'
+  return n.toLocaleString('fa-IR', { maximumFractionDigits: 0 }) + ' ریال'
+}
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
@@ -30,7 +37,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 }
 
 // ─── Optimal Purchase Line Chart ──────────────────────────────────────────────
-function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }) {
+function OptimalPurchaseLineChart({ data, onSelect }: { data: OptimalPurchaseCurveResult; onSelect?: (kWh: number | null) => void }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [hoverIdx, setHoverIdx]       = useState<number | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
@@ -82,7 +89,7 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
       <div ref={trackRef} className="relative cursor-pointer" style={{ height: 64 }}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIdx(null)}
-        onClick={() => { if (hoverIdx !== null) setSelectedIdx(hoverIdx) }}>
+        onClick={() => { if (hoverIdx !== null) { setSelectedIdx(hoverIdx); onSelect?.(points[hoverIdx].contractCapacityKw) } }}>
 
         <div className="absolute inset-x-0 flex overflow-hidden"
           style={{ top: '50%', transform: 'translateY(-50%)', height: 22, borderRadius: 11 }}>
@@ -99,7 +106,7 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
             <span className="text-base leading-none text-white">★</span>
           </div>
           <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700 shadow-sm">
-            بهینه {optKw.toFixed(0)} kW
+            بهینه {optKw.toFixed(0)} kWh
           </div>
         </div>
 
@@ -115,6 +122,15 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
         {hovPct !== null && (
           <div className="pointer-events-none absolute inset-y-0 w-px bg-gray-700/40" style={{ left: `${hovPct}%` }} />
         )}
+        {hovPct !== null && hovered && (
+          <div className="pointer-events-none absolute -translate-x-1/2"
+            style={{ top: 3, left: `${hovPct}%`, zIndex: 25 }}>
+            <div className="whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-bold text-white shadow-lg"
+              style={{ background: hovered.savingRial >= 0 ? '#065f46' : '#991b1b' }}>
+              {hovered.contractCapacityKw.toFixed(0)} kWh
+            </div>
+          </div>
+        )}
 
         {selectedPct !== null && (
           <div className="pointer-events-none absolute"
@@ -128,8 +144,8 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
       </div>
 
       <div className="flex justify-between text-[10px] text-gray-300">
-        <span>{minKw.toFixed(0)} kW</span>
-        <span>{maxKw.toFixed(0)} kW</span>
+        <span>{minKw.toFixed(0)} kWh</span>
+        <span>{maxKw.toFixed(0)} kWh</span>
       </div>
 
       <div className="min-h-[72px] rounded-xl px-4 py-3 transition-all"
@@ -137,9 +153,8 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
         {hovered ? (
           <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
             <div>
-              <p className="text-gray-400">ظرفیت انتخابی</p>
-              <p className="text-sm font-bold text-gray-900">{hovered.contractCapacityKw.toFixed(1)} kW</p>
-              <p className="text-[10px] text-gray-400">{hovered.contractedEnergyKwh.toFixed(0)} kWh/ماه</p>
+              <p className="text-gray-400">خرید از بورس</p>
+              <p className="text-sm font-bold text-gray-900">{hovered.contractCapacityKw.toFixed(1)} kWh</p>
             </div>
             <div>
               <p className="text-gray-400">هزینه با متین</p>
@@ -163,19 +178,19 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
             )}
           </div>
         ) : (
-          <p className="py-3 text-center text-xs text-gray-400">نشانگر موس را روی خط بکشید تا سود هر ظرفیت را ببینید</p>
+          <p className="py-3 text-center text-xs text-gray-400">نشانگر موس را روی خط بکشید تا سود هر سطح خرید از بورس را ببینید</p>
         )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-right" dir="rtl">
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-          <p className="text-[10px] font-semibold text-emerald-500">بهینه‌ترین ظرفیت</p>
-          <p className="mt-0.5 text-sm font-bold text-emerald-700">{optKw.toFixed(1)} kW</p>
+          <p className="text-[10px] font-semibold text-emerald-500">بهینه‌ترین خرید از بورس</p>
+          <p className="mt-0.5 text-sm font-bold text-emerald-700">{optKw.toFixed(1)} kWh</p>
           <p className="text-[10px] text-emerald-400">صرفه: {data.optimalSavingRial.toLocaleString('fa-IR')} ر</p>
         </div>
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-          <p className="text-[10px] font-semibold text-blue-500">قرارداد فعلی شما</p>
-          <p className="mt-0.5 text-sm font-bold text-blue-700">{curKw.toFixed(1)} kW</p>
+          <p className="text-[10px] font-semibold text-blue-500">خرید فعلی از بورس</p>
+          <p className="mt-0.5 text-sm font-bold text-blue-700">{curKw.toFixed(1)} kWh</p>
           <p className="text-[10px] text-blue-400">صرفه: {data.savingAtCurrentContractRial.toLocaleString('fa-IR')} ر</p>
         </div>
         <div className={`rounded-xl border p-3 ${improve > 0 ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
@@ -190,14 +205,14 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
         <div className="rounded-xl border-2 border-violet-200 p-4" style={{ background: 'rgba(245,243,255,0.95)' }} dir="rtl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-violet-500">ظرفیت انتخاب‌شده</p>
-              <p className="mt-0.5 text-lg font-bold text-violet-900">{selected.contractCapacityKw.toFixed(1)} kW</p>
+              <p className="text-xs font-semibold text-violet-500">خرید انتخاب‌شده از بورس</p>
+              <p className="mt-0.5 text-lg font-bold text-violet-900">{selected.contractCapacityKw.toFixed(1)} kWh</p>
               <p className="text-[10px] text-violet-400">
-                {selected.contractedEnergyKwh.toFixed(0)} kWh/ماه · صرفه:{' '}
+                صرفه:{' '}
                 {selected.savingRial >= 0 ? '+' : ''}{selected.savingRial.toLocaleString('fa-IR')} ریال
               </p>
             </div>
-            <button onClick={() => setSelectedIdx(null)}
+            <button onClick={() => { setSelectedIdx(null); onSelect?.(null) }}
               className="rounded-lg px-3 py-1.5 text-xs font-medium text-violet-500 transition-colors hover:bg-violet-100">
               پاک کردن
             </button>
@@ -205,8 +220,160 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
         </div>
       )}
       {!selected && (
-        <p className="text-center text-[10px] text-gray-300">روی هر نقطه از خط کلیک کنید تا آن ظرفیت را انتخاب کنید</p>
+        <p className="text-center text-[10px] text-gray-300">روی هر نقطه از خط کلیک کنید تا آن سطح خرید را انتخاب کنید</p>
       )}
+    </div>
+  )
+}
+
+// ─── Portfolio Recommendation Card ───────────────────────────────────────────
+
+const ENERGY_LABEL: Record<string, string> = {
+  exchange:  'بورس برق',
+  green:     'برق سبز',
+  bilateral: 'دوجانبه',
+  grid:      'شبکه',
+}
+
+const ENERGY_COLOR: Record<string, { bg: string; text: string; dot: string }> = {
+  exchange:  { bg: 'bg-violet-100', text: 'text-violet-700', dot: '#7c3aed' },
+  green:     { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: '#059669' },
+  bilateral: { bg: 'bg-blue-100', text: 'text-blue-700', dot: '#2563eb' },
+  grid:      { bg: 'bg-gray-100', text: 'text-gray-600', dot: '#6b7280' },
+}
+
+function PortfolioCard({ rec, loading }: { rec: PortfolioOptimizationResult | null; loading: boolean }) {
+  if (loading) return (
+    <div className="glass-card overflow-hidden rounded-2xl">
+      <div className="flex items-center gap-3 px-5 py-4" style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+        <span className="text-base">🤖</span>
+        <h3 className="font-semibold text-gray-900">پیشنهاد ترکیب بهینه خرید</h3>
+      </div>
+      <div className="flex justify-center py-10">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+      </div>
+    </div>
+  )
+
+  if (!rec) return null
+
+  const mix = rec.optimalMix
+  const total = mix.gridKwh + mix.exchangeKwh + mix.greenKwh + mix.bilateralKwh
+  const mixItems = [
+    { type: 'exchange',  kwh: mix.exchangeKwh  },
+    { type: 'green',     kwh: mix.greenKwh     },
+    { type: 'bilateral', kwh: mix.bilateralKwh },
+    { type: 'grid',      kwh: mix.gridKwh      },
+  ].filter(m => m.kwh > 0)
+
+  return (
+    <div className="glass-card overflow-hidden rounded-2xl" style={{ border: '2px solid #059669' }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+        style={{ background: 'linear-gradient(135deg,#065f46 0%,#047857 100%)' }}>
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🤖</span>
+          <div>
+            <h3 className="font-bold text-white">پیشنهاد ترکیب بهینه خرید</h3>
+          </div>
+        </div>
+        {rec.saving > 0 && (
+          <div className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2">
+            <span className="text-xs text-emerald-200">صرفه‌جویی بیشینه</span>
+            <span className="text-base font-black text-yellow-300">
+              {rec.savingPercent.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+            </span>
+            <span className="text-xs font-bold text-white">
+              ({(rec.saving / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} M ریال)
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-5 p-5">
+        {total > 0 && (
+          <div>
+            <p className="mb-2 text-xs font-bold text-gray-500">ترکیب پیشنهادی تامین انرژی</p>
+            <div className="flex h-5 overflow-hidden rounded-full" style={{ gap: 2 }}>
+              {mixItems.map(m => {
+                const pct = (m.kwh / total) * 100
+                const col = ENERGY_COLOR[m.type]
+                return (
+                  <div key={m.type} style={{ width: `${pct}%`, background: col.dot, minWidth: 4 }}
+                    title={`${ENERGY_LABEL[m.type]}: ${pct.toFixed(1)}٪`} />
+                )
+              })}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {mixItems.map(m => {
+                const pct = ((m.kwh / total) * 100).toFixed(1)
+                const col = ENERGY_COLOR[m.type]
+                return (
+                  <div key={m.type} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${col.bg} ${col.text}`}>
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: col.dot }} />
+                    {ENERGY_LABEL[m.type]}
+                    <span className="font-mono">{m.kwh.toLocaleString('fa-IR', { maximumFractionDigits: 0 })} kWh ({pct}٪)</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="rounded-xl border border-red-100 bg-red-50 p-3">
+            <p className="text-gray-400">بدون قرارداد</p>
+            <p className="mt-0.5 font-bold text-red-700">{smartRial(rec.baselineCost)}</p>
+          </div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-gray-400">با قرارداد متین</p>
+            <p className="mt-0.5 font-bold text-emerald-700">{smartRial(rec.totalCost)}</p>
+          </div>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <p className="text-gray-400">صرفه‌جویی</p>
+            <p className="mt-0.5 font-bold text-blue-700">{smartRial(rec.saving)}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold text-gray-500">دلایل تصمیم‌گیری</p>
+          <div className="space-y-2">
+            {rec.reasoning.map((r, i) => (
+              <div key={i} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ${
+                r.isActive
+                  ? 'border border-emerald-200 bg-emerald-50'
+                  : 'border border-gray-100 bg-gray-50'
+              }`}>
+                <span className="mt-0.5 shrink-0 text-base leading-none">{r.isActive ? '✅' : '⏭️'}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      ENERGY_COLOR[r.channel]?.bg ?? 'bg-gray-100'
+                    } ${ENERGY_COLOR[r.channel]?.text ?? 'text-gray-600'}`}>
+                      {ENERGY_LABEL[r.channel] ?? r.channel}
+                    </span>
+                  </div>
+                  <p className={`mt-1 leading-relaxed ${r.isActive ? 'text-emerald-800' : 'text-gray-600'}`}>
+                    {r.message}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {rec.constraintHits.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="mb-1.5 text-xs font-bold text-amber-700">محدودیت‌های اعمال‌شده</p>
+            <ul className="space-y-1">
+              {rec.constraintHits.map((c, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm text-amber-800">
+                  <span>⚠️</span> {constraintLabel(c)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -232,11 +399,17 @@ export default function CustomerBills() {
   const [curveData, setCurveData]       = useState<OptimalPurchaseCurveResult | null>(null)
   const [curveLoading, setCurveLoading] = useState(false)
   const [energyTypes, setETypes]        = useState<IdTitle[]>([])
-  const [showOrderModal, setShowOM]     = useState(false)
-  const [orderKwh, setOrderKwh]         = useState('')
-  const [orderETypeId, setOrderEType]   = useState<number | ''>('')
+  const [showOrderModal, setShowOM]       = useState(false)
+  const [orderRegKwh, setOrderRegKwh]   = useState('')
+  const [orderGrnKwh, setOrderGrnKwh]   = useState('')
+  const [orderIncReg, setOrderIncReg]   = useState(true)
+  const [orderIncGrn, setOrderIncGrn]   = useState(false)
   const [orderPR, setOrderPR]           = useState(false)
   const [orderCreating, setOrderCr]     = useState(false)
+  const [selectedCurveKwh, setSelectedCurveKwh] = useState<number | null>(null)
+  const [portfolio, setPortfolio]     = useState<PortfolioOptimizationResult | null>(null)
+  const [portLoading, setPortLoading] = useState(false)
+  const [showPrint, setShowPrint]     = useState(false)
 
   useEffect(() => {
     customerApi.getSubscriptions().then(r => {
@@ -254,26 +427,38 @@ export default function CustomerBills() {
       setForm(p => ({ ...p, [k]: e.target.value }))
 
   const handleCreateOrder = async () => {
-    if (!orderETypeId || !orderKwh) { toast.error('نوع انرژی و مقدار را وارد کنید'); return }
+    const regularEType = energyTypes.find(t => !t.title.includes('سبز'))
+    const greenEType   = energyTypes.find(t => t.title.includes('سبز'))
+    const tasks: Array<Promise<void>> = []
+    if (orderIncReg && +orderRegKwh > 0 && regularEType) {
+      tasks.push(customerApi.createOrder({
+        subscriptionId: selectedSubId as number,
+        requestedKwh: +orderRegKwh,
+        energyTypeId: regularEType.id,
+        isPriceRequest: orderPR,
+      }).then(r => { if (r.code !== 200) throw new Error(r.message ?? 'خطا در ثبت سفارش برق عادی') }))
+    }
+    if (orderIncGrn && +orderGrnKwh > 0 && greenEType) {
+      tasks.push(customerApi.createOrder({
+        subscriptionId: selectedSubId as number,
+        requestedKwh: +orderGrnKwh,
+        energyTypeId: greenEType.id,
+        isPriceRequest: orderPR,
+      }).then(r => { if (r.code !== 200) throw new Error(r.message ?? 'خطا در ثبت سفارش برق سبز') }))
+    }
+    if (tasks.length === 0) { toast.error('حداقل یک نوع انرژی را انتخاب کنید'); return }
     setOrderCr(true)
     try {
-      const r = await customerApi.createOrder({
-        subscriptionId: selectedSubId as number,
-        requestedKwh: +orderKwh,
-        energyTypeId: orderETypeId as number,
-        isPriceRequest: orderPR,
-      })
-      if (r.code === 200) {
-        toast.success('سفارش با موفقیت ثبت شد')
-        setShowOM(false)
-        navigate('/customer/orders', { state: { newOrderId: r.result, analysis: result } })
-      } else { toast.error(r.message ?? r.caption ?? 'خطا در ثبت سفارش') }
-    } catch { toast.error('خطا در ارتباط با سرور') }
+      await Promise.all(tasks)
+      toast.success('سفارش با موفقیت ثبت شد')
+      setShowOM(false)
+      navigate('/customer/orders', { state: { analysis: result } })
+    } catch (err: any) { toast.error(err.message ?? 'خطا در ارتباط با سرور') }
     finally { setOrderCr(false) }
   }
 
   const handleSubmit = async () => {
-    if (!selectedSubId) { toast.error('ابتدا اشتراک را انتخاب کنید'); return }
+    if (!selectedSubId) { toast.error('ابتدا شناسه را انتخاب کنید'); return }
     if (form.consumptionMode === 'split' && (!form.peakKwh || !form.midKwh || !form.lowKwh))
       { toast.error('مصارف اوج/میان/کم‌بار را وارد کنید'); return }
     if (form.consumptionMode === 'total' && !form.totalKwh)
@@ -294,23 +479,29 @@ export default function CustomerBills() {
       saveReport: true,
     }
 
-    setLoading(true); setResult(null); setShowDetails(false); setCurveData(null); setCurveLoading(false)
+    setLoading(true); setResult(null); setShowDetails(false); setCurveData(null); setCurveLoading(false); setSelectedCurveKwh(null); setPortfolio(null); setPortLoading(false)
     try {
       const res = await customerApi.advancedBillAnalysis(req)
       if (res.code === 200 && res.result) {
         const analysisResult = res.result as AdvancedBillAnalysisResult
         setResult(analysisResult)
         toast.success('تحلیل قبض انجام شد')
-        // Automatically compute optimal purchase curve in the background
+        // Fetch optimal purchase curve and portfolio recommendation in parallel
         setCurveLoading(true)
-        customerApi.manualOptimalPurchaseCurve({
-          subscriptionId: selectedSubId as number,
-          year: +form.year, month: +form.month,
-          peakKwh: analysisResult.peakKwh, midKwh: analysisResult.midKwh,
-          lowKwh: analysisResult.lowKwh, fridayPeakKwh: 0,
-        }).then(cr => {
+        customerApi.advancedOptimalPurchaseCurve(req).then(cr => {
           if (cr.code === 200 && cr.result) setCurveData(cr.result as OptimalPurchaseCurveResult)
         }).finally(() => setCurveLoading(false))
+
+        setPortLoading(true)
+        customerApi.getOptimalPortfolio({
+          ...req,
+          maxExchangeKwh: 0,
+          greenAvailabilityKwh: 0,
+          maxBilateralKwh: 0,
+          operationalReserveKwh: 0,
+        }).then(pr => {
+          if (pr.code === 200 && pr.result) setPortfolio(pr.result as PortfolioOptimizationResult)
+        }).finally(() => setPortLoading(false))
       } else { toast.error(res.message ?? res.caption ?? 'خطا در تحلیل') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setLoading(false) }
@@ -320,27 +511,27 @@ export default function CustomerBills() {
 
   return (
     <div className="space-y-6">
-      {/* انتخاب اشتراک */}
+      {/* انتخاب شناسه */}
       <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 px-5 py-4"
           style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
             <Zap className="h-4 w-4" />
           </div>
-          <h3 className="font-semibold text-gray-900">انتخاب اشتراک</h3>
+          <h3 className="font-semibold text-gray-900">انتخاب شناسه</h3>
         </div>
         <div className="p-5">
           {subscriptions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-emerald-200 py-8 text-center">
               <Zap className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500">اشتراکی یافت نشد</p>
+              <p className="text-sm text-gray-500">شناسه‌ای یافت نشد</p>
               <p className="mt-1 text-xs text-gray-400">ابتدا از بخش پروفایل آدرس اضافه کنید</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {subscriptions.map(s => (
                 <button key={s.id}
-                  onClick={() => { setSelectedSubId(s.id); setResult(null); setCurveData(null) }}
+                  onClick={() => { setSelectedSubId(s.id); setResult(null); setCurveData(null); setSelectedCurveKwh(null) }}
                   className={`rounded-xl p-4 text-right transition-all ${
                     selectedSubId === s.id
                       ? 'border-2 border-emerald-500 bg-emerald-50 shadow-sm'
@@ -415,13 +606,29 @@ export default function CustomerBills() {
                   ))}
                 </div>
                 {form.consumptionMode === 'total' ? (
-                  <Input label="مصرف کل *" value={form.totalKwh} onChange={set('totalKwh')}
-                    placeholder="kWh — سیستم بر اساس ساعات TOU توزیع می‌کند" inputMode="numeric" />
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">مصرف کل *</span>
+                      <HelpTooltip pageKey="bill-optimal" fieldKey="totalKwh" />
+                    </div>
+                    <Input value={form.totalKwh} onChange={set('totalKwh')}
+                      placeholder="kWh — سیستم بر اساس ساعات TOU توزیع می‌کند" inputMode="numeric" />
+                  </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-4">
-                    <Input label="اوج بار *"  value={form.peakKwh} onChange={set('peakKwh')} placeholder="kWh" inputMode="numeric" />
-                    <Input label="میان بار *" value={form.midKwh}  onChange={set('midKwh')}  placeholder="kWh" inputMode="numeric" />
-                    <Input label="کم بار *"   value={form.lowKwh}  onChange={set('lowKwh')}  placeholder="kWh" inputMode="numeric" />
+                    {([
+                      { fk: 'midKwh',  lbl: 'میان بار *',  key: 'midKwh'  as const },
+                      { fk: 'peakKwh', lbl: 'اوج بار *',   key: 'peakKwh' as const },
+                      { fk: 'lowKwh',  lbl: 'کم بار *',    key: 'lowKwh'  as const },
+                    ]).map(({ fk, lbl, key }) => (
+                      <div key={fk}>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{lbl}</span>
+                          <HelpTooltip pageKey="bill-optimal" fieldKey={fk} />
+                        </div>
+                        <Input value={form[key]} onChange={set(key)} placeholder="kWh" inputMode="numeric" />
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -430,8 +637,18 @@ export default function CustomerBills() {
               <div>
                 <p className="mb-2 text-xs font-bold text-gray-500">دیماند (kW)</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="دیماند قراردادی" value={form.contractDemandKw} onChange={set('contractDemandKw')} placeholder="kW" inputMode="numeric" />
-                  <Input label="دیماند مصرفی"    value={form.actualDemandKw}   onChange={set('actualDemandKw')}   placeholder="kW" inputMode="numeric" />
+                  {([
+                    { fk: 'contractDemandKw', lbl: 'دیماند قراردادی', key: 'contractDemandKw' as const },
+                    { fk: 'actualDemandKw',   lbl: 'دیماند مصرفی',    key: 'actualDemandKw'   as const },
+                  ]).map(({ fk, lbl, key }) => (
+                    <div key={fk}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{lbl}</span>
+                        <HelpTooltip pageKey="bill-optimal" fieldKey={fk} />
+                      </div>
+                      <Input value={form[key]} onChange={set(key)} placeholder="kW" inputMode="numeric" />
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -446,18 +663,18 @@ export default function CustomerBills() {
                       <Input label="نرخ (ریال/kWh)" value={form.bilateralRate} onChange={set('bilateralRate')} placeholder="0" inputMode="numeric" />
                     </div>
                   </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-                    <p className="mb-2 text-xs font-semibold text-emerald-700">بورس برق</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input label="انرژی (kWh)"    value={form.exchangeKwh}  onChange={set('exchangeKwh')}  placeholder="0" inputMode="numeric" />
-                      <Input label="نرخ (ریال/kWh)" value={form.exchangeRate} onChange={set('exchangeRate')} placeholder="0" inputMode="numeric" />
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3">
-                    <p className="mb-2 text-xs font-semibold text-amber-700">قانون جهش تولید (برق سبز)</p>
+                  <div className="rounded-xl border border-green-200 bg-green-50/60 p-3">
+                    <p className="mb-2 text-xs font-semibold text-green-700">قانون جهش تولید (برق سبز)</p>
                     <div className="grid grid-cols-2 gap-3">
                       <Input label="انرژی (kWh)"    value={form.greenLawKwh} onChange={set('greenLawKwh')} placeholder="0" inputMode="numeric" />
                       <Input label="نرخ (ریال/kWh)" value={form.greenRate}   onChange={set('greenRate')}   placeholder="0" inputMode="numeric" />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-orange-100 bg-orange-50/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-orange-700">بورس برق</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input label="انرژی (kWh)"    value={form.exchangeKwh}  onChange={set('exchangeKwh')}  placeholder="0" inputMode="numeric" />
+                      <Input label="نرخ (ریال/kWh)" value={form.exchangeRate} onChange={set('exchangeRate')} placeholder="0" inputMode="numeric" />
                     </div>
                   </div>
                 </div>
@@ -509,15 +726,15 @@ export default function CustomerBills() {
                     <tbody>
                       <tr style={{ background: '#fefce8' }}>
                         <td className="px-4 py-3 font-semibold text-gray-700">جمع کل هزینه برق قبل از قرارداد</td>
-                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-red-700 ltr">{rial(r.costWithoutMatin)}</td>
+                        <td className="px-4 py-3 text-right text-lg font-bold text-red-700">{rial(r.costWithoutMatin)}</td>
                       </tr>
                       <tr style={{ background: '#fefce8', borderTop: '1px solid #fde68a' }}>
                         <td className="px-4 py-3 font-semibold text-gray-700">جمع کل هزینه برق بعد از قرارداد</td>
-                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-emerald-700 ltr">{rial(r.costWithMatin)}</td>
+                        <td className="px-4 py-3 text-right text-lg font-bold text-emerald-700">{rial(r.costWithMatin)}</td>
                       </tr>
                       <tr style={{ background: '#fef9c3', borderTop: '1px solid #fde047' }}>
                         <td className="px-4 py-3 font-bold text-gray-900">صرفه‌جویی حاصل از قرارداد</td>
-                        <td className="px-4 py-3 text-left font-mono text-lg font-bold text-blue-700 ltr">{rial(r.netSaving)}</td>
+                        <td className="px-4 py-3 text-right text-lg font-bold text-blue-700">{rial(r.netSaving)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -528,7 +745,6 @@ export default function CustomerBills() {
                   const bars = [
                     { label: 'بهای انرژی', before: r.energyBeforeRial, after: r.energyAfterRial },
                     ...(r.article16BeforeRial > 0 || r.article16AfterRial > 0 ? [{ label: 'ماده ۱۶', before: r.article16BeforeRial, after: r.article16AfterRial }] : []),
-                    ...(r.regulatoryBeforeRial > 0 || r.regulatoryAfterRial > 0 ? [{ label: 'مقررات', before: r.regulatoryBeforeRial, after: r.regulatoryAfterRial }] : []),
                     ...((r.bilateralBillRial + r.exchangeBillRial + r.greenBillRial) > 0 ? [{ label: 'صورتحساب‌ها', before: 0, after: r.bilateralBillRial + r.exchangeBillRial + r.greenBillRial }] : []),
                   ]
                   const maxVal = Math.max(...bars.flatMap(b => [b.before, b.after]), 1)
@@ -538,12 +754,17 @@ export default function CustomerBills() {
                   const rowH = barH * 2 + gap + 20
                   const chartH = bars.length * rowH + 20
                   const labelW = 90
+                  const chartUnitLabel = maxVal >= 1e9 ? 'میلیارد ریال' : 'میلیون ریال'
+                  const chartFmt = (v: number) => maxVal >= 1e9
+                    ? (v / 1e9).toFixed(2)
+                    : Math.round(v / 1e6).toLocaleString('fa-IR')
 
                   return (
                     <div className="glass-card overflow-hidden rounded-2xl">
                       <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
                         <BarChart3 className="h-4 w-4 text-emerald-700" />
-                        <span className="text-sm font-bold text-gray-700">نمودار مقایسه هزینه (ریال)</span>
+                        <span className="text-sm font-bold text-gray-700">نمودار مقایسه هزینه</span>
+                        <span className="text-xs text-gray-400">({chartUnitLabel})</span>
                         <div className="mr-auto flex items-center gap-4 text-xs">
                           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-red-400"></span>بدون قرارداد</span>
                           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500"></span>با قرارداد</span>
@@ -560,17 +781,15 @@ export default function CustomerBills() {
                                 <text x={labelW - 6} y={y + barH / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">{b.label}</text>
                                 {/* before bar */}
                                 <rect x={labelW} y={y} width={Math.max(beforeW, 2)} height={barH} rx={4} fill="#f87171" opacity={0.85} />
-                                {b.before > 0 && (
-                                  <text x={labelW + beforeW + 4} y={y + barH / 2 + 4} fontSize={9} fill="#b91c1c">
-                                    {(b.before / 1e9).toFixed(1)}G
-                                  </text>
+                                {b.before > 0 && (beforeW > W - labelW - 28
+                                  ? <text x={labelW + Math.max(beforeW, 2) - 4} y={y + barH / 2 + 4} textAnchor="end" fontSize={9} fill="#fff" fontWeight="600">{chartFmt(b.before)}</text>
+                                  : <text x={labelW + Math.max(beforeW, 2) + 4} y={y + barH / 2 + 4} fontSize={9} fill="#b91c1c">{chartFmt(b.before)}</text>
                                 )}
                                 {/* after bar */}
                                 <rect x={labelW} y={y + barH + 4} width={Math.max(afterW, 2)} height={barH} rx={4} fill="#34d399" opacity={0.85} />
-                                {b.after > 0 && (
-                                  <text x={labelW + afterW + 4} y={y + barH + 4 + barH / 2 + 4} fontSize={9} fill="#065f46">
-                                    {(b.after / 1e9).toFixed(1)}G
-                                  </text>
+                                {b.after > 0 && (afterW > W - labelW - 28
+                                  ? <text x={labelW + Math.max(afterW, 2) - 4} y={y + barH + 4 + barH / 2 + 4} textAnchor="end" fontSize={9} fill="#fff" fontWeight="600">{chartFmt(b.after)}</text>
+                                  : <text x={labelW + Math.max(afterW, 2) + 4} y={y + barH + 4 + barH / 2 + 4} fontSize={9} fill="#065f46">{chartFmt(b.after)}</text>
                                 )}
                               </g>
                             )
@@ -588,8 +807,8 @@ export default function CustomerBills() {
                       style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                       <Activity className="h-4 w-4 text-violet-600" />
                       <div>
-                        <h3 className="font-semibold text-gray-900">نمودار بهینه خرید ظرفیت</h3>
-                        <p className="text-xs text-gray-400">بهترین ظرفیت قرارداد با متین را بیابید — نشانگر موس را روی خط بکشید</p>
+                        <h3 className="font-semibold text-gray-900">نمودار بهینه خرید از بورس برق</h3>
+                        <p className="text-xs text-gray-400">بهترین مقدار خرید از بورس برق را بیابید — نشانگر موس را روی خط بکشید</p>
                       </div>
                     </div>
                     <div className="p-5">
@@ -598,10 +817,15 @@ export default function CustomerBills() {
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
                         </div>
                       ) : curveData ? (
-                        <OptimalPurchaseLineChart data={curveData} />
+                        <OptimalPurchaseLineChart data={curveData} onSelect={setSelectedCurveKwh} />
                       ) : null}
                     </div>
                   </div>
+                )}
+
+                {/* Portfolio recommendation */}
+                {(portfolio || portLoading) && (
+                  <PortfolioCard rec={portfolio} loading={portLoading} />
                 )}
 
                 {/* کارت‌های خلاصه */}
@@ -631,23 +855,23 @@ export default function CustomerBills() {
                       <tbody className="divide-y divide-red-100">
                         <tr>
                           <td className="py-1.5 text-gray-500">بهای انرژی</td>
-                          <td className="py-1.5 text-left font-mono text-gray-700">{fmt(r.energyBeforeRial)}</td>
+                          <td className="py-1.5 text-left text-gray-700">{fmt(r.energyBeforeRial)}</td>
                         </tr>
                         {r.article16BeforeRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-gray-500">مابه التفاوت ماده ۱۶</td>
-                            <td className="py-1.5 text-left font-mono text-purple-600">{fmt(r.article16BeforeRial)}</td>
+                            <td className="py-1.5 text-left text-purple-600">{fmt(r.article16BeforeRial)}</td>
                           </tr>
                         )}
                         {r.regulatoryBeforeRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-gray-500">مابه التفاوت اجرای مقررات</td>
-                            <td className="py-1.5 text-left font-mono text-orange-600">{fmt(r.regulatoryBeforeRial)}</td>
+                            <td className="py-1.5 text-left text-orange-600">{fmt(r.regulatoryBeforeRial)}</td>
                           </tr>
                         )}
                         <tr style={{ background: 'rgba(254,242,242,0.8)' }}>
                           <td className="py-2 font-bold text-red-700">جمع کل</td>
-                          <td className="py-2 text-left font-bold font-mono text-red-700">{rial(r.costWithoutMatin)}</td>
+                          <td className="py-2 text-left font-bold text-red-700">{rial(r.costWithoutMatin)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -659,47 +883,47 @@ export default function CustomerBills() {
                       <tbody className="divide-y divide-emerald-100">
                         <tr>
                           <td className="py-1.5 text-gray-500">بهای انرژی شبکه</td>
-                          <td className="py-1.5 text-left font-mono text-gray-700">{fmt(r.energyAfterRial)}</td>
+                          <td className="py-1.5 text-left text-gray-700">{fmt(r.energyAfterRial)}</td>
                         </tr>
                         {r.article16AfterRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-gray-500">مابه التفاوت ماده ۱۶</td>
-                            <td className="py-1.5 text-left font-mono text-purple-600">{fmt(r.article16AfterRial)}</td>
+                            <td className="py-1.5 text-left text-purple-600">{fmt(r.article16AfterRial)}</td>
                           </tr>
                         )}
                         {r.regulatoryAfterRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-gray-500">مابه التفاوت اجرای مقررات</td>
-                            <td className="py-1.5 text-left font-mono text-orange-600">{fmt(r.regulatoryAfterRial)}</td>
+                            <td className="py-1.5 text-left text-orange-600">{fmt(r.regulatoryAfterRial)}</td>
                           </tr>
                         )}
                         {r.creditRial < 0 && (
                           <tr>
                             <td className="py-1.5 text-emerald-600">بستانکاری</td>
-                            <td className="py-1.5 text-left font-mono font-semibold text-emerald-700">{fmt(r.creditRial)}</td>
+                            <td className="py-1.5 text-left font-semibold text-emerald-700">{fmt(r.creditRial)}</td>
                           </tr>
                         )}
                         {r.bilateralBillRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-blue-600">صورتحساب دوجانبه</td>
-                            <td className="py-1.5 text-left font-mono text-blue-700">{fmt(r.bilateralBillRial)}</td>
+                            <td className="py-1.5 text-left text-blue-700">{fmt(r.bilateralBillRial)}</td>
                           </tr>
                         )}
                         {r.exchangeBillRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-indigo-600">صورتحساب بورس</td>
-                            <td className="py-1.5 text-left font-mono text-indigo-700">{fmt(r.exchangeBillRial)}</td>
+                            <td className="py-1.5 text-left text-indigo-700">{fmt(r.exchangeBillRial)}</td>
                           </tr>
                         )}
                         {r.greenBillRial > 0 && (
                           <tr>
                             <td className="py-1.5 text-amber-600">صورتحساب برق سبز</td>
-                            <td className="py-1.5 text-left font-mono text-amber-700">{fmt(r.greenBillRial)}</td>
+                            <td className="py-1.5 text-left text-amber-700">{fmt(r.greenBillRial)}</td>
                           </tr>
                         )}
                         <tr style={{ background: 'rgba(236,253,245,0.8)' }}>
                           <td className="py-2 font-bold text-emerald-700">جمع کل</td>
-                          <td className="py-2 text-left font-bold font-mono text-emerald-700">{rial(r.costWithMatin)}</td>
+                          <td className="py-2 text-left font-bold text-emerald-700">{rial(r.costWithMatin)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -716,21 +940,40 @@ export default function CustomerBills() {
                       <p className="mt-0.5 text-sm text-emerald-100">معادل {r.savingPercent.toLocaleString('fa-IR')}٪ کاهش هزینه</p>
                     </div>
                   </div>
-                ) : (
+                ) : r.netSaving < 0 ? (
                   <div className="flex items-center gap-3 rounded-2xl px-6 py-4"
                     style={{ background: 'rgba(254,243,199,0.7)', border: '1px solid rgba(252,211,77,0.3)' }}>
                     <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
                     <p className="text-sm font-medium text-amber-700">در این ماه هزینه با قرارداد بیشتر از بدون قرارداد است.</p>
                   </div>
-                )}
+                ) : null}
 
-                {/* دکمه ثبت سفارش */}
-                <button
-                  onClick={() => { setOrderKwh(String(result.totalKwh)); setOrderEType(''); setOrderPR(false); setShowOM(true) }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-bold text-white shadow-md transition hover:opacity-90 active:scale-[0.99]"
-                  style={{ background: 'linear-gradient(135deg,#065f46 0%,#047857 100%)' }}>
-                  ثبت سفارش خرید برق
-                </button>
+                {/* دکمه‌ها */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPrint(true)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-emerald-700 py-3.5 text-base font-bold text-emerald-800 transition hover:bg-emerald-50 active:scale-[0.99]">
+                    <FileDown className="h-5 w-5" />
+                    خروجی PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      const base = Math.round(selectedCurveKwh ?? result.totalKwh)
+                      const grnKwh = Math.round(base * 0.04)
+                      const regKwh = base - grnKwh
+                      setOrderRegKwh(String(regKwh))
+                      setOrderGrnKwh(String(grnKwh))
+                      setOrderIncReg(true)
+                      setOrderIncGrn(true)
+                      setOrderPR(false)
+                      setShowOM(true)
+                    }}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-bold text-white shadow-md transition hover:opacity-90 active:scale-[0.99]"
+                    style={{ background: 'linear-gradient(135deg,#065f46 0%,#047857 100%)' }}>
+                    <ShoppingCart className="h-5 w-5" />
+                    ثبت سفارش خرید برق
+                  </button>
+                </div>
 
                 {/* جزئیات فنی (قابل بسط) */}
                 <button onClick={() => setShowDetails(p => !p)}
@@ -756,15 +999,15 @@ export default function CustomerBills() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {[
-                                { l: 'اوج بار',  t: r.tariffPeakRial, m: r.maxWholePeak },
                                 { l: 'میان بار', t: r.tariffMidRial,  m: r.maxWholeMid  },
+                                { l: 'اوج بار',  t: r.tariffPeakRial, m: r.maxWholePeak },
                                 { l: 'کم بار',   t: r.tariffLowRial,  m: r.maxWholeLow  },
                               ].map(row => (
                                 <tr key={row.l} className="hover:bg-gray-50">
                                   <td className="px-3 py-2 font-semibold text-gray-700">{row.l}</td>
-                                  <td className="px-3 py-2 text-left font-mono text-gray-800">{fmt(row.t)}</td>
-                                  <td className="px-3 py-2 text-left font-mono font-bold text-orange-600">{fmt(row.m)}</td>
-                                  <td className="px-3 py-2 text-left font-mono text-blue-600">{fmt(r.avgMarket)}</td>
+                                  <td className="px-3 py-2 text-left text-gray-800">{fmt(row.t)}</td>
+                                  <td className="px-3 py-2 text-left font-bold text-orange-600">{fmt(row.m)}</td>
+                                  <td className="px-3 py-2 text-left text-blue-600">{fmt(r.avgMarket)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -792,9 +1035,9 @@ export default function CustomerBills() {
                               ].map(row => (
                                 <tr key={row.l} className="hover:bg-gray-50">
                                   <td className="px-3 py-2 font-semibold text-gray-700">{row.l}</td>
-                                  <td className="px-3 py-2 text-left font-mono text-gray-600">{fmt(row.c)}</td>
-                                  <td className="px-3 py-2 text-left font-mono font-semibold text-blue-600">{fmt(row.m)}</td>
-                                  <td className="px-3 py-2 text-left font-mono font-bold text-emerald-700">{fmt(row.rem)}</td>
+                                  <td className="px-3 py-2 text-left text-gray-600">{fmt(row.c)}</td>
+                                  <td className="px-3 py-2 text-left font-semibold text-blue-600">{fmt(row.m)}</td>
+                                  <td className="px-3 py-2 text-left font-bold text-emerald-700">{fmt(row.rem)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -827,8 +1070,19 @@ export default function CustomerBills() {
       {selectedSubId === '' && subscriptions.length > 0 && (
         <div className="flex flex-col items-center py-16 text-center">
           <Zap className="mb-3 h-10 w-10 text-gray-300" />
-          <p className="font-semibold text-gray-500">یک اشتراک را از بالا انتخاب کنید</p>
+          <p className="font-semibold text-gray-500">یک شناسه را از بالا انتخاب کنید</p>
         </div>
+      )}
+
+      {/* ── PDF Print Modal ── */}
+      {showPrint && result && (
+        <BillAnalysisPrintModal
+          open={showPrint}
+          onClose={() => setShowPrint(false)}
+          result={result}
+          recommendation={portfolio}
+          billIdentifier={selectedSub?.billIdentifier}
+        />
       )}
 
       {/* ── Order Confirmation Modal ── */}
@@ -853,11 +1107,11 @@ export default function CustomerBills() {
               <div className="grid grid-cols-3 divide-x divide-amber-100 text-center text-xs">
                 <div className="px-3 py-2.5" style={{ direction: 'rtl' }}>
                   <p className="text-gray-400">بدون قرارداد</p>
-                  <p className="mt-0.5 font-bold text-red-600">{(result.costWithoutMatin / 1e9).toFixed(2)} G ریال</p>
+                  <p className="mt-0.5 font-bold text-red-600">{smartRial(result.costWithoutMatin)}</p>
                 </div>
                 <div className="px-3 py-2.5" style={{ direction: 'rtl' }}>
                   <p className="text-gray-400">با قرارداد متین</p>
-                  <p className="mt-0.5 font-bold text-emerald-600">{(result.costWithMatin / 1e9).toFixed(2)} G ریال</p>
+                  <p className="mt-0.5 font-bold text-emerald-600">{smartRial(result.costWithMatin)}</p>
                 </div>
                 <div className="px-3 py-2.5 bg-amber-50/60" style={{ direction: 'rtl' }}>
                   <p className="text-gray-400">صرفه‌جویی</p>
@@ -866,30 +1120,49 @@ export default function CustomerBills() {
               </div>
             </div>
 
-            <div className="space-y-4 px-5 py-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">نوع انرژی درخواستی *</label>
-                <select
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-                  value={orderETypeId}
-                  onChange={e => setOrderEType(e.target.value ? Number(e.target.value) : '')}>
-                  <option value="">انتخاب کنید...</option>
-                  {energyTypes.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                </select>
-              </div>
+            <div className="space-y-3 px-5 py-4">
+              {(() => {
+                const totalKwh = (+orderRegKwh || 0) + (+orderGrnKwh || 0)
+                const regPct = totalKwh > 0 ? Math.round((+orderRegKwh / totalKwh) * 100) : 0
+                const grnPct = totalKwh > 0 ? 100 - regPct : 0
+                return (
+                  <>
+                    {/* برق عادی */}
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition-all ${orderIncReg ? 'border-violet-200 bg-violet-50' : 'border-gray-200 bg-gray-50 opacity-55'}`}>
+                      <input type="checkbox" className="h-4 w-4 shrink-0 accent-violet-600"
+                        checked={orderIncReg}
+                        onChange={e => setOrderIncReg(e.target.checked)} />
+                      <div className="flex flex-1 items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">برق عادی</p>
+                          <p className="text-xs text-gray-500">بورس + دوجانبه</p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-base font-bold text-violet-700">{(+orderRegKwh).toLocaleString('fa-IR')} kWh</p>
+                          <p className="text-xs font-semibold text-violet-400">{regPct}٪ از کل</p>
+                        </div>
+                      </div>
+                    </label>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  مقدار درخواستی (kWh) *
-                  <span className="mr-2 font-normal text-gray-400 text-xs">— از تحلیل: {result.totalKwh.toLocaleString('fa-IR')} kWh</span>
-                </label>
-                <input
-                  type="number" min="0"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-                  value={orderKwh}
-                  onChange={e => setOrderKwh(e.target.value)}
-                />
-              </div>
+                    {/* برق سبز */}
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition-all ${orderIncGrn ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50 opacity-55'}`}>
+                      <input type="checkbox" className="h-4 w-4 shrink-0 accent-emerald-600"
+                        checked={orderIncGrn}
+                        onChange={e => setOrderIncGrn(e.target.checked)} />
+                      <div className="flex flex-1 items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">برق سبز</p>
+                          <p className="text-xs text-gray-500">تجدیدپذیر</p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-base font-bold text-emerald-700">{(+orderGrnKwh).toLocaleString('fa-IR')} kWh</p>
+                          <p className="text-xs font-semibold text-emerald-400">{grnPct}٪ از کل</p>
+                        </div>
+                      </div>
+                    </label>
+                  </>
+                )
+              })()}
 
               <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50">
                 <input type="checkbox" className="h-4 w-4 rounded accent-emerald-600"

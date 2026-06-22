@@ -1,12 +1,24 @@
-/** Iranian 10-digit national code */
+/** Iranian 10-digit national code with checksum */
 export function validateNationalCode(code: string): boolean {
   if (!/^\d{10}$/.test(code)) return false
-  if (new Set(code).size === 1) return false // all identical digits (e.g. 1111111111)
+  if (new Set(code).size === 1) return false
   const d = code.split('').map(Number)
   const sum = d.slice(0, 9).reduce((acc, n, i) => acc + n * (10 - i), 0)
   const rem = sum % 11
   const check = rem < 2 ? rem : 11 - rem
   return d[9] === check
+}
+
+/** Iranian 11-digit company national ID (شناسه ملی شرکت) */
+export function validateNationalId(id: string): boolean {
+  if (!/^\d{11}$/.test(id)) return false
+  if (new Set(id).size === 1) return false
+  const d = id.split('').map(Number)
+  const w = [29, 27, 23, 19, 17, 29, 27, 23, 19, 17]
+  const sum = d.slice(0, 10).reduce((acc, n, i) => acc + n * w[i], 0)
+  const rem = sum % 11
+  const check = rem === 10 ? 0 : rem
+  return d[10] === check
 }
 
 /** Iranian mobile: exactly 11 digits, starts with 09 */

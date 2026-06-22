@@ -1,6 +1,7 @@
 import { BarChart2, RefreshCw, Download, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { uploadApi } from '../../../api/upload'
+import { DatePicker } from '../../../components/ui/Input'
 
 export const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 export const rial = (n: number) => fmt(n) + ' ریال'
@@ -78,17 +79,7 @@ export function FilterSelect({ label, value, onChange, children }: {
 export function FilterDate({ label, value, onChange }: {
   label: string; value: string; onChange: (v: string) => void
 }) {
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-gray-600">{label}</label>
-      <input
-        type="date"
-        className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      />
-    </div>
-  )
+  return <DatePicker label={label} value={value || null} onChange={v => onChange(v)} />
 }
 
 export function ApplyBtn({ loading, onApply }: { loading: boolean; onApply: () => void }) {

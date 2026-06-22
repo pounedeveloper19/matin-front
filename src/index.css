@@ -24,6 +24,10 @@
     box-sizing: border-box;
   }
 
+  code, kbd, pre, samp {
+    font-family: 'Vazirmatn', ui-monospace, monospace;
+  }
+
   body {
     background: var(--app-bg);
     min-height: 100vh;

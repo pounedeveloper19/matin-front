@@ -115,7 +115,7 @@ export default function CustomerContracts() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900">{c.contractNumber}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">انشعاب: {c.subscription}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">شناسه: {c.subscription}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

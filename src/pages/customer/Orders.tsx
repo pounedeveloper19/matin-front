@@ -65,6 +65,7 @@ export default function Orders() {
     methodId: '' as number | '',
     referenceNumber: '',
     receiptFileId: '' as string | '',
+    suggestedAmount: 0,
   })
 
   useEffect(() => {
@@ -104,8 +105,9 @@ export default function Orders() {
       .catch(() => toast.error('خطا در ارتباط با سرور'))
   }
 
-  const openPay = (orderId: number) => {
-    setPayForm({ orderId, amount: '', methodId: '', referenceNumber: '', receiptFileId: '' })
+  const openPay = (o: OrderResult) => {
+    const suggested = o.priceAtMoment > 0 ? Math.round(o.requestedKwh * o.priceAtMoment) : 0
+    setPayForm({ orderId: o.id, amount: suggested > 0 ? String(suggested) : '', methodId: '', referenceNumber: '', receiptFileId: '', suggestedAmount: suggested })
     setShowPay(true)
   }
 
@@ -283,7 +285,7 @@ export default function Orders() {
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                           <span className="font-semibold text-gray-700">{o.energyType}</span>
                           <span className="text-gray-300">·</span>
-                          <span className="font-mono font-bold text-gray-900">{fmt(o.requestedKwh)} kWh</span>
+                          <span className="font-bold text-gray-900">{fmt(o.requestedKwh)} kWh</span>
                           {o.priceAtMoment > 0 && (
                             <>
                               <span className="text-gray-300">·</span>
@@ -309,7 +311,7 @@ export default function Orders() {
                           جزئیات
                         </button>
                         {payable && (
-                          <button onClick={() => openPay(o.id)}
+                          <button onClick={() => openPay(o)}
                             className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
                             <Receipt className="h-3 w-3" />
                             ثبت فیش
@@ -358,7 +360,7 @@ export default function Orders() {
             </div>
             <div className="space-y-4 p-5">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">اشتراک *</label>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">شناسه *</label>
                 <select className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   value={createForm.subscriptionId}
                   onChange={e => setCreateForm(p => ({ ...p, subscriptionId: e.target.value ? Number(e.target.value) : '' }))}>
@@ -436,6 +438,9 @@ export default function Orders() {
                   placeholder="مبلغ را به ریال وارد کنید"
                   value={payForm.amount}
                   onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))} />
+                {payForm.suggestedAmount > 0 && (
+                  <p className="mt-1 text-xs text-gray-400">مبلغ پیش‌فرض: {rial(payForm.suggestedAmount)}</p>
+                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">شماره مرجع / کد رهگیری</label>
@@ -484,7 +489,7 @@ export default function Orders() {
               {/* Order fields */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'اشتراک',         value: detail.billIdentifier,  mono: true },
+                  { label: 'شناسه',           value: detail.billIdentifier,  mono: true },
                   { label: 'نوع انرژی',      value: detail.energyType },
                   { label: 'مقدار درخواستی', value: `${fmt(detail.requestedKwh)} kWh`, mono: true },
                   { label: 'قیمت اعلامی',    value: detail.priceAtMoment > 0 ? rial(detail.priceAtMoment) : 'در انتظار اعلام', mono: detail.priceAtMoment > 0 },
@@ -557,7 +562,7 @@ export default function Orders() {
               {/* Pay button */}
               {canPay(detail) && (
                 <button
-                  onClick={() => { setShowDetail(false); openPay(detail.id) }}
+                  onClick={() => { setShowDetail(false); openPay(detail) }}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700">
                   <Receipt className="h-4 w-4" />
                   ثبت فیش پرداخت

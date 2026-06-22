@@ -40,7 +40,7 @@ export default function AdminReportPayments() {
   const doExport = () => {
     if (!data) return
     exportCSV(
-      ['#', 'ش.سفارش', 'مشتری', 'اشتراک', 'مبلغ ریال', 'روش', 'وضعیت', 'شماره مرجع', 'تاریخ'],
+      ['#', 'ش.سفارش', 'مشتری', 'شناسه', 'مبلغ ریال', 'روش', 'وضعیت', 'شماره مرجع', 'تاریخ'],
       data.items.map((p, i) => [i + 1, p.orderId, p.customerName, p.billIdentifier, p.amount, p.method, p.status, p.referenceNumber, p.createdAt]),
       'payments-report.csv',
     )
@@ -81,7 +81,7 @@ export default function AdminReportPayments() {
 
               {/* Table */}
               <TableWrap>
-                <THead cols={['#', 'ش.سفارش', 'مشتری', 'اشتراک', 'مبلغ ریال', 'روش پرداخت', 'وضعیت', 'شماره مرجع', 'تاریخ', 'فیش']} />
+                <THead cols={['#', 'ش.سفارش', 'مشتری', 'شناسه', 'مبلغ ریال', 'روش پرداخت', 'وضعیت', 'شماره مرجع', 'تاریخ', 'فیش']} />
                 <tbody className="divide-y divide-gray-50">
                   {data.items.length === 0
                     ? <EmptyRow cols={10} />

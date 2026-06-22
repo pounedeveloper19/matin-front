@@ -239,7 +239,7 @@ export default function AdminBillReports() {
 
   const handleAnalyze = async () => {
     if (!form.subscriptionId || !form.peakKwh || !form.midKwh || !form.lowKwh) {
-      toast.error('شناسه اشتراک و مصارف را وارد کنید')
+      toast.error('شناسه و مصارف را وارد کنید')
       return
     }
     setSaving(true)
@@ -355,7 +355,7 @@ export default function AdminBillReports() {
       <div className="flex flex-wrap gap-3">
         <div className="w-56">
           <Select
-            placeholder="همه اشتراک‌ها"
+            placeholder="همه شناسه‌ها"
             value={filterSubId}
             loading={subsLoading}
             options={subscriptions.map(s => ({ value: s.id, label: `${s.billIdentifier} — ${s.address}` }))}
@@ -392,7 +392,7 @@ export default function AdminBillReports() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Select
-              label="اشتراک *"
+              label="شناسه *"
               value={form.subscriptionId}
               loading={subsLoading}
               options={subscriptions.map(s => ({ value: s.id, label: `${s.billIdentifier} — ${s.address}` }))}
@@ -415,8 +415,8 @@ export default function AdminBillReports() {
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">مصرف TOU (kWh)</p>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Input label="اوج بار *"      value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
               <Input label="میان بار *"     value={form.midKwh}        onChange={set('midKwh')}        placeholder="kWh" inputMode="numeric" />
+              <Input label="اوج بار *"      value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
               <Input label="کم بار *"       value={form.lowKwh}        onChange={set('lowKwh')}        placeholder="kWh" inputMode="numeric" />
               <Input label="اوج جمعه"       value={form.fridayPeakKwh} onChange={set('fridayPeakKwh')} placeholder="kWh" inputMode="numeric" />
             </div>
@@ -438,7 +438,7 @@ export default function AdminBillReports() {
       <Modal
         open={detailModal}
         onClose={() => setDetailModal(false)}
-        title={`جزئیات تحلیل — اشتراک ${selected?.subscriptionId ?? ''}`}
+        title={`جزئیات تحلیل — شناسه ${selected?.subscriptionId ?? ''}`}
         size="lg"
       >
         {analysisResult ? (
@@ -459,7 +459,7 @@ export default function AdminBillReports() {
       {/* ===== مودال حذف ===== */}
       <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="حذف گزارش" size="sm">
         <p className="text-sm text-gray-600">
-          آیا از حذف گزارش تحلیل اشتراک <span className="font-bold text-gray-900">{selected?.billIdentifier}</span> برای{' '}
+          آیا از حذف گزارش تحلیل شناسه <span className="font-bold text-gray-900">{selected?.billIdentifier}</span> برای{' '}
           <span className="font-bold text-gray-900">{selected?.month ? MONTHS[selected.month] : ''} {selected?.year}</span> اطمینان دارید؟
         </p>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">

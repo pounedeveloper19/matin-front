@@ -27,16 +27,42 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
 
   const minKw     = points[0].contractCapacityKw
   const maxKw     = points[points.length - 1].contractCapacityKw
+  // maxSaving based on real data only (used for color normalization)
   const maxSaving = Math.max(...points.map(p => p.savingRial), 1)
 
-  const kwToPct = (kw: number) =>
-    maxKw === minKw ? 50 : ((kw - minKw) / (maxKw - minKw)) * 100
+  // Extend display range 30% beyond the optimal point to show "over-purchase" zone
+  const displayMaxKw = Math.max(maxKw, optKw * 1.30)
 
-  const optPct  = kwToPct(optKw)
-  const curPct  = kwToPct(curKw)
-  const hovered = hoverIdx !== null ? points[hoverIdx] : null
-  const hovPct  = hovered ? kwToPct(hovered.contractCapacityKw) : null
-  const selected    = selectedIdx !== null ? points[selectedIdx] : null
+  // Build synthetic extrapolated points for the extended zone beyond real data
+  const realCount = points.length
+  const syntheticPoints: typeof points = []
+  if (displayMaxKw > maxKw + 0.01 && points.length >= 2) {
+    const lastPt  = points[points.length - 1]
+    const prevPt  = points[points.length - 2]
+    const rawSlope = (lastPt.savingRial - prevPt.savingRial) /
+                     (lastPt.contractCapacityKw - prevPt.contractCapacityKw)
+    // If curve is still ascending at the edge (peak is at the boundary), mirror
+    // the slope so the extension shows the natural declining zone past optimal
+    const slope = rawSlope > 0 ? -rawSlope : rawSlope
+    const N = 20
+    for (let i = 1; i <= N; i++) {
+      const kw     = maxKw + (displayMaxKw - maxKw) * (i / N)
+      const saving = lastPt.savingRial + slope * (kw - maxKw)
+      syntheticPoints.push({ contractCapacityKw: kw, savingRial: saving, contractedEnergyKwh: 0, withMatinBillRial: 0 })
+    }
+  }
+  const allPoints   = [...points, ...syntheticPoints]
+  const isSynth     = (i: number) => i >= realCount
+
+  const kwToPct = (kw: number) =>
+    displayMaxKw === minKw ? 50 : ((kw - minKw) / (displayMaxKw - minKw)) * 100
+
+  const optPct      = kwToPct(optKw)
+  const curPct      = kwToPct(curKw)
+  const boundaryPct = kwToPct(maxKw)
+  const hovered     = hoverIdx !== null ? allPoints[hoverIdx] : null
+  const hovPct      = hovered ? kwToPct(hovered.contractCapacityKw) : null
+  const selected    = selectedIdx !== null ? allPoints[selectedIdx] : null
   const selectedPct = selected ? kwToPct(selected.contractCapacityKw) : null
 
   const segColor = (s: number) => {
@@ -52,11 +78,11 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
     const rect = trackRef.current?.getBoundingClientRect()
     if (!rect) return
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    setHoverIdx(Math.round(pct * (points.length - 1)))
+    setHoverIdx(Math.round(pct * (allPoints.length - 1)))
   }
 
   const improve     = data.optimalSavingRial - data.savingAtCurrentContractRial
-  const stepSize    = points.length > 1 ? (maxKw - minKw) / (points.length - 1) : 1
+  const stepSize    = allPoints.length > 1 ? (displayMaxKw - minKw) / (allPoints.length - 1) : 1
   const isAtOptimal = Math.abs((hovered?.contractCapacityKw ?? -99) - optKw) < stepSize * 0.6
 
   return (
@@ -67,73 +93,110 @@ function OptimalPurchaseLineChart({ data }: { data: OptimalPurchaseCurveResult }
       </div>
 
       <div ref={trackRef} className="relative cursor-pointer" style={{ height: 64 }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIdx(null)}
-        onClick={() => { if (hoverIdx !== null) setSelectedIdx(hoverIdx) }}>
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+          onClick={() => { if (hoverIdx !== null && !isSynth(hoverIdx)) setSelectedIdx(hoverIdx) }}>
 
-        <div className="absolute inset-x-0 flex overflow-hidden"
-          style={{ top: '50%', transform: 'translateY(-50%)', height: 22, borderRadius: 11 }}>
-          {points.map((pt, i) => (
-            <div key={i} style={{
-              flex: 1, background: segColor(pt.savingRial),
-              opacity: hoverIdx === i ? 1 : 0.82, transition: 'opacity 0.08s',
-            }} />
-          ))}
+          <div className="absolute inset-x-0 flex overflow-hidden"
+            style={{ top: '50%', transform: 'translateY(-50%)', height: 22, borderRadius: 11 }}>
+            {allPoints.map((pt, i) => (
+              <div key={i} style={{
+                flex: 1, background: segColor(pt.savingRial),
+                opacity: isSynth(i) ? 0.55 : (hoverIdx === i ? 1 : 0.82),
+                transition: 'opacity 0.08s',
+              }} />
+            ))}
+          </div>
+
+          {syntheticPoints.length > 0 && (
+            <div className="pointer-events-none absolute"
+              style={{
+                left: `${boundaryPct}%`,
+                top: '50%', transform: 'translate(-50%, -50%)',
+                height: 28, width: 2,
+                background: 'rgba(255,255,255,0.75)',
+                zIndex: 11, borderRadius: 1,
+              }}
+            />
+          )}
+
+          <div className="absolute" style={{ left: `${optPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 20 }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-lg">
+              <span className="text-base leading-none text-white">★</span>
+            </div>
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700 shadow-sm">
+              بهینه {optKw.toFixed(0)} kW
+            </div>
+          </div>
+
+          {Math.abs(curPct - optPct) > 4 && (
+            <div className="absolute" style={{ left: `${curPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 15 }}>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-blue-500 shadow">
+                <div className="h-2.5 w-2.5 rounded-full bg-white" />
+              </div>
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-blue-500">فعلی</div>
+            </div>
+          )}
+
+          {hovPct !== null && (
+            <div className="pointer-events-none absolute inset-y-0 w-px bg-gray-700/40" style={{ left: `${hovPct}%` }} />
+          )}
+          {hovPct !== null && hovered && (
+            <div className="pointer-events-none absolute -translate-x-1/2"
+              style={{ top: 3, left: `${hovPct}%`, zIndex: 25 }}>
+              <div className="whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-bold text-white shadow-lg"
+                style={{ background: hovered.savingRial >= 0 ? '#065f46' : '#991b1b' }}>
+                {hovered.contractCapacityKw.toFixed(0)} kW
+              </div>
+            </div>
+          )}
+
+          {selectedPct !== null && (
+            <div className="pointer-events-none absolute"
+              style={{ left: `${selectedPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 30 }}>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-violet-600 shadow-lg ring-2 ring-violet-300">
+                <span className="text-xs font-bold text-white">✓</span>
+              </div>
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-violet-500">انتخاب</div>
+            </div>
+          )}
         </div>
 
-        <div className="absolute" style={{ left: `${optPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 20 }}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-lg">
-            <span className="text-base leading-none text-white">★</span>
-          </div>
-          <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700 shadow-sm">
-            بهینه {optKw.toFixed(0)} kW
-          </div>
-        </div>
-
-        {Math.abs(curPct - optPct) > 4 && (
-          <div className="absolute" style={{ left: `${curPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 15 }}>
-            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-blue-500 shadow">
-              <div className="h-2.5 w-2.5 rounded-full bg-white" />
-            </div>
-            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-blue-500">فعلی</div>
-          </div>
+      {/* X-axis labels */}
+      <div className="relative h-4 text-[10px] text-gray-300">
+        <span className="absolute left-0">{minKw.toFixed(0)} kW</span>
+        {syntheticPoints.length > 0 && (
+          <span className="absolute -translate-x-1/2 text-gray-400" style={{ left: `${boundaryPct}%` }}>
+            {maxKw.toFixed(0)}
+          </span>
         )}
-
-        {hovPct !== null && (
-          <div className="pointer-events-none absolute inset-y-0 w-px bg-gray-700/40" style={{ left: `${hovPct}%` }} />
-        )}
-
-        {selectedPct !== null && (
-          <div className="pointer-events-none absolute"
-            style={{ left: `${selectedPct}%`, top: '50%', transform: 'translate(-50%,-50%)', zIndex: 30 }}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-violet-600 shadow-lg ring-2 ring-violet-300">
-              <span className="text-xs font-bold text-white">✓</span>
-            </div>
-            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-violet-500">انتخاب</div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between text-[10px] text-gray-300">
-        <span>{minKw.toFixed(0)} kW</span>
-        <span>{maxKw.toFixed(0)} kW</span>
+        <span className="absolute right-0">{displayMaxKw.toFixed(0)} kW</span>
       </div>
 
       <div className="min-h-[72px] rounded-xl px-4 py-3 transition-all"
         style={{ background: 'rgba(248,250,252,0.95)', border: '1px solid rgba(209,250,229,0.5)' }}>
         {hovered ? (
           <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
+            {hoverIdx !== null && isSynth(hoverIdx) && (
+              <div className="w-full text-[9px] font-medium text-amber-500">⚠ تخمین — خارج از محدوده داده واقعی</div>
+            )}
             <div>
               <p className="text-gray-400">ظرفیت انتخابی</p>
               <p className="text-sm font-bold text-gray-900">{hovered.contractCapacityKw.toFixed(1)} kW</p>
-              <p className="text-[10px] text-gray-400">{hovered.contractedEnergyKwh.toFixed(0)} kWh/ماه</p>
+              {hovered.contractedEnergyKwh > 0 && (
+                <p className="text-[10px] text-gray-400">{hovered.contractedEnergyKwh.toFixed(0)} kWh/ماه</p>
+              )}
             </div>
+            {hoverIdx !== null && !isSynth(hoverIdx) && hovered.withMatinBillRial > 0 && (
+              <div>
+                <p className="text-gray-400">هزینه با متین</p>
+                <p className="font-bold text-blue-700">{hovered.withMatinBillRial.toLocaleString('fa-IR')} ریال</p>
+              </div>
+            )}
             <div>
-              <p className="text-gray-400">هزینه با متین</p>
-              <p className="font-bold text-blue-700">{hovered.withMatinBillRial.toLocaleString('fa-IR')} ریال</p>
-            </div>
-            <div>
-              <p className={hovered.savingRial >= 0 ? 'text-emerald-500' : 'text-red-400'}>صرفه‌جویی</p>
+              <p className={hovered.savingRial >= 0 ? 'text-emerald-500' : 'text-red-400'}>
+                {hoverIdx !== null && isSynth(hoverIdx) ? 'صرفه‌جویی (تخمینی)' : 'صرفه‌جویی'}
+              </p>
               <p className={`text-sm font-bold ${hovered.savingRial >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                 {hovered.savingRial >= 0 ? '+' : ''}{hovered.savingRial.toLocaleString('fa-IR')} ریال
               </p>
@@ -230,7 +293,7 @@ export default function BillOptimal() {
       setForm(p => ({ ...p, [k]: e.target.value }))
 
   const handleSubmit = async () => {
-    if (!selectedSubId) { toast.error('ابتدا اشتراک را انتخاب کنید'); return }
+    if (!selectedSubId) { toast.error('ابتدا شناسه را انتخاب کنید'); return }
     if (!form.peakKwh || !form.midKwh || !form.lowKwh) { toast.error('مصارف TOU را وارد کنید'); return }
 
     setLoading(true); setCurveData(null)
@@ -253,20 +316,20 @@ export default function BillOptimal() {
 
   return (
     <div className="space-y-6">
-      {/* انتخاب اشتراک */}
+      {/* انتخاب شناسه */}
       <div className="glass-card overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 px-5 py-4"
           style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
             <Zap className="h-4 w-4" />
           </div>
-          <h3 className="font-semibold text-gray-900">انتخاب اشتراک</h3>
+          <h3 className="font-semibold text-gray-900">انتخاب شناسه</h3>
         </div>
         <div className="p-5">
           {subscriptions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-emerald-200 py-8 text-center">
               <Zap className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500">اشتراکی یافت نشد</p>
+              <p className="text-sm text-gray-500">شناسه‌ای یافت نشد</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -332,8 +395,8 @@ export default function BillOptimal() {
               <div>
                 <p className="mb-2 text-xs font-semibold text-gray-600">مصرف به تفکیک TOU (kWh)</p>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Input label="اوج بار *"  value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
                   <Input label="میان بار *" value={form.midKwh}        onChange={set('midKwh')}        placeholder="kWh" inputMode="numeric" />
+                  <Input label="اوج بار *"  value={form.peakKwh}       onChange={set('peakKwh')}       placeholder="kWh" inputMode="numeric" />
                   <Input label="کم بار *"   value={form.lowKwh}        onChange={set('lowKwh')}        placeholder="kWh" inputMode="numeric" />
                   <Input label="اوج جمعه"   value={form.fridayPeakKwh} onChange={set('fridayPeakKwh')} placeholder="kWh" inputMode="numeric" />
                 </div>

@@ -321,6 +321,15 @@ export interface TariffCodeOption {
   creditMultiplier: number
 }
 
+export interface TariffCodeOptionRate {
+  id: number
+  tariffCodeOptionId: number
+  year: number
+  rateRialPerKwh: number       // نرخ میان‌بار (و مبنای ماده ۱۶)
+  ratePeakRialPerKwh: number   // نرخ اوج‌بار
+  rateLowRialPerKwh: number    // نرخ کم‌بار
+}
+
 export interface AdvancedBillAnalysisResult {
   monthName: string
   year: number
@@ -585,6 +594,68 @@ export interface OptimalPurchaseCurveResult {
   points: OptimalPurchaseCurvePoint[]
 }
 
+// Energy Optimization (Phase 3A — Greedy Recommendation)
+export interface OptimizationReason {
+  energyType: string   // "exchange" | "green" | "bilateral" | "grid"
+  message: string
+  isActive: boolean
+  effectiveCost: number | null
+  alternativeCost: number | null
+}
+
+export interface OptimizationResult {
+  gridKwh: number
+  exchangeKwh: number
+  greenKwh: number
+  bilateralKwh: number
+  estimatedSavingAmount: number
+  estimatedSavingPercent: number
+  reasoning: OptimizationReason[]
+  constraints: string[]
+}
+
+// Portfolio Optimization (Phase 3B — Constrained LP)
+export interface ChannelDecision {
+  channel: string        // "exchange" | "green" | "bilateral" | "grid"
+  channelName: string    // فارسی
+  isActive: boolean
+  kwhAllocated: number
+  costRial: number
+  message: string
+  channelRate: number | null
+  gridSavingRate: number | null
+}
+
+export interface OptimalMix {
+  exchangeKwh: number
+  greenKwh: number
+  bilateralKwh: number
+  gridKwh: number
+  exchangeCost: number
+  greenCost: number
+  bilateralCost: number
+  gridCost: number
+  totalMarketKwh: number
+}
+
+export interface PortfolioOptimizationResult {
+  optimalMix: OptimalMix
+  totalCost: number
+  baselineCost: number
+  saving: number
+  savingPercent: number
+  residualGridCost: number
+  exchangeBill: number
+  greenBill: number
+  bilateralBill: number
+  article16After: number
+  article16Saved: number
+  weightedGridTariff: number
+  article16Benefit: number
+  constraintHits: string[]
+  reasoning: ChannelDecision[]
+}
+
 // Orders & Payments
 export interface OrderResult {
   id: number
@@ -745,5 +816,55 @@ export interface AdminBillReport {
   costWithoutMatin: number | null
   costWithMatin: number | null
   netSaving: number | null
+  createdAt: string | null
+}
+
+// Dashboard
+export interface DashboardSummary {
+  totalContracts: number
+  activeContracts: number
+  totalCustomers: number
+  pendingOrders: number
+  pendingRegistrations: number
+  billReports: number
+}
+
+export interface ContractByStatus {
+  statusId: number
+  title: string | null
+  count: number
+}
+
+export interface MonthCount {
+  year: number
+  month: number
+  count: number
+}
+
+export interface CustomerGrowthRow {
+  year: number
+  month: number
+  legal: number
+  real: number
+}
+
+export interface DashboardMarketRate {
+  year: number
+  month: number
+  marketAvg: number | null
+  marketPeak: number | null
+  marketMid: number | null
+  marketLow: number | null
+  greenBoardRate: number | null
+  openBoardRate: number | null
+}
+
+export interface ActivityRow {
+  auditId: number
+  tableName: string | null
+  recordId: number | null
+  auditType: string
+  newValue: string | null
+  userName: string | null
   createdAt: string | null
 }

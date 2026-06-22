@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Printer, X, FileText, Calendar, Zap, Shield, MapPin, Hash } from 'lucide-react'
+import { Printer, X, FileText, Calendar, Zap, Shield, MapPin, Hash, Download } from 'lucide-react'
 
 export interface PrintableContract {
   contractNumber?: string | null
@@ -18,25 +18,43 @@ export interface PrintableContract {
   status?: string | null
   warrantyAmount?: number | null
   warrantyType?: string | null
+  warrantyFileId?: string | null
   contractPowerKw?: number | null
   contractVolumeKwh?: number | null
   contractAmountRial?: number | null
+  paymentDeadline?: string | null
 }
 
 interface Props {
   open: boolean
   data: PrintableContract | null
   onClose: () => void
+  onWarrantyDownload?: () => void
 }
 
 const _ = (v?: string | null) => v || '.....................'
 const _n = (v?: number | null) => (v != null ? v.toLocaleString('fa-IR') : '.....................')
 
-export default function ContractPrintModal({ open, data, onClose }: Props) {
+export default function ContractPrintModal({ open, data, onClose, onWarrantyDownload }: Props) {
   if (!open || !data) return null
 
   const powerKw = data.contractPowerKw
   const powerMw = powerKw ? (powerKw / 1000).toFixed(3) : null
+
+  const handlePrint = () => {
+    const prev = document.title
+    document.title = data.contractNumber ?? 'قرارداد'
+    window.print()
+    setTimeout(() => { document.title = prev }, 1500)
+  }
+
+  const warrantyLabel = (() => {
+    const t = data.warrantyType
+    if (!t) return '.....................'
+    if (t.includes('چک')) return 'یک فقره چک'
+    if (t.includes('سفته')) return 'سفته'
+    return t
+  })()
 
   return (
     <>
@@ -123,7 +141,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
                   <div className="flex items-start gap-2.5">
                     <Hash className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/60" />
                     <div>
-                      <p className="text-[10px] text-emerald-300/50">شناسه انشعاب</p>
+                      <p className="text-[10px] text-emerald-300/50">شناسه</p>
                       <p className="mt-0.5 text-sm font-medium text-white">{data.subscription}</p>
                     </div>
                   </div>
@@ -146,6 +164,15 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
                     </div>
                   </div>
                 )}
+                {data.contractVolumeKwh != null && (
+                  <div className="flex items-start gap-2.5">
+                    <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/60" />
+                    <div>
+                      <p className="text-[10px] text-emerald-300/50">حجم قرارداد</p>
+                      <p className="mt-0.5 text-sm font-medium text-white">{data.contractVolumeKwh.toLocaleString('fa-IR')} kWh</p>
+                    </div>
+                  </div>
+                )}
                 {data.contractAmountRial != null && (
                   <div className="flex items-start gap-2.5">
                     <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/60" />
@@ -155,19 +182,38 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
                     </div>
                   </div>
                 )}
+                {data.paymentDeadline && (
+                  <div className="flex items-start gap-2.5">
+                    <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/60" />
+                    <div>
+                      <p className="text-[10px] text-emerald-300/50">مهلت پرداخت</p>
+                      <p className="mt-0.5 text-sm font-medium text-white">{data.paymentDeadline}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            {(data.warrantyAmount || data.warrantyType) && (
+            {(data.warrantyAmount || data.warrantyType || data.warrantyFileId) && (
               <div className="border-t p-5" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                 <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">ضمانت‌نامه</p>
-                <div className="flex items-center gap-4">
+                <div className="flex items-start gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'rgba(52,211,153,0.15)' }}>
                     <Shield className="h-5 w-5 text-emerald-300" />
                   </div>
-                  <div className="grid flex-1 grid-cols-2 gap-x-6">
-                    {data.warrantyType && <div><p className="text-[10px] text-emerald-300/50">نوع ضمانت</p><p className="mt-0.5 text-sm font-medium text-white">{data.warrantyType}</p></div>}
-                    {data.warrantyAmount ? <div><p className="text-[10px] text-emerald-300/50">مبلغ</p><p className="mt-0.5 text-sm font-medium text-white">{data.warrantyAmount.toLocaleString('fa-IR')} <span className="text-[10px] text-emerald-300">ریال</span></p></div> : null}
+                  <div className="flex-1">
+                    <div className="grid grid-cols-2 gap-x-6">
+                      {data.warrantyType && <div><p className="text-[10px] text-emerald-300/50">نوع ضمانت</p><p className="mt-0.5 text-sm font-medium text-white">{data.warrantyType}</p></div>}
+                      {data.warrantyAmount ? <div><p className="text-[10px] text-emerald-300/50">مبلغ</p><p className="mt-0.5 text-sm font-medium text-white">{data.warrantyAmount.toLocaleString('fa-IR')} <span className="text-[10px] text-emerald-300">ریال</span></p></div> : null}
+                    </div>
+                    {data.warrantyFileId && onWarrantyDownload && (
+                      <button onClick={onWarrantyDownload}
+                        className="no-print mt-3 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95"
+                        style={{ background: 'rgba(52,211,153,0.2)', border: '1px solid rgba(52,211,153,0.3)' }}>
+                        <Download className="h-4 w-4 text-emerald-300" />
+                        دانلود فایل ضمانت‌نامه
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -180,7 +226,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
               style={{ border: '1px solid rgba(255,255,255,0.18)' }}>
               بستن
             </button>
-            <button onClick={() => window.print()}
+            <button onClick={handlePrint}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95"
               style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.25)' }}>
               <Printer className="h-4 w-4" /> چاپ قرارداد
@@ -224,7 +270,9 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
           <Art title="ماده ۱ – موضوع قرارداد">
             <Row n="۱">
               تأمین برق مصرفی خریدار به ظرفیت <b>{_n(powerKw)}</b> کیلووات
-              {powerMw && <> (<b>{powerMw}</b> مگاوات)</>} بار پایه توسط فروشنده طبق شرایط مندرج در قرارداد، به استناد
+              {powerMw && <> (<b>{powerMw}</b> مگاوات)</>}
+              {data.contractVolumeKwh != null && <> و حجم <b>{_n(data.contractVolumeKwh)}</b> کیلووات‌ساعت ماهانه</>}{' '}
+              بار پایه توسط فروشنده طبق شرایط مندرج در قرارداد، به استناد
               پرونده شماره .................... خریدار نزد شرکت توزیع برق استان تهران.
             </Row>
             <Row n="۲">تأمین برق تجدیدپذیر مورد نیاز خریدار مطابق با «آیین‌نامه اجرایی ماده ۱۶ قانون جهش تولید دانش بنیان».</Row>
@@ -262,7 +310,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
 
           <Art title="ماده ۴ – تضامین">
             <p style={{ margin: '4px 0', textAlign: 'justify' }}>
-              خریدار نسبت به ارائه یک فقره چک مورد درخواست فروشنده معادل ۲۰ درصد مبلغ اولیه به میزان
+              خریدار نسبت به ارائه <b>{warrantyLabel}</b> مورد درخواست فروشنده معادل ۲۰ درصد مبلغ اولیه به میزان
               <b> {_n(data.warrantyAmount)}</b> ریال به عنوان تضمین پرداخت صورتحساب اقدام خواهد نمود. فروشنده پس از پایان
               مدت قرارداد و تسویه کامل بدهی، متعهد به استرداد تضامین براساس درخواست کتبی خریدار خواهد بود.
             </p>
@@ -281,7 +329,10 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
           <Art title="ماده ۶ – تعهدات و مسئولیت خریدار">
             <Row n="۱">خریدار متعهد می‌گردد میزان انرژی درخواستی ماهیانه را حداکثر تا ۲۸ هر ماه به صورت مکتوب به فروشنده اعلام نماید.</Row>
             <Row n="۲">خریدار متعهد می‌گردد انرژی درخواستی تجدیدپذیر را ۱۰ روز پیش از اتمام ماه اعلام نماید تا خرید از بورس انرژی میسر باشد.</Row>
-            <Row n="۳">خریدار موظف به پرداخت صورتحساب‌های ماهانه ظرف مدت ۳۰ روز از اتمام دوره مصرف می‌باشد.</Row>
+            <Row n="۳">
+              خریدار موظف به پرداخت صورتحساب‌های ماهانه ظرف مدت ۳۰ روز از اتمام دوره مصرف
+              {data.paymentDeadline && <> (مهلت پرداخت: <b>{data.paymentDeadline}</b>)</>} می‌باشد.
+            </Row>
             <Row n="۴">خریدار کماکان مشترک مالک شبکه خواهد بود و درخواست‌های سیم‌داری، انشعاب و نوع انشعاب را از مالک شبکه درخواست خواهد نمود.</Row>
             <Row n="۵">پرداخت بهای ترانزیت مندرج در قبوض مالک شبکه بر عهده خریدار می‌باشد.</Row>
             <Row n="۶">خریدار موظف به پرداخت مبالغ قبوض مالک شبکه (غیر از بهای برق تأمین‌شده توسط فروشنده) به مالک شبکه می‌باشد.</Row>
@@ -325,7 +376,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
           </p>
 
           {/* Signatures */}
-          <div style={{ display: 'flex', gap: '24px', marginTop: '36px' }}>
+          <div style={{ display: 'flex', gap: '24px', marginTop: '36px', pageBreakInside: 'avoid' }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <p style={{ fontWeight: 800, fontSize: '13px', margin: '0 0 3px' }}>فروشنده</p>
               <p style={{ fontWeight: 700, margin: '0 0 3px' }}>شرکت توسعه انرژی متین</p>

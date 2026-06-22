@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Plus, Pencil, Trash2, FileText, Download, Printer, CheckCircle, Clock, XCircle, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, Download, Printer, CheckCircle, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
-import { uploadApi, type FileInfo } from '../../api/upload'
+import { uploadApi } from '../../api/upload'
 import { lookupApi } from '../../api/lookup'
 import type { SubOption, IdTitle } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
@@ -43,13 +43,11 @@ export default function AdminContracts() {
   const [subsLoading, setSubsLoading] = useState(true)
   const [guaranteeTypes, setGuaranteeTypes] = useState<IdTitle[]>([])
   const [guaranteeLoading, setGuaranteeLoading] = useState(true)
+  const [contractStatuses, setContractStatuses] = useState<IdTitle[]>([])
+  const [statusLoading, setStatusLoading] = useState(true)
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [printData, setPrintData] = useState<PrintableContract | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'expired'>('all')
-  const [previewFileId, setPreviewFileId] = useState<string | null>(null)
-  const [previewInfo, setPreviewInfo] = useState<FileInfo | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [downloading, setDownloading] = useState(false)
   const pageSize = 10
 
   const customerOptions = useMemo(() =>
@@ -67,6 +65,9 @@ export default function AdminContracts() {
     lookupApi.getGuaranteeTypes()
       .then(r => { if (r.code === 200) setGuaranteeTypes(toArr(r.result) as IdTitle[]) })
       .finally(() => setGuaranteeLoading(false))
+    lookupApi.getContractStatuses()
+      .then(r => { if (r.code === 200) setContractStatuses(toArr(r.result) as IdTitle[]) })
+      .finally(() => setStatusLoading(false))
   }, [])
 
   const fetchData = useCallback((p: number) => {
@@ -113,6 +114,7 @@ export default function AdminContracts() {
   }
 
   const handleDelete = async () => {
+    if (isFinalized(form.status)) { toast.error('قرارداد قطعی‌شده قابل حذف نیست'); return }
     setSaving(true)
     try {
       const res = await adminApi.deleteContract(form.id)
@@ -123,31 +125,11 @@ export default function AdminContracts() {
     finally { setSaving(false) }
   }
 
-  const openFilePreview = async (fileId: string) => {
-    setPreviewFileId(fileId)
-    setPreviewInfo(null)
-    setPreviewLoading(true)
+  const handleWarrantyDownload = async () => {
+    if (!printData?.warrantyFileId) return
     try {
-      const res = await uploadApi.info(fileId)
-      if (res.code === 200 && res.result) setPreviewInfo(res.result)
-    } catch { /* show modal anyway */ }
-    finally { setPreviewLoading(false) }
-  }
-
-  const handlePreviewDownload = async () => {
-    if (!previewFileId) return
-    setDownloading(true)
-    try {
-      await uploadApi.download(previewFileId, previewInfo?.originalName)
-      setPreviewFileId(null)
-    } catch { toast.error('خطا در دانلود فایل') }
-    finally { setDownloading(false) }
-  }
-
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+      await uploadApi.download(printData.warrantyFileId, 'ضمانت‌نامه')
+    } catch { toast.error('خطا در دانلود فایل ضمانت‌نامه') }
   }
 
   const activeCount  = data.filter(c => c.status?.includes('فعال') || c.status?.includes('تایید')).length
@@ -173,6 +155,9 @@ export default function AdminContracts() {
     a.href = url; a.download = `قراردادها.csv`; a.click()
     URL.revokeObjectURL(url)
   }
+
+  const isFinalized = (status?: string | null) =>
+    !!(status?.includes('فعال') || status?.includes('تایید'))
 
   const filterTabs = [
     { key: 'all' as const,     label: 'همه',         count: data.length },
@@ -266,9 +251,11 @@ export default function AdminContracts() {
                     contractPowerKw: d.contractPowerKw,
                     contractVolumeKwh: d.contractVolumeKwh,
                     contractAmountRial: d.contractAmountRial,
+                    paymentDeadline: d.paymentDeadline ?? row.paymentDeadline ?? null,
                     status: d.status,
                     warrantyAmount: d.warrantyAmount,
                     warrantyType: d.warrantyType,
+                    warrantyFileId: d.warrantyFileId ?? row.warrantyFileId ?? null,
                   })
                 } else {
                   toast.error('خطا در دریافت اطلاعات قرارداد')
@@ -279,21 +266,14 @@ export default function AdminContracts() {
           >
             <Printer className="h-3.5 w-3.5" />
           </button>
-          {row.warrantyFileId && (
-            <button
-              onClick={() => openFilePreview(row.warrantyFileId!)}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-              title="مشاهده و دانلود فایل"
-            >
-              <Eye className="h-3.5 w-3.5" />
-            </button>
-          )}
           <button onClick={() => openEdit(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {!isFinalized(row.status) && (
+            <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -350,6 +330,11 @@ export default function AdminContracts() {
           {modal === 'edit' && (
             <Input label="شماره قرارداد" value={form.contractNumber} disabled onChange={() => {}} />
           )}
+          {modal === 'edit' && (
+            <Select label="وضعیت قرارداد" value={form.statusId ?? ''} loading={statusLoading}
+              options={contractStatuses.map(s => ({ value: s.id, label: s.title }))}
+              onChange={(v) => setForm({ ...form, statusId: +v })} />
+          )}
           <Input label="نرخ قرارداد (ریال/kWh)" type="number" value={form.contractRate}
             onChange={(e) => setForm({ ...form, contractRate: +e.target.value })} />
           <Select label="مشتری" value={selectedCustomer} loading={subsLoading}
@@ -399,47 +384,12 @@ export default function AdminContracts() {
         </div>
       </Modal>
 
-      <ContractPrintModal open={!!printData} data={printData} onClose={() => setPrintData(null)} />
-
-      {/* File Preview Modal */}
-      <Modal open={!!previewFileId} onClose={() => setPreviewFileId(null)} title="مشاهده فایل ضمانت" size="sm">
-        {previewLoading ? (
-          <div className="flex h-24 items-center justify-center">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-          </div>
-        ) : previewInfo ? (
-          <div className="space-y-3">
-            <div className="rounded-xl bg-gray-50 px-4 py-3">
-              <p className="text-[10px] text-gray-400">نام فایل</p>
-              <p className="mt-0.5 text-sm font-semibold text-gray-800 break-all">{previewInfo.originalName}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-[10px] text-gray-400">حجم</p>
-                <p className="mt-0.5 text-sm font-semibold text-gray-800">{formatBytes(previewInfo.sizeBytes)}</p>
-              </div>
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-[10px] text-gray-400">نوع فایل</p>
-                <p className="mt-0.5 text-sm font-semibold text-gray-800">{previewInfo.mimeType.split('/')[1]?.toUpperCase() ?? previewInfo.mimeType}</p>
-              </div>
-            </div>
-            {previewInfo.uploadedAt && (
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-[10px] text-gray-400">تاریخ بارگذاری</p>
-                <p className="mt-0.5 text-sm font-semibold text-gray-800">{previewInfo.uploadedAt.split('T')[0]}</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="py-4 text-center text-sm text-gray-400">اطلاعات فایل دریافت نشد</p>
-        )}
-        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
-          <Button variant="secondary" onClick={() => setPreviewFileId(null)}>انصراف</Button>
-          <Button loading={downloading} onClick={handlePreviewDownload}>
-            <Download className="h-4 w-4" /> دانلود
-          </Button>
-        </div>
-      </Modal>
+      <ContractPrintModal
+        open={!!printData}
+        data={printData}
+        onClose={() => setPrintData(null)}
+        onWarrantyDownload={printData?.warrantyFileId ? handleWarrantyDownload : undefined}
+      />
 
       {/* Delete Confirm */}
       <Modal open={modal === 'delete'} onClose={() => setModal(null)} title="حذف قرارداد" size="sm">

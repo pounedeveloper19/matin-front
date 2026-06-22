@@ -6,7 +6,7 @@ import {
   Users, Building2, Building, LogOut, Bolt,
   BarChart2, Tag, Clock, Receipt, UserCheck,
   Megaphone, Headset, Shield, ChevronDown, ChevronLeft,
-  ShoppingCart, CreditCard,
+  ShoppingCart, CreditCard, FlaskConical, Activity,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { lookupApi } from '../api/lookup'
@@ -17,7 +17,7 @@ const iconMap: Record<string, LucideIcon> = {
   Users, Building2, Building, Bolt,
   BarChart2, Tag, Clock, Receipt,
   UserCheck, Megaphone, Headset, Shield,
-  ShoppingCart, CreditCard,
+  ShoppingCart, CreditCard, FlaskConical, Activity,
 }
 
 const customerFallback: NavMenuItem[] = [
@@ -38,6 +38,7 @@ const adminFallback: NavMenuItem[] = [
   { id: 16, title: 'تعرفه‌ها',          path: '/admin/tariffs',         icon: 'Tag',             isSelectable: true, children: [] },
   { id: 17, title: 'برنامه TOU',        path: '/admin/tou-schedule',    icon: 'Clock',           isSelectable: true, children: [] },
   { id: 27, title: 'سفارشات',           path: '/admin/orders',          icon: 'ShoppingCart',    isSelectable: true, children: [] },
+  { id: 36, title: 'محاسبه تعرفه',     path: '/admin/bill-analysis',   icon: 'FlaskConical',    isSelectable: true, children: [] },
   { id: 33, title: 'گزارشات',           path: null,                     icon: 'BarChart2',       isSelectable: false, children: [
     { id: 18, title: 'گزارش قبض‌ها',    path: '/admin/bill-reports',              icon: 'Receipt',      isSelectable: true, children: [] },
     { id: 32, title: 'گزارش قراردادها', path: '/admin/reports/contracts',         icon: 'FileText',     isSelectable: true, children: [] },
@@ -46,6 +47,7 @@ const adminFallback: NavMenuItem[] = [
   ]},
   { id: 19, title: 'تیکت‌ها',           path: '/admin/tickets',         icon: 'Headset',         isSelectable: true, children: [] },
   { id: 20, title: 'اعلانات',           path: '/admin/announcements',   icon: 'Megaphone',       isSelectable: true, children: [] },
+  { id: 37, title: 'مدیریت راهنماها',  path: '/admin/tooltips',        icon: 'HelpCircle',      isSelectable: true, children: [] },
   { id: 23, title: 'کدهای تعرفه',       path: '/admin/tariff-codes',    icon: 'Tag',             isSelectable: true, children: [] },
   { id: 26, title: 'مدیریت امنیت',      path: null,                     icon: 'Shield',          isSelectable: false, children: [
     { id: 21, title: 'درخواست‌های ثبت‌نام', path: '/admin/pending-users', icon: 'UserCheck', isSelectable: true, children: [] },
@@ -54,7 +56,6 @@ const adminFallback: NavMenuItem[] = [
   ]},
 ]
 
-// پیدا کردن تمام pathهای زیرمجموعه یه گروه
 function collectPaths(item: NavMenuItem): string[] {
   const paths: string[] = []
   if (item.path) paths.push(item.path)
@@ -62,12 +63,21 @@ function collectPaths(item: NavMenuItem): string[] {
   return paths
 }
 
-// آیا مسیر فعلی زیرمجموعه یه گروه هست؟
 function isGroupActive(item: NavMenuItem, pathname: string): boolean {
   return collectPaths(item).some(p => pathname.startsWith(p))
 }
 
 interface SidebarProps { role: 'admin' | 'customer' }
+
+const ADMIN = {
+  bg: '#003322',
+  activeBg: '#1a4d3d',
+  text: 'rgba(255,255,255,0.88)',
+  textMuted: 'rgba(255,255,255,0.55)',
+  border: 'rgba(255,255,255,0.08)',
+  mint: '#4ade80',
+  mintText: '#003322',
+}
 
 export default function Sidebar({ role }: SidebarProps) {
   const { user, logout }   = useAuth()
@@ -75,6 +85,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const [navItems, setNavItems]       = useState<NavMenuItem[]>([])
   const [menuLoading, setMenuLoading] = useState(true)
   const [expanded, setExpanded]       = useState<Set<number>>(new Set())
+  const isAdmin = role === 'admin'
 
   useEffect(() => {
     lookupApi.getMyMenu()
@@ -82,8 +93,6 @@ export default function Sidebar({ role }: SidebarProps) {
         const raw = Array.isArray(r.result) ? r.result : (r.result as any)?.$values ?? []
         const items: NavMenuItem[] = raw.length > 0 ? raw : (role === 'admin' ? adminFallback : customerFallback)
         setNavItems(items)
-
-        // باز کردن خودکار گروه‌هایی که مسیر فعلی توشونه
         const auto = new Set<number>()
         items.forEach(item => {
           if (!item.isSelectable && isGroupActive(item, location.pathname)) auto.add(item.id)
@@ -94,7 +103,6 @@ export default function Sidebar({ role }: SidebarProps) {
       .finally(() => setMenuLoading(false))
   }, [role])
 
-  // وقتی مسیر تغییر می‌کنه گروه مربوطه رو باز کن
   useEffect(() => {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -108,39 +116,32 @@ export default function Sidebar({ role }: SidebarProps) {
   const toggle = (id: number) =>
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  // رندر بازگشتی آیتم‌های منو
   const renderItem = (item: NavMenuItem, depth = 0) => {
     const Icon = iconMap[item.icon] ?? Shield
     const indent = depth * 12
 
     if (!item.isSelectable) {
-      // ── گروه قابل باز/بسته شدن ──
-      const open    = expanded.has(item.id)
-      const active  = isGroupActive(item, location.pathname)
+      const open   = expanded.has(item.id)
+      const active = isGroupActive(item, location.pathname)
       return (
         <li key={item.id}>
           <button
             onClick={() => toggle(item.id)}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 hover:bg-emerald-800 hover:text-white"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150"
             style={{
               paddingRight: `${12 + indent}px`,
-              color: active ? '#064e3b' : '#416656',
-              background: active ? 'rgba(6,78,59,0.07)' : 'transparent',
+              color: isAdmin ? (active ? '#fff' : ADMIN.text) : (active ? '#064e3b' : '#416656'),
+              background: isAdmin
+                ? (active ? ADMIN.activeBg : 'transparent')
+                : (active ? 'rgba(6,78,59,0.07)' : 'transparent'),
             }}
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-              style={active ? { background: 'rgba(149,211,186,0.25)' } : undefined}>
-              <Icon className="h-4 w-4" />
-            </span>
+            <Icon className="h-4 w-4 shrink-0" />
             <span className="flex-1 truncate text-right">{item.title}</span>
-            {open
-              ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              : <ChevronLeft className="h-3.5 w-3.5 shrink-0 opacity-60" />
-            }
+            {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" /> : <ChevronLeft className="h-3.5 w-3.5 shrink-0 opacity-60" />}
           </button>
-
           {open && item.children.length > 0 && (
-            <ul className="mt-0.5 space-y-0.5 border-r border-emerald-100 mr-5">
+            <ul className="mt-0.5 space-y-0.5 mr-5" style={{ borderRight: isAdmin ? `1px solid ${ADMIN.border}` : '1px solid #d1fae5' }}>
               {item.children.map(c => renderItem(c, depth + 1))}
             </ul>
           )}
@@ -148,29 +149,25 @@ export default function Sidebar({ role }: SidebarProps) {
       )
     }
 
-    // ── صفحه واقعی ──
     return (
       <li key={item.id}>
         <NavLink
           to={item.path as string}
-          className={({ isActive }) =>
-            ['flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
-              isActive ? 'text-white shadow-sm' : 'hover:bg-emerald-800 hover:text-white'].join(' ')
-          }
+          end
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150"
           style={({ isActive }) => ({
             paddingRight: `${12 + indent}px`,
-            background: isActive ? '#064e3b' : 'transparent',
-            color: isActive ? '#ffffff' : '#416656',
+            background: isActive ? (isAdmin ? ADMIN.activeBg : '#064e3b') : 'transparent',
+            color: isActive ? '#ffffff' : (isAdmin ? ADMIN.text : '#416656'),
           })}
         >
           {({ isActive }) => (
             <>
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                style={isActive ? { background: 'rgba(149,211,186,0.2)' } : undefined}>
-                <Icon className="h-4 w-4" />
-              </span>
+              <Icon className="h-4 w-4 shrink-0" />
               <span className="truncate">{item.title}</span>
-              {isActive && <span className="mr-auto h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: '#95d3ba' }} />}
+              {isActive && isAdmin && (
+                <span className="mr-auto h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: ADMIN.mint }} />
+              )}
             </>
           )}
         </NavLink>
@@ -178,6 +175,62 @@ export default function Sidebar({ role }: SidebarProps) {
     )
   }
 
+  if (isAdmin) {
+    return (
+      <aside
+        className="flex h-full w-64 shrink-0 flex-col sidebar-scroll overflow-y-auto text-white"
+        style={{ background: ADMIN.bg, boxShadow: '4px 0 24px rgba(0,0,0,0.12)' }}
+      >
+        <div className="flex flex-col items-center px-5 py-6 text-center" style={{ borderBottom: `1px solid ${ADMIN.border}` }}>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: ADMIN.activeBg }}>
+            <Bolt className="h-5 w-5" style={{ color: ADMIN.mint }} />
+          </div>
+          <p className="mt-3 text-base font-bold leading-tight text-white">مدیریت برق</p>
+          <p className="mt-1 text-[11px]" style={{ color: ADMIN.textMuted }}>پنل هوشمند انرژی</p>
+        </div>
+
+        <nav className="flex-1 px-3 py-4">
+          {menuLoading ? (
+            <div className="flex h-32 items-center justify-center">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: ADMIN.mint, borderTopColor: 'transparent' }} />
+            </div>
+          ) : (
+            <ul className="space-y-0.5">{navItems.map(item => renderItem(item))}</ul>
+          )}
+        </nav>
+
+        <div className="px-3 pb-4" style={{ borderTop: `1px solid ${ADMIN.border}` }}>
+          <NavLink
+            to="/admin/dashboard"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-opacity hover:opacity-90"
+            style={{ background: ADMIN.mint, color: ADMIN.mintText }}
+          >
+            <Activity className="h-4 w-4" />
+            گزارش لحظه‌ای
+          </NavLink>
+          <div className="mb-2 mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: ADMIN.activeBg }}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: ADMIN.mint, color: ADMIN.mintText }}>
+              {user?.fullName?.charAt(0) ?? 'U'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{user?.fullName}</p>
+              <p className="text-[11px]" style={{ color: ADMIN.textMuted }}>مدیر سیستم</p>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all hover:bg-white/10"
+            style={{ color: ADMIN.text }}
+          >
+            <LogOut className="h-4 w-4" />
+            خروج از سیستم
+          </button>
+        </div>
+      </aside>
+    )
+  }
+
+  // ── Customer sidebar (light) ──
   return (
     <aside
       className="flex h-full w-64 shrink-0 flex-col sidebar-scroll overflow-y-auto"
@@ -188,7 +241,6 @@ export default function Sidebar({ role }: SidebarProps) {
         borderLeft: '1px solid #e1e3e4',
       }}
     >
-      {/* Logo */}
       <div className="flex flex-col items-center px-5 py-6 text-center" style={{ borderBottom: '1px solid #e1e3e4' }}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: '#064e3b' }}>
           <Bolt className="h-5 w-5 text-emerald-50" />
@@ -199,34 +251,27 @@ export default function Sidebar({ role }: SidebarProps) {
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4">
         {menuLoading ? (
           <div className="flex h-32 items-center justify-center">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
           </div>
         ) : (
-          <ul className="space-y-0.5">
-            {navItems.map(item => renderItem(item))}
-          </ul>
+          <ul className="space-y-0.5">{navItems.map(item => renderItem(item))}</ul>
         )}
       </nav>
 
-      {/* User footer */}
       <div className="px-3 pb-4" style={{ borderTop: '1px solid #e1e3e4' }}>
         <div className="mb-2 mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: '#edeeef' }}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-emerald-50"
-            style={{ background: '#064e3b' }}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-emerald-50" style={{ background: '#064e3b' }}>
             {user?.fullName?.charAt(0) ?? 'U'}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium" style={{ color: '#294e3f' }}>{user?.fullName}</p>
-            <p className="text-[11px]" style={{ color: '#416656' }}>{role === 'admin' ? 'مدیر سیستم' : 'مشتری'}</p>
+            <p className="text-[11px]" style={{ color: '#416656' }}>مشتری</p>
           </div>
         </div>
-        <button onClick={logout}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all hover:bg-emerald-900 hover:text-white"
-          style={{ color: '#416656' }}>
+        <button onClick={logout} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all hover:bg-emerald-900 hover:text-white" style={{ color: '#416656' }}>
           <LogOut className="h-4 w-4" />
           خروج از سیستم
         </button>

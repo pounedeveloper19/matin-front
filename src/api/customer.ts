@@ -25,6 +25,7 @@ import type {
   OrderDetailResult,
   CreateOrderRequest,
   SubmitPaymentRequest,
+  PortfolioOptimizationResult,
 } from '../types'
 
 export const customerApi = {
@@ -93,6 +94,11 @@ export const customerApi = {
     client.post<ExecutionResult<OptimalPurchaseCurveResult>>('/BillCalculation/ManualOptimalPurchaseCurve', data).then((r) => r.data),
   advancedBillAnalysis: (data: object) =>
     client.post<ExecutionResult<AdvancedBillAnalysisResult>>('/BillCalculation/AdvancedAnalysis', data).then((r) => r.data),
+  advancedOptimalPurchaseCurve: (data: object) =>
+    client.post<ExecutionResult<OptimalPurchaseCurveResult>>('/BillCalculation/AdvancedOptimalPurchaseCurve', data).then((r) => r.data),
+
+  getOptimalPortfolio: (data: object) =>
+    client.post<ExecutionResult<PortfolioOptimizationResult>>('/BillCalculation/GetOptimalPortfolio', data).then((r) => r.data),
 
   getSubscriptionRate: (subscriptionId: number, year: number, month: number) =>
     client.get<ExecutionResult>(`/BillCalculation/GetSubscriptionRate/${subscriptionId}/${year}/${month}`).then((r) => r.data),
