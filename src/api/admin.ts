@@ -42,6 +42,8 @@ import type {
   ActivityRow,
   OptimizationResult,
   PortfolioOptimizationResult,
+  ProfitReportResult,
+  BillProfitRow,
 } from '../types'
 
 type PageParams = {
@@ -121,6 +123,9 @@ export const adminApi = {
 
   deleteContract: (id: number) =>
     client.delete<ExecutionResult>(`/AdminContract/Delete/${id}`).then((r) => r.data),
+
+  rejectContract: (contractId: number, reason: string | null) =>
+    client.post<ExecutionResult>('/AdminContract/RejectContract', { contractId, reason }).then((r) => r.data),
 
   // Monthly Market Rates
   getMarketRates: (params: PageParams = {}) =>
@@ -422,7 +427,7 @@ export const adminApi = {
 
   // Orders (Admin)
   getAdminOrders: (params: PageParams = {}) =>
-    client.get<ExecutionResult<{ pageNumber: number; pageSize: number; totalRecords: number; totalPages: number; data: AdminOrderResult[] }>>(
+    client.get<ExecutionResult<PaginationResult<AdminOrderResult>>>(
       '/AdminOrder/GetList',
       { params: buildParams({ pageNumber: 1, pageSize: 20, ...params }) }
     ).then(r => r.data),
@@ -515,4 +520,17 @@ export const adminApi = {
 
   deleteTooltip: (id: number) =>
     client.delete<ExecutionResult>(`/AdminTooltip/Delete/${id}`).then(r => r.data),
+
+  // Profit / Savings report
+  getProfitAvailableYears: () =>
+    client.get<ExecutionResult<number[]>>('/BillAdmin/GetAvailableYears').then(r => r.data),
+
+  getCustomerNames: () =>
+    client.get<ExecutionResult<{ profileId: number; customerName: string }[]>>('/BillAdmin/GetCustomerNames').then(r => r.data),
+
+  getAllProfitSummary: (params: { pageNumber?: number; pageSize?: number; fromYear?: number; fromMonth?: number; toYear?: number; toMonth?: number; customerName?: string } = {}) =>
+    client.get<ExecutionResult<PaginationResult<BillProfitRow>>>('/BillAdmin/GetAllProfitSummary', { params }).then(r => r.data),
+
+  getProfitReport: (profileId: number) =>
+    client.get<ExecutionResult<ProfitReportResult>>(`/BillAdmin/GetProfitReport/${profileId}`).then(r => r.data),
 }

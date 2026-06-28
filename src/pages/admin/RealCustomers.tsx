@@ -110,7 +110,7 @@ export default function AdminRealCustomers() {
     finally { setBulkDeleting(false) }
   }
 
-  const openCreate = () => { setForm(emptyForm); setModal('create') }
+  const openCreate = () => { setForm({ ...emptyForm, password: '' }); setModal('create') }
   const openEdit = async (row: AdminRealCustomer) => {
     try {
       const res = await adminApi.getRealCustomerDetail(row.id)
@@ -126,6 +126,9 @@ export default function AdminRealCustomers() {
     }
     if (!validateNationalCode(form.nationalCode)) { toast.error('کد ملی وارد شده معتبر نیست'); return }
     if (!validateMobile(form.mobile)) { toast.error('موبایل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+    if (modal === 'create' && !form.password?.trim()) {
+      toast.error('رمز عبور الزامی است'); return
+    }
     setSaving(true)
     try {
       const res = modal === 'create' ? await adminApi.createRealCustomer(form) : await adminApi.updateRealCustomer(form)
@@ -295,8 +298,17 @@ export default function AdminRealCustomers() {
               {familiarityOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          {modal === 'create' && (
+            <Input
+              label="رمز عبور *"
+              type="password"
+              value={form.password ?? ''}
+              onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+              placeholder="حداقل ۴ کاراکتر"
+            />
+          )}
           <div className="flex items-center gap-3 pt-2">
-            <input type="checkbox" id="realActive" checked={form.isActive ?? true}
+            <input type="checkbox" id="realActive" checked={form.isActive === true}
               onChange={(e) => setForm(p => ({ ...p, isActive: e.target.checked }))}
               className="h-4 w-4 rounded border-gray-300 accent-primary-600" />
             <label htmlFor="realActive" className="text-sm text-gray-700">کاربر فعال است</label>

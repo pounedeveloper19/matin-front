@@ -34,7 +34,15 @@ export default function AdminPendingUsers() {
     setLoading(true)
     try {
       const res = await adminApi.getPendingUsers()
-      if (res.code === 200) setUsers((res.result as PendingUser[]) ?? [])
+      if (res.code === 200) {
+        const list = (res.result as PendingUser[]) ?? []
+        list.sort((a, b) => {
+          const da = a.registeredAt ? new Date(a.registeredAt).getTime() : a.id
+          const db = b.registeredAt ? new Date(b.registeredAt).getTime() : b.id
+          return db - da
+        })
+        setUsers(list)
+      }
     } finally { setLoading(false) }
   }, [])
 

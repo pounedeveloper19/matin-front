@@ -16,8 +16,14 @@ const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl'
 export default function Modal({ open, onClose, title, children, size = 'md', noPadding }: ModalProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    if (open) document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    if (open) {
+      document.addEventListener('keydown', handler)
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -29,8 +35,14 @@ export default function Modal({ open, onClose, title, children, size = 'md', noP
         style={{ background: 'rgba(15, 23, 42, 0.35)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
-      <div className={clsx('relative w-full rounded-2xl overflow-hidden shadow-2xl', sizes[size])}
+      <div
+        className={clsx(
+          'relative w-full rounded-2xl overflow-hidden shadow-2xl',
+          'flex flex-col',
+          sizes[size],
+        )}
         style={{
+          maxHeight: 'calc(100vh - 2rem)',
           background: '#ffffff',
           border: '1px solid #e2e8f0',
           boxShadow: '0 24px 64px rgba(15,23,42,0.18), 0 4px 16px rgba(15,23,42,0.08)',
@@ -38,7 +50,7 @@ export default function Modal({ open, onClose, title, children, size = 'md', noP
       >
         {title && (
           <div
-            className="flex items-center justify-between px-6 py-4"
+            className="flex shrink-0 items-center justify-between px-6 py-4"
             style={{ borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}
           >
             <h2 className="text-base font-bold text-gray-900">{title}</h2>
@@ -50,7 +62,12 @@ export default function Modal({ open, onClose, title, children, size = 'md', noP
             </button>
           </div>
         )}
-        <div className={noPadding ? '' : 'px-6 py-5'}>{children}</div>
+        <div className={clsx(
+          'flex-1 min-h-0',
+          noPadding ? 'overflow-hidden' : 'overflow-y-auto px-6 py-5',
+        )}>
+          {children}
+        </div>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { validateBillIdentifier, validateNationalCode, validateNationalId } from '../../utils/validators'
-import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2, Tag } from 'lucide-react'
+import { User, MapPin, UserCog, Building2, Pencil, Plus, Zap, ShieldCheck, Trash2, Tag, Paperclip, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi } from '../../api/lookup'
@@ -8,10 +8,12 @@ import type { IdTitle, IdName } from '../../api/lookup'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
-import FileUpload from '../../components/ui/FileUpload'
+import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
+import { uploadApi } from '../../api/upload'
 import type {
   AddressResult, CustomerAgent, CustomerReal, CustomerLegal,
   SubscriptionResult, AddSubscriptionRequest, TariffCode, TariffCodeOption, CustomerTariffInfo,
+  CustomerDocument,
 } from '../../types'
 
 const toArr = (v: any): any[] => Array.isArray(v) ? v : (v?.$values ?? [])
@@ -30,7 +32,12 @@ export default function CustomerProfile() {
   const [addresses, setAddresses]         = useState<AddressResult[]>([])
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
   const [agent, setAgent]                 = useState<CustomerAgent | null>(null)
-  const [identityDocFileId, setIdentityDocFileId] = useState<string | null>(null)
+  const [documents, setDocuments]         = useState<CustomerDocument[]>([])
+  const [docsLoading, setDocsLoading]     = useState(false)
+  const [deleteDocId, setDeleteDocId]     = useState<number | null>(null)
+  const [docUploading, setDocUploading]   = useState(false)
+  const [docProgress, setDocProgress]     = useState(0)
+  const docInputRef                       = useRef<HTMLInputElement>(null)
   const [loading, setLoading]             = useState(true)
   const [saving, setSaving]               = useState(false)
   const [cities, setCities]               = useState<IdTitle[]>([])
@@ -50,6 +57,9 @@ export default function CustomerProfile() {
   const [deleteAddrId, setDeleteAddrId] = useState<number | null>(null)
   const [agentModal, setAgentModal]     = useState(false)
   const [subModal, setSubModal]         = useState(false)
+  const [editSubModal, setEditSubModal] = useState(false)
+  const [deleteSubId, setDeleteSubId]   = useState<number | null>(null)
+  const [editSubForm, setEditSubForm]   = useState<{ id: number; billIdentifier: string; contractCapacityKw: number | null }>({ id: 0, billIdentifier: '', contractCapacityKw: null })
 
   const [realForm, setRealForm]   = useState<CustomerReal>({ firstName: '', lastName: '', nationalCode: '', mobile: '' })
   const [legalForm, setLegalForm] = useState<CustomerLegal>({ companyName: '', nationalId: '', economicCode: '', ceo_FullName: '', ceo_Mobile: '' })
@@ -57,15 +67,23 @@ export default function CustomerProfile() {
   const [agentForm, setAgentForm] = useState<CustomerAgent>({ customerProfileId: 0, fullName: '', mobile: '', password: '' })
   const [subForm, setSubForm]     = useState<AddSubscriptionRequest>({ addressId: 0, billIdentifier: '', contractCapacityKw: null })
 
+  const loadDocuments = async () => {
+    setDocsLoading(true)
+    try {
+      const res = await customerApi.getDocuments()
+      if (res.code === 200) setDocuments(toArr(res.result))
+    } catch { /* silent */ }
+    finally { setDocsLoading(false) }
+  }
+
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [c, a, s, ag, meta] = await Promise.allSettled([
+      const [c, a, s, ag] = await Promise.allSettled([
         customerApi.getCustomer(),
         customerApi.getAddresses(),
         customerApi.getSubscriptions(),
         customerApi.getAgent(),
-        customerApi.getProfileMeta(),
       ])
 
       if (c.status === 'fulfilled') {
@@ -91,13 +109,12 @@ export default function CustomerProfile() {
       if (a.status === 'fulfilled' && a.value.code === 200) setAddresses(toArr(a.value.result))
       if (s.status === 'fulfilled' && s.value.code === 200) setSubscriptions(toArr(s.value.result))
       if (ag.status === 'fulfilled' && ag.value.code === 200 && ag.value.result) setAgent(ag.value.result as CustomerAgent)
-      if (meta.status === 'fulfilled' && meta.value.code === 200 && meta.value.result)
-        setIdentityDocFileId((meta.value.result as any).identityDocFileId ?? null)
     } finally { setLoading(false) }
   }
 
   useEffect(() => {
     loadAll()
+    loadDocuments()
     Promise.all([lookupApi.getCities(), lookupApi.getPowerEntities(), lookupApi.getTariffCodes()])
       .then(([c, p, tc]) => {
         if (c.code === 200 && Array.isArray(c.result)) setCities(c.result as IdTitle[])
@@ -170,6 +187,37 @@ export default function CustomerProfile() {
     finally { setSaving(false) }
   }
 
+  const handleEditSub = async () => {
+    const bid = editSubForm.billIdentifier.trim()
+    if (!bid) { toast.error('شناسه قبض را وارد کنید'); return }
+    if (!/^\d{13}$/.test(bid)) { toast.error('شناسه قبض باید دقیقاً ۱۳ رقم باشد'); return }
+    if (!validateBillIdentifier(bid)) { toast.error('شناسه قبض معتبر نیست (رقم کنترل اشتباه است)'); return }
+    setSaving(true)
+    try {
+      const res = await customerApi.updateSubscription(editSubForm)
+      if (res.code === 200) {
+        toast.success('شناسه ویرایش شد'); setEditSubModal(false)
+        const updated = await customerApi.getSubscriptions()
+        if (updated.code === 200) setSubscriptions(toArr(updated.result))
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در ویرایش شناسه') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSaving(false) }
+  }
+
+  const handleDeleteSub = async () => {
+    if (!deleteSubId) return
+    setSaving(true)
+    try {
+      const res = await customerApi.deleteSubscription(deleteSubId)
+      if (res.code === 200) {
+        toast.success('شناسه حذف شد'); setDeleteSubId(null)
+        const updated = await customerApi.getSubscriptions()
+        if (updated.code === 200) setSubscriptions(toArr(updated.result))
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در حذف شناسه') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSaving(false) }
+  }
+
   const handleSaveAgent = async () => {
     if (!agentForm.fullName || !agentForm.mobile) { toast.error('نام و موبایل نماینده را وارد کنید'); return }
     setSaving(true)
@@ -211,16 +259,33 @@ export default function CustomerProfile() {
     finally { setSavingTariff(false) }
   }
 
-  const handleIdentityUploaded = async (fileId: string) => {
+  const handleDocFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { toast.error('حداکثر حجم فایل ۱۰ مگابایت است'); return }
+    if (documents.length >= 5) { toast.error('حداکثر ۵ مدرک مجاز است'); return }
+    setDocUploading(true); setDocProgress(0)
     try {
-      const res = await customerApi.updateIdentityDoc(fileId)
-      if (res.code === 200) { setIdentityDocFileId(fileId); toast.success('مدرک شناسایی ثبت شد') }
-      else { toast.error(res.message ?? res.caption ?? 'خطا در ثبت مدرک') }
+      const upRes = await uploadApi.upload(file, undefined, undefined, setDocProgress)
+      if (upRes.code === 200 && upRes.result) {
+        const fileId = (upRes.result as any).fileId as string
+        const addRes = await customerApi.addDocument(fileId)
+        if (addRes.code === 200) { toast.success('مدرک بارگذاری شد'); await loadDocuments() }
+        else { toast.error(addRes.message ?? addRes.caption ?? 'خطا در ثبت مدرک') }
+      } else { toast.error(upRes.message ?? upRes.caption ?? 'خطا در آپلود') }
     } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setDocUploading(false); if (docInputRef.current) docInputRef.current.value = '' }
   }
 
-  const handleIdentityDeleted = async () => {
-    try { await customerApi.updateIdentityDoc(null); setIdentityDocFileId(null) } catch { /* silent */ }
+  const handleDeleteDoc = async () => {
+    if (!deleteDocId) return
+    setSaving(true)
+    try {
+      const res = await customerApi.deleteDocument(deleteDocId)
+      if (res.code === 200) { toast.success('مدرک حذف شد'); setDeleteDocId(null); await loadDocuments() }
+      else { toast.error(res.message ?? res.caption ?? 'خطا در حذف') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSaving(false) }
   }
 
   const isLegal = profile?.type === 'legal'
@@ -297,19 +362,77 @@ export default function CustomerProfile() {
 
       {/* مدارک شناسایی */}
       <div className="glass-card overflow-hidden rounded-2xl">
-        <div className="flex items-center gap-3 px-5 py-4"
+        <div className="flex items-center justify-between px-5 py-4"
           style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-            <ShieldCheck className="h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">
+                مدارک شناسایی
+                {documents.length > 0 && (
+                  <span className="mr-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
+                    {documents.length} / ۵
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-gray-400">کارت ملی، شناسنامه، اساسنامه — حداکثر ۵ فایل</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">مدارک شناسایی</h3>
-            <p className="text-xs text-gray-400">تصویر کارت ملی یا شناسنامه / اساسنامه شرکت</p>
-          </div>
+          {documents.length < 5 && (
+            <div>
+              <input
+                ref={docInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={handleDocFileSelect}
+              />
+              <Button variant="secondary" size="sm" loading={docUploading}
+                onClick={() => docInputRef.current?.click()}>
+                {docUploading
+                  ? <span>آپلود... {docProgress}%</span>
+                  : <><Paperclip className="h-3.5 w-3.5" /> بارگذاری مدرک</>}
+              </Button>
+            </div>
+          )}
         </div>
+
         <div className="p-5">
-          <FileUpload label="بارگذاری مدرک" fileId={identityDocFileId} accept="image/*,.pdf"
-            onUploaded={handleIdentityUploaded} onDeleted={handleIdentityDeleted} />
+          {docsLoading ? (
+            <div className="flex justify-center py-6">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-indigo-200 py-8 text-center">
+              <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+              <p className="text-sm text-gray-400">هنوز مدرکی بارگذاری نشده است</p>
+              <p className="mt-1 text-xs text-gray-300">روی «بارگذاری مدرک» کلیک کنید</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc, idx) => (
+                <div key={doc.id}
+                  className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+                  style={{ background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+                  <FileText className="h-4 w-4 shrink-0 text-indigo-500" />
+                  <span className="flex-1 text-sm text-gray-700">
+                    {doc.title ?? `مدرک ${idx + 1}`}
+                  </span>
+                  <span className="text-xs text-gray-400">{doc.createdAt}</span>
+                  <PreviewDownloadButton fileId={doc.fileId} iconOnly />
+                  <button
+                    onClick={() => setDeleteDocId(doc.id)}
+                    className="rounded p-1 text-gray-300 hover:text-red-500 transition-colors"
+                    title="حذف مدرک"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -409,11 +532,29 @@ export default function CustomerProfile() {
                     <p className="font-mono text-sm font-semibold text-gray-800">شناسه: {s.billIdentifier}</p>
                     <p className="mt-0.5 text-xs text-gray-400">{s.powerEntity} · {s.mainAddress}</p>
                   </div>
-                  {s.contractCapacityKw != null && (
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                      {s.contractCapacityKw.toLocaleString('fa-IR')} kW
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {s.contractCapacityKw != null && (
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                        {s.contractCapacityKw.toLocaleString('fa-IR')} kW
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setEditSubForm({ id: s.id, billIdentifier: s.billIdentifier, contractCapacityKw: s.contractCapacityKw ?? null }); setEditSubModal(true) }}
+                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                      title="ویرایش"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteSubId(s.id)}
+                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                      title="حذف"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -564,7 +705,7 @@ export default function CustomerProfile() {
             onChange={(e) => setAddrForm({ ...addrForm, mainAddress: e.target.value })} placeholder="خیابان، کوچه، پلاک..." />
           <Input label="کد پستی *" value={addrForm.postalCode}
             onChange={(e) => setAddrForm({ ...addrForm, postalCode: e.target.value })} inputMode="numeric" maxLength={10} placeholder="۱۰ رقم" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select label="شهر" value={addrForm.cityId || ''} loading={lookupsLoading}
               options={cities.map(c => ({ value: c.id, label: c.title }))}
               onChange={(v) => setAddrForm({ ...addrForm, cityId: +v })} />
@@ -596,6 +737,40 @@ export default function CustomerProfile() {
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSubModal(false)}>انصراف</Button>
           <Button loading={saving} onClick={handleAddSubscription}>ثبت شناسه</Button>
+        </div>
+      </Modal>
+
+      {/* مودال ویرایش شناسه قبض */}
+      <Modal open={editSubModal} onClose={() => setEditSubModal(false)} title="ویرایش شناسه قبض" size="sm">
+        <div className="space-y-4">
+          <Input label="شناسه قبض (Meter ID) *" value={editSubForm.billIdentifier}
+            onChange={(e) => setEditSubForm({ ...editSubForm, billIdentifier: e.target.value.replace(/\D/g, '') })}
+            placeholder="۱۳ رقم" maxLength={13} inputMode="numeric" />
+          <Input label="قدرت قراردادی (kW)" type="number" value={editSubForm.contractCapacityKw ?? ''}
+            onChange={(e) => setEditSubForm({ ...editSubForm, contractCapacityKw: e.target.value ? +e.target.value : null })}
+            placeholder="مثال: ۵۰۰" />
+        </div>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setEditSubModal(false)}>انصراف</Button>
+          <Button loading={saving} onClick={handleEditSub}>ذخیره تغییرات</Button>
+        </div>
+      </Modal>
+
+      {/* مودال تأیید حذف شناسه */}
+      <Modal open={deleteSubId !== null} onClose={() => setDeleteSubId(null)} title="حذف شناسه قبض" size="sm">
+        <p className="text-sm text-gray-600">آیا از حذف این شناسه قبض اطمینان دارید؟ این عملیات قابل بازگشت نیست.</p>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setDeleteSubId(null)}>انصراف</Button>
+          <Button variant="danger" loading={saving} onClick={handleDeleteSub}><Trash2 className="h-4 w-4" /> حذف</Button>
+        </div>
+      </Modal>
+
+      {/* مودال حذف مدرک */}
+      <Modal open={deleteDocId !== null} onClose={() => setDeleteDocId(null)} title="حذف مدرک" size="sm">
+        <p className="text-sm text-gray-600">آیا از حذف این مدرک اطمینان دارید؟ این عملیات قابل بازگشت نیست.</p>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setDeleteDocId(null)}>انصراف</Button>
+          <Button variant="danger" loading={saving} onClick={handleDeleteDoc}><Trash2 className="h-4 w-4" /> حذف</Button>
         </div>
       </Modal>
 

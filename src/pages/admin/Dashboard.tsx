@@ -293,7 +293,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Pending registrations */}
-          <div className="rounded-2xl p-5" style={{ ...cardStyle, borderRight: `4px solid ${PALETTE.red}` }}>
+          <Link to="/admin/pending-users" className="block rounded-2xl p-5 transition-shadow hover:shadow-md" style={{ ...cardStyle, borderRight: `4px solid ${PALETTE.red}` }}>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-red-500">در انتظار تایید ثبت‌نام</p>
@@ -305,13 +305,14 @@ export default function AdminDashboard() {
                 <AlertCircle className="h-5 w-5 text-red-500" />
               </div>
             </div>
-            <div className="mt-3">
+            <div className="mt-3 flex items-center justify-between">
               <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-600">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
                 نیاز به بررسی فوری
               </span>
+              <ArrowLeft className="h-4 w-4 text-red-400" />
             </div>
-          </div>
+          </Link>
 
           {/* Bill reports — dark card */}
           <div className="rounded-2xl p-5" style={{ background: PALETTE.forest, border: `1px solid ${PALETTE.forestMid}` }}>

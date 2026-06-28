@@ -40,11 +40,13 @@ export default function AdminTariffSlabs() {
       ...(filterTariffId ? { Search_TariffId: filterTariffId } : {}),
     })
       .then((r) => {
+        if (r.code !== 200) { toast.error(r.caption ?? 'خطا در دریافت اطلاعات'); return }
         const res = r.result as any
         setData(res?.data ?? [])
         setTotal(res?.totalRecords ?? 0)
         setTotalPages(res?.totalPages ?? 1)
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setLoading(false))
   }, [filterTariffId])
 
@@ -59,6 +61,10 @@ export default function AdminTariffSlabs() {
   const openDelete = (row: TariffSlab) => { setForm(row); setModal('delete') }
 
   const handleSave = async () => {
+    if (!form.tariffId) { toast.error('تعرفه را انتخاب کنید'); return }
+    if (form.fromKwh < 0) { toast.error('مقدار «از» نمی‌تواند منفی باشد'); return }
+    if (form.toKwh != null && form.toKwh <= form.fromKwh) { toast.error('مقدار «تا» باید از «از» بیشتر باشد'); return }
+    if (!form.multiplier || form.multiplier <= 0) { toast.error('ضریب باید بزرگتر از صفر باشد'); return }
     setSaving(true)
     try {
       const res = modal === 'create'

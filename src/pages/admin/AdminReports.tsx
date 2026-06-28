@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   BarChart2, FileText, ShoppingCart, CreditCard,
-  RefreshCw, Download, Search,
+  RefreshCw, Search, Download,
 } from 'lucide-react'
 import { DatePicker } from '../../components/ui/Input'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { uploadApi } from '../../api/upload'
+import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
 import type {
   ContractReportResult,
   OrderReportResult,
@@ -363,12 +364,11 @@ export default function AdminReports() {
                               <Td>{p.createdAt ?? '—'}</Td>
                               <Td>
                                 {p.receiptFileId && (
-                                  <button
-                                    onClick={() => uploadApi.download(p.receiptFileId!).catch(() => toast.error('خطا در دانلود'))}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100">
-                                    <Download className="h-3 w-3" />
-                                    دانلود
-                                  </button>
+                                  <PreviewDownloadButton
+                                    fileId={p.receiptFileId!}
+                                    label="مشاهده"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                  />
                                 )}
                               </Td>
                             </tr>

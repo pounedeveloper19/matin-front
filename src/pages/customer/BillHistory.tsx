@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 import { Zap, History, RefreshCw } from 'lucide-react'
 import { customerApi } from '../../api/customer'
 import type { SubscriptionResult } from '../../types'
-import { toArr } from '../../utils'
-
-const MONTHS = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
+import { toArr, monthName } from '../../utils'
 
 export default function BillHistory() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
@@ -137,7 +135,7 @@ export default function BillHistory() {
                         return (
                           <tr key={i} className="transition-colors hover:bg-emerald-50/30">
                             <td className="py-3 font-semibold text-gray-900">
-                              {h.month ? MONTHS[h.month] : '—'} {h.year}
+                              {h.month ? monthName(h.month) : '—'} {h.year}
                             </td>
                             <td className="py-3 text-left font-mono font-semibold text-red-600">
                               {h.costWithoutMatin != null ? h.costWithoutMatin.toLocaleString('fa-IR') + ' ر' : '—'}

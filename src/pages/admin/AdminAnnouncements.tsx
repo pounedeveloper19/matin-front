@@ -38,14 +38,23 @@ export default function AdminAnnouncements() {
 
   const openCreate = () => { setForm(empty); setModal('create') }
   const openEdit = async (row: AdminAnnouncement) => {
-    try { const r = await adminApi.getAnnouncementDetail(row.id); setForm(r.result ?? row) }
-    catch { setForm(row) }
+    try {
+      const r = await adminApi.getAnnouncementDetail(row.id)
+      if (r.code === 200) setForm(r.result ?? row)
+      else { toast.error(r.message ?? 'خطا در دریافت اعلان'); setForm(row) }
+    } catch { toast.error('خطا در ارتباط با سرور'); setForm(row) }
     setModal('edit')
   }
   const openDelete = (row: AdminAnnouncement) => { setForm(row); setModal('delete') }
 
   const handleSave = async () => {
-    if (!form.title || !form.contents) { toast.error('عنوان و متن الزامی است'); return }
+    if (!form.title?.trim()) { toast.error('عنوان اعلان الزامی است'); return }
+    if (form.title.trim().length > 200) { toast.error('عنوان نباید بیشتر از ۲۰۰ کاراکتر باشد'); return }
+    if (!form.contents?.trim()) { toast.error('متن اعلان الزامی است'); return }
+    if (!form.publishDate) { toast.error('تاریخ انتشار الزامی است'); return }
+    if (form.finishDate && form.publishDate && form.finishDate < form.publishDate) {
+      toast.error('تاریخ پایان باید بعد از تاریخ انتشار باشد'); return
+    }
     setSaving(true)
     try {
       const res = modal === 'create' ? await adminApi.createAnnouncement(form) : await adminApi.updateAnnouncement(form)

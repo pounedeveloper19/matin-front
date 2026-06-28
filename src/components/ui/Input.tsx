@@ -130,6 +130,7 @@ export function DatePicker({ label, error, hint, value, onChange, disabled }: Da
           onChange?.(g.toISOString().slice(0, 10))
         }}
         disabled={disabled}
+        portal
         containerStyle={{ width: '100%' }}
         inputClass={clsx(
           'block w-full rounded-xl border bg-white/80 px-4 py-2.5 text-sm transition-all',

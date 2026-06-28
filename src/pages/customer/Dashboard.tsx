@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Zap, MessageSquare, User, ArrowLeft, Megaphone, CheckCircle } from 'lucide-react'
+import { FileText, Zap, MessageSquare, User, ArrowLeft, Megaphone, CheckCircle, TrendingUp } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { customerApi } from '../../api/customer'
 import { StatCard } from '../../components/ui/Card'
 import Badge, { contractStatusVariant } from '../../components/ui/Badge'
-import type { ContractResult, TicketSummary, AnnouncementItem } from '../../types'
+import type { ContractResult, TicketSummary, AnnouncementItem, ProfitReportSummary } from '../../types'
 import { toArr } from '../../utils'
+
+const fmt = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 
 export default function CustomerDashboard() {
   const { user } = useAuth()
   const [contracts, setContracts]         = useState<ContractResult[]>([])
   const [tickets, setTickets]             = useState<TicketSummary[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+  const [profitSummary, setProfitSummary] = useState<ProfitReportSummary | null>(null)
 
   useEffect(() => {
     customerApi.getContracts().then((r) => { if (r.code === 200) setContracts(toArr(r.result)) })
     customerApi.getTickets().then((r) => { if (r.code === 200) setTickets(toArr(r.result) as TicketSummary[]) })
     customerApi.getAnnouncements().then((r) => { if (r.code === 200) setAnnouncements(toArr(r.result) as AnnouncementItem[]) })
+    customerApi.getMyProfitReport().then((r) => { if (r.code === 200 && r.result) setProfitSummary(r.result.summary) })
   }, [])
 
   const activeContracts = contracts.filter((c) => c.status.includes('فعال')).length
@@ -58,29 +62,30 @@ export default function CustomerDashboard() {
         <StatCard title="کل تیکت‌ها"      value={tickets.length}     icon={<MessageSquare className="h-5 w-5" />} color="purple" />
       </div>
 
-      {/* Quick links */}
-      <div>
-        <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-400">دسترسی سریع</h3>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {quickLinks.map(({ to, icon: Icon, label, desc, color }) => (
-            <Link
-              key={to}
-              to={to}
-              className="group glass-card rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${color}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <p className="font-semibold text-gray-800">{label}</p>
-              <p className="mt-1 text-xs text-gray-500">{desc}</p>
-              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100">
-                <span>مشاهده</span>
-                <ArrowLeft className="h-3 w-3" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* Accumulated savings banner */}
+      {profitSummary && profitSummary.totalNetSaving > 0 && (
+        <Link
+          to="/customer/savings"
+          className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 to-white px-5 py-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-emerald-700 font-semibold">سود انباشته شما با متین</p>
+              <p className="text-xl font-black text-emerald-800">{fmt(profitSummary.totalNetSaving)} ریال</p>
+              <p className="text-xs text-emerald-600 mt-0.5">
+                {profitSummary.savingPercent}٪ صرفه‌جویی در {profitSummary.monthCount} ماه
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-semibold text-emerald-700">
+            <span>مشاهده جزئیات</span>
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </div>
+        </Link>
+      )}
 
       {/* Announcements */}
       {announcements.length > 0 && (

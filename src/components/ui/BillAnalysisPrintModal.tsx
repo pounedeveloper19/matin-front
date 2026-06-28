@@ -125,14 +125,38 @@ function PrintContent({ r, rec, mixItems, mixTotal, customerName, billIdentifier
         ))}
       </div>
 
-      {/* ── TOU hours ── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 10, color: '#374151' }}>
-        <span>ساعات اوج: <strong>{r.peakHoursPerDay}h</strong></span>
-        <span>ساعات میان: <strong>{r.midHoursPerDay}h</strong></span>
-        <span>ساعات کم‌بار: <strong>{r.lowHoursPerDay}h</strong></span>
-        {r.greenPercent > 0 && (
-          <span style={{ color: '#065f46' }}>مشمول جهش: <strong>{fmt(r.greenSubjectKwh)} kWh ({(r.greenPercent * 100).toFixed(0)}٪)</strong></span>
-        )}
+      {/* ── TOU hours + consumption breakdown ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+        <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 12px', fontSize: 10 }}>
+          <div style={{ fontWeight: 700, color: '#374151', marginBottom: 6 }}>ساعات TOU (روزانه)</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <span>اوج: <strong>{r.peakHoursPerDay}h</strong></span>
+            <span>میان: <strong>{r.midHoursPerDay}h</strong></span>
+            <span>کم‌بار: <strong>{r.lowHoursPerDay}h</strong></span>
+          </div>
+          {r.greenPercent > 0 && (
+            <div style={{ color: '#065f46', marginTop: 4 }}>مشمول جهش: <strong>{fmt(r.greenSubjectKwh)} kWh ({(r.greenPercent * 100).toFixed(0)}٪)</strong></div>
+          )}
+        </div>
+        <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 12px', fontSize: 10 }}>
+          <div style={{ fontWeight: 700, color: '#374151', marginBottom: 6 }}>توزیع مصرف (kWh)</div>
+          {[
+            { label: 'میان بار', kwh: r.midKwh,  color: '#f59e0b' },
+            { label: 'اوج بار',  kwh: r.peakKwh, color: '#ef4444' },
+            { label: 'کم بار',   kwh: r.lowKwh,  color: '#3b82f6' },
+          ].map(row => {
+            const pct = r.totalKwh > 0 ? ((row.kwh / r.totalKwh) * 100).toFixed(0) : '0'
+            return (
+              <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ width: 52, color: '#6b7280' }}>{row.label}</span>
+                <div style={{ flex: 1, background: '#e5e7eb', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: row.color, borderRadius: 4 }} />
+                </div>
+                <span style={{ width: 72, textAlign: 'left', fontWeight: 700 }}>{fmt(row.kwh)} ({pct}٪)</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Final summary table ── */}
@@ -153,6 +177,17 @@ function PrintContent({ r, rec, mixItems, mixTotal, customerName, billIdentifier
           </tr>
         </tbody>
       </table>
+
+      {/* ── Saving banner ── */}
+      {r.netSaving > 0 && (
+        <div style={{ background: 'linear-gradient(135deg,#065f46,#047857)', borderRadius: 8, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: '#a7f3d0', fontSize: 10 }}>با قرارداد برق متین صرفه‌جویی کردید:</span>
+          <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>{rial(r.netSaving)}</span>
+          <span style={{ background: '#fff', color: '#065f46', fontWeight: 800, fontSize: 12, borderRadius: 20, padding: '2px 10px' }}>
+            {r.savingPercent.toLocaleString('fa-IR')}٪ کاهش
+          </span>
+        </div>
+      )}
 
       {/* ── Breakdown side by side ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -187,6 +222,25 @@ function PrintContent({ r, rec, mixItems, mixTotal, customerName, billIdentifier
         </div>
       </div>
 
+      {/* ── Market energy details ── */}
+      {(r.bilateralBillRial > 0 || r.exchangeBillRial > 0 || r.greenBillRial > 0) && (
+        <>
+          <SectionTitle>جزئیات انرژی خریداری‌شده از بازار</SectionTitle>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, fontSize: 10, border: '1px solid #e5e7eb' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <Th>نوع انرژی</Th><Th right>مبلغ صورتحساب (ریال)</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.bilateralBillRial > 0 && <TRow cells={['قرارداد دوجانبه', fmt(r.bilateralBillRial)]} />}
+              {r.exchangeBillRial  > 0 && <TRow cells={['بورس برق', fmt(r.exchangeBillRial)]} />}
+              {r.greenBillRial     > 0 && <TRow cells={['برق سبز (قانون جهش)', fmt(r.greenBillRial)]} />}
+            </tbody>
+          </table>
+        </>
+      )}
+
       {/* ── Rate table ── */}
       <SectionTitle>نرخ‌های تعرفه و بازار (ریال/kWh)</SectionTitle>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, fontSize: 10, border: '1px solid #e5e7eb' }}>
@@ -196,8 +250,8 @@ function PrintContent({ r, rec, mixItems, mixTotal, customerName, billIdentifier
           </tr>
         </thead>
         <tbody>
-          <TRow cells={['اوج بار', fmt(r.peakKwh), fmt(r.tariffPeakRial), fmt(r.maxWholePeak), fmt(r.avgMarket)]} />
           <TRow cells={['میان بار', fmt(r.midKwh), fmt(r.tariffMidRial), fmt(r.maxWholeMid), fmt(r.avgMarket)]} />
+          <TRow cells={['اوج بار', fmt(r.peakKwh), fmt(r.tariffPeakRial), fmt(r.maxWholePeak), fmt(r.avgMarket)]} />
           <TRow cells={['کم بار', fmt(r.lowKwh), fmt(r.tariffLowRial), fmt(r.maxWholeLow), fmt(r.avgMarket)]} />
         </tbody>
       </table>

@@ -36,11 +36,14 @@ export default function Register() {
 
   const handleSubmitReal = async (e: FormEvent) => {
     e.preventDefault()
-    if (!real.firstName || !real.lastName || !real.nationalCode || !real.mobile || !real.password) {
-      toast.error('لطفاً تمام فیلدهای اجباری را پر کنید')
-      return
-    }
+    if (!real.firstName.trim() || !real.lastName.trim()) { toast.error('نام و نام خانوادگی الزامی است'); return }
+    if (!real.nationalCode) { toast.error('کد ملی الزامی است'); return }
+    if (!real.mobile) { toast.error('موبایل الزامی است'); return }
+    if (!real.password) { toast.error('رمز عبور الزامی است'); return }
     if (!validateNationalCode(real.nationalCode)) { toast.error('کد ملی وارد شده معتبر نیست'); return }
+    if (!/^09\d{9}$/.test(real.mobile)) { toast.error('شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+    if (real.password.length < 6) { toast.error('رمز عبور باید حداقل ۶ کاراکتر باشد'); return }
+    if (real.familiarityType === 0) { toast.error('نحوه آشنایی را انتخاب کنید'); return }
     setSaving(true)
     try {
       const res = await customerApi.publicRegisterReal(real)
@@ -52,11 +55,16 @@ export default function Register() {
 
   const handleSubmitLegal = async (e: FormEvent) => {
     e.preventDefault()
-    if (!legal.companyName || !legal.nationalId || !legal.ceoFullName || !legal.mobile || !legal.password) {
-      toast.error('لطفاً تمام فیلدهای اجباری را پر کنید')
-      return
-    }
+    if (!legal.companyName.trim()) { toast.error('نام شرکت الزامی است'); return }
+    if (!legal.nationalId) { toast.error('شناسه ملی الزامی است'); return }
+    if (!legal.ceoFullName.trim()) { toast.error('نام مدیرعامل الزامی است'); return }
+    if (!legal.mobile) { toast.error('موبایل الزامی است'); return }
+    if (!legal.password) { toast.error('رمز عبور الزامی است'); return }
     if (!validateNationalId(legal.nationalId)) { toast.error('شناسه ملی باید ۱۱ رقم و معتبر باشد'); return }
+    if (!/^09\d{9}$/.test(legal.mobile)) { toast.error('شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+    if (legal.ceoMobile && !/^09\d{9}$/.test(legal.ceoMobile)) { toast.error('موبایل مدیرعامل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+    if (legal.password.length < 6) { toast.error('رمز عبور باید حداقل ۶ کاراکتر باشد'); return }
+    if (legal.familiarityType === 0) { toast.error('نحوه آشنایی را انتخاب کنید'); return }
     setSaving(true)
     try {
       const res = await customerApi.publicRegisterLegal(legal)

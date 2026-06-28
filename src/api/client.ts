@@ -19,16 +19,38 @@ client.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 globally
+// Normalize all responses to ExecutionResult shape so page-level error handling
+// always goes through the same `if (r.code === 200)` path instead of two separate paths.
 client.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 401 → redirect to login
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.href = '/login'
+      return Promise.reject(error)
     }
-    return Promise.reject(error)
+
+    // If server returned a body that looks like ExecutionResult, resolve with it
+    // so that `toast.error(r.message ?? r.caption)` in the caller works correctly.
+    const data = error.response?.data
+    if (data && (data.type !== undefined || data.code !== undefined || data.caption !== undefined)) {
+      return Promise.resolve({ ...error.response, data })
+    }
+
+    // Network error or server returned no body — reject with a synthetic ExecutionResult
+    const status = error.response?.status
+    const synthetic = {
+      type: 'Danger',
+      code: status ?? 0,
+      caption: 'خطا در ارتباط با سرور',
+      message: status
+        ? `سرور با کد ${status} پاسخ داد. لطفاً دوباره تلاش کنید.`
+        : 'ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کنید.',
+      result: null,
+    }
+    return Promise.resolve({ data: synthetic })
   }
 )
 

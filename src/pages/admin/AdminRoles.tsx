@@ -127,7 +127,7 @@ export default function AdminRoles() {
           {item.isInMenu
             ? <span className="mr-auto rounded bg-blue-50 px-1.5 py-0.5 text-[9px] text-blue-500">منو</span>
             : item.controlKey
-              ? <span className="mr-auto rounded bg-amber-50 px-1.5 py-0.5 font-mono text-[9px] text-amber-600">{item.controlKey}</span>
+              ? <span className="mr-auto rounded bg-amber-50 px-1.5 py-0.5 text-[9px] text-amber-600">عملیاتی</span>
               : null}
         </button>
       )
@@ -254,7 +254,7 @@ export default function AdminRoles() {
                   {/* راهنما */}
                   <div className="mb-3 flex gap-3 rounded-lg bg-gray-50 px-3 py-2 text-[10px] text-gray-500">
                     <span className="flex items-center gap-1"><span className="rounded bg-blue-50 px-1 text-blue-500">منو</span> آیتم ناوبری</span>
-                    <span className="flex items-center gap-1"><span className="rounded bg-amber-50 px-1 font-mono text-amber-600">key</span> دسترسی عملیاتی</span>
+                    <span className="flex items-center gap-1"><span className="rounded bg-amber-50 px-1 text-amber-600">عملیاتی</span> دسترسی عملیاتی</span>
                   </div>
                   {roots.map(root => renderNode(root, 0))}
                 </div>

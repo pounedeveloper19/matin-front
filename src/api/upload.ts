@@ -49,6 +49,10 @@ export const uploadApi = {
   info: (fileId: string): Promise<ExecutionResult<FileInfo>> =>
     client.get<ExecutionResult<FileInfo>>(`/File/Info/${fileId}`).then((r) => r.data),
 
+  /** Fetch raw blob for in-browser preview (does not trigger download) */
+  blob: (fileId: string): Promise<Blob> =>
+    client.get<Blob>(`/File/Download/${fileId}`, { responseType: 'blob' }).then((r) => r.data),
+
   /** Download URL (open in browser or anchor tag) */
   downloadUrl: (fileId: string): string => `/api/File/Download/${fileId}`,
 

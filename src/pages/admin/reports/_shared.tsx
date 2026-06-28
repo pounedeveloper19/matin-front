@@ -1,7 +1,7 @@
-import { BarChart2, RefreshCw, Download, Search } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { uploadApi } from '../../../api/upload'
+import { BarChart2, Download, RefreshCw, Search } from 'lucide-react'
+import PreviewDownloadButton from '../../../components/ui/FilePreviewModal'
 import { DatePicker } from '../../../components/ui/Input'
+export { MONTHS, monthName } from '../../../utils'
 
 export const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 export const rial = (n: number) => fmt(n) + ' ریال'
@@ -177,13 +177,11 @@ export function EmptyState({ loading, onLoad, label }: {
 }
 
 export function DownloadReceiptBtn({ fileId }: { fileId: string | null }) {
-  if (!fileId) return null
   return (
-    <button
-      onClick={() => uploadApi.download(fileId).catch(() => toast.error('خطا در دانلود'))}
-      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100">
-      <Download className="h-3 w-3" />
-      دانلود
-    </button>
+    <PreviewDownloadButton
+      fileId={fileId}
+      label="مشاهده"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
+    />
   )
 }

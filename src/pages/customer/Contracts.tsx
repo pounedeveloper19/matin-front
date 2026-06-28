@@ -121,45 +121,58 @@ export default function CustomerContracts() {
                 <div className="flex items-center gap-2">
                   <StatusIcon statusId={c.statusId} />
                   <Badge variant={contractStatusVariant(c.status)}>{c.status}</Badge>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await customerApi.getContractPrintData(c.id)
-                        if (res.code === 200 && res.result) {
-                          const d = res.result as any
-                          setPrintData({
-                            contractNumber: d.contractNumber,
-                            customerName: d.companyName,
-                            customerIdentifier: d.nationalId,
-                            registerNumber: d.registerNumber,
-                            ceoFullName: d.ceoFullName,
-                            ceoNationalId: d.ceoNationalId,
-                            gazetteDate: d.gazetteDate,
-                            subscription: d.subscription,
-                            address: d.address,
-                            postalCode: d.postalCode,
-                            startDate: d.startDate,
-                            endDate: d.endDate,
-                            contractRate: d.contractRate,
-                            contractPowerKw: d.contractPowerKw,
-                            contractVolumeKwh: d.contractVolumeKwh,
-                            contractAmountRial: d.contractAmountRial,
-                            status: d.status,
-                            warrantyAmount: d.warrantyAmount,
-                            warrantyType: d.warrantyType,
-                          })
-                        } else {
-                          toast.error('خطا در دریافت اطلاعات قرارداد')
-                        }
-                      } catch { toast.error('خطا در ارتباط با سرور') }
-                    }}
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                    title="مشاهده / چاپ"
-                  >
-                    <Printer className="h-4 w-4" />
-                  </button>
+                  {!c.status?.includes('عدم تایید') && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await customerApi.getContractPrintData(c.id)
+                          if (res.code === 200 && res.result) {
+                            const d = res.result as any
+                            setPrintData({
+                              contractNumber: d.contractNumber,
+                              customerName: d.companyName,
+                              customerIdentifier: d.nationalId,
+                              registerNumber: d.registerNumber,
+                              ceoFullName: d.ceoFullName,
+                              ceoNationalId: d.ceoNationalId,
+                              gazetteDate: d.gazetteDate,
+                              subscription: d.subscription,
+                              address: d.address,
+                              postalCode: d.postalCode,
+                              startDate: d.startDate,
+                              endDate: d.endDate,
+                              contractRate: d.contractRate,
+                              contractPowerKw: d.contractPowerKw,
+                              contractVolumeKwh: d.contractVolumeKwh,
+                              contractAmountRial: d.contractAmountRial,
+                              status: d.status,
+                              warrantyAmount: d.warrantyAmount,
+                              warrantyType: d.warrantyType,
+                            })
+                          } else {
+                            toast.error('خطا در دریافت اطلاعات قرارداد')
+                          }
+                        } catch { toast.error('خطا در ارتباط با سرور') }
+                      }}
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                      title="مشاهده / چاپ"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Rejection reason banner */}
+              {c.status?.includes('عدم تایید') && c.rejectionReason && (
+                <div className="flex items-start gap-2 px-5 py-3 text-sm" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
+                  <span className="mt-0.5 shrink-0 text-red-400">⚠</span>
+                  <div>
+                    <span className="font-semibold text-red-700">علت رد: </span>
+                    <span className="text-red-600">{c.rejectionReason}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Contract details bento */}
               <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">

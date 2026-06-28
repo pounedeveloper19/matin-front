@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   MessageSquare, Plus, Send, CheckCircle,
   AlertTriangle, Clock, RefreshCw, XCircle, MousePointer,
-  Paperclip, Download, X,
+  Paperclip, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { uploadApi } from '../../api/upload'
+import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
 import { StatCard } from '../../components/ui/Card'
 import Badge, { ticketStatusVariant } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -214,11 +215,11 @@ export default function CustomerTickets() {
                     </div>
                     {m.body && <p className="leading-relaxed text-gray-700">{m.body}</p>}
                     {m.fileId && (
-                      <button
-                        onClick={() => uploadApi.download(m.fileId!).catch(() => toast.error('خطا در دانلود'))}
-                        className="mt-1 flex items-center gap-1.5 self-start rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
-                        <Download className="h-3.5 w-3.5" /> دانلود پیوست
-                      </button>
+                      <PreviewDownloadButton
+                        fileId={m.fileId!}
+                        label="پیش‌نمایش پیوست"
+                        className="mt-1 flex items-center gap-1.5 self-start rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                      />
                     )}
                   </div>
                 ))}

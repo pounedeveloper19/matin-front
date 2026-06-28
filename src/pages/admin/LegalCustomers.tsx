@@ -18,6 +18,7 @@ const emptyForm: AdminLegalCustomer = {
   id: 0, nationalId: '', companyName: '', ceoFullName: '', economicCode: '',
   ceoMobile: '', familiarityType: 0, customerTypeId: 2, isActive: true,
   registerNumber: '', ceoNationalId: '', gazetteDate: '',
+  agentFullName: '', agentMobile: '', password: '',
 }
 
 const familiarityOptions = [
@@ -111,7 +112,7 @@ export default function AdminLegalCustomers() {
     finally { setBulkDeleting(false) }
   }
 
-  const openCreate = () => { setForm(emptyForm); setModal('create') }
+  const openCreate = () => { setForm({ ...emptyForm }); setModal('create') }
   const openEdit = async (row: AdminLegalCustomer) => {
     try {
       const res = await adminApi.getLegalCustomerDetail(row.id)
@@ -129,6 +130,12 @@ export default function AdminLegalCustomers() {
     if (form.ceoNationalId && !validateNationalCode(form.ceoNationalId)) { toast.error('کد ملی مدیرعامل معتبر نیست'); return }
     if (form.ceoMobile && !validateMobile(form.ceoMobile)) {
       toast.error('موبایل مدیرعامل باید ۱۱ رقم و با ۰۹ شروع شود'); return
+    }
+    if (modal === 'create') {
+      if (!form.agentFullName?.trim()) { toast.error('نام کامل نماینده الزامی است'); return }
+      if (!form.agentMobile?.trim()) { toast.error('موبایل نماینده الزامی است'); return }
+      if (!validateMobile(form.agentMobile)) { toast.error('موبایل نماینده باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+      if (!form.password?.trim()) { toast.error('رمز عبور نماینده الزامی است'); return }
     }
     setSaving(true)
     try {
@@ -286,6 +293,7 @@ export default function AdminLegalCustomers() {
       {/* Create / Edit Modal */}
       <Modal open={modal === 'create' || modal === 'edit'} onClose={() => setModal(null)}
         title={modal === 'create' ? 'مشتری حقوقی جدید' : 'ویرایش مشتری حقوقی'} size="lg">
+        {/* Company info */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="نام شرکت *" value={form.companyName} onChange={f('companyName')} placeholder="نام کامل شرکت" />
           <Input label="شناسه ملی *" value={form.nationalId} onChange={fNum('nationalId')} placeholder="۱۱ رقم" maxLength={11} inputMode="numeric" />
@@ -303,12 +311,47 @@ export default function AdminLegalCustomers() {
             </select>
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <input type="checkbox" id="legalActive" checked={form.isActive ?? true}
+            <input type="checkbox" id="legalActive" checked={form.isActive === true}
               onChange={(e) => setForm(p => ({ ...p, isActive: e.target.checked }))}
               className="h-4 w-4 rounded border-gray-300 accent-primary-600" />
             <label htmlFor="legalActive" className="text-sm text-gray-700">کاربر فعال است</label>
           </div>
         </div>
+
+        {/* Agent section — only on create */}
+        {modal === 'create' && (
+          <div className="mt-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary-800">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-primary-700 text-xs">★</span>
+              نماینده کاربری
+            </div>
+            <p className="mb-3 text-xs text-gray-500">اطلاعات ورود کاربری که با این حساب وارد سیستم می‌شود.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Input
+                label="نام کامل نماینده *"
+                value={form.agentFullName ?? ''}
+                onChange={e => setForm(p => ({ ...p, agentFullName: e.target.value }))}
+                placeholder="نام و نام خانوادگی"
+              />
+              <Input
+                label="موبایل نماینده *"
+                value={form.agentMobile ?? ''}
+                onChange={e => setForm(p => ({ ...p, agentMobile: e.target.value.replace(/\D/g, '') }))}
+                placeholder="09xxxxxxxxx"
+                maxLength={11}
+                inputMode="numeric"
+              />
+              <Input
+                label="رمز عبور *"
+                type="password"
+                value={form.password ?? ''}
+                onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                placeholder="حداقل ۴ کاراکتر"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button loading={saving} onClick={handleSave}>

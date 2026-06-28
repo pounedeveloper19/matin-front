@@ -8,6 +8,7 @@ const pageTitles: Record<string, string> = {
   '/customer/contracts':  'قراردادها',
   '/customer/bills':      'تحلیل قبض',
   '/customer/tickets':    'تیکت‌های پشتیبانی',
+  '/customer/savings':    'سود انباشته',
   '/admin/dashboard':     'داشبورد مدیریت',
   '/admin/legal-customers': 'مشتریان حقوقی',
   '/admin/real-customers':  'مشتریان حقیقی',
@@ -20,7 +21,8 @@ const pageTitles: Record<string, string> = {
   '/admin/announcements':   'اعلانات',
   '/admin/pending-users':   'درخواست‌های ثبت‌نام',
   '/admin/power-entities':  'شرکت‌های برق',
-  '/admin/bill-analysis':   'محاسبه تعرفه و سفارش',
+  '/admin/bill-analysis':      'محاسبه تعرفه و سفارش',
+  '/admin/reports/savings':    'گزارش سود انباشته',
 }
 
 interface LayoutProps {

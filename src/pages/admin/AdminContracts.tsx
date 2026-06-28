@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Plus, Pencil, Trash2, FileText, Download, Printer, CheckCircle, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
-import { uploadApi } from '../../api/upload'
 import { lookupApi } from '../../api/lookup'
 import type { SubOption, IdTitle } from '../../api/lookup'
 import { Table, Pagination } from '../../components/ui/Table'
@@ -36,9 +35,10 @@ export default function AdminContracts() {
   const [totalPages, setTotalPages] = useState(1)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
+  const [modal, setModal] = useState<'create' | 'edit' | 'delete' | 'reject' | null>(null)
   const [form, setForm] = useState<AdminContract>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [subscriptions, setSubscriptions] = useState<SubOption[]>([])
   const [subsLoading, setSubsLoading] = useState(true)
   const [guaranteeTypes, setGuaranteeTypes] = useState<IdTitle[]>([])
@@ -86,15 +86,29 @@ export default function AdminContracts() {
 
   const openCreate = () => { setForm(emptyForm); setSelectedCustomer(''); setModal('create') }
   const openEdit = async (row: AdminContract) => {
-    try { const res = await adminApi.getContractDetail(row.id); setForm(res.result ?? row) }
-    catch { setForm(row) }
-    setSelectedCustomer(subscriptions.find(s => s.id === row.subscriptionId)?.customerName ?? '')
+    let subId = row.subscriptionId
+    try {
+      const res = await adminApi.getContractDetail(row.id)
+      const detail = res.result ?? row
+      setForm(detail)
+      subId = (detail as AdminContract).subscriptionId ?? row.subscriptionId
+    } catch { setForm(row) }
+    setSelectedCustomer(subscriptions.find(s => s.id === subId)?.customerName ?? '')
     setModal('edit')
   }
-  const openDelete = (row: AdminContract) => { setForm(row); setModal('delete') }
+  const openDelete  = (row: AdminContract) => { setForm(row); setModal('delete') }
+  const openReject  = (row: AdminContract) => { setForm(row); setRejectionReason(''); setModal('reject') }
 
   const handleSave = async () => {
-    if (!form.subscriptionId) { toast.error('لطفاً شناسه را انتخاب کنید'); return }
+    if (!form.subscriptionId) { toast.error('لطفاً شناسه اشتراک را انتخاب کنید'); return }
+    if (!form.contractRate || form.contractRate <= 0) { toast.error('نرخ قرارداد باید بزرگتر از صفر باشد'); return }
+    if (form.contractPowerKw != null && form.contractPowerKw <= 0) { toast.error('قدرت قرارداد باید بزرگتر از صفر باشد'); return }
+    if (form.contractVolumeKwh != null && form.contractVolumeKwh <= 0) { toast.error('حجم قرارداد باید بزرگتر از صفر باشد'); return }
+    if (form.contractAmountRial != null && form.contractAmountRial <= 0) { toast.error('مبلغ قرارداد باید بزرگتر از صفر باشد'); return }
+    if (form.amount != null && form.amount < 0) { toast.error('مبلغ ضمانت نمی‌تواند منفی باشد'); return }
+    if (form.startDate && form.endDate && form.startDate > form.endDate) {
+      toast.error('تاریخ پایان باید بعد از تاریخ شروع باشد'); return
+    }
     if (
       form.contractVolumeKwh != null && form.contractPowerKw != null &&
       form.contractVolumeKwh > form.contractPowerKw * 720
@@ -113,6 +127,17 @@ export default function AdminContracts() {
     finally { setSaving(false) }
   }
 
+  const handleReject = async () => {
+    setSaving(true)
+    try {
+      const res = await adminApi.rejectContract(form.id, rejectionReason || null)
+      if (res.code === 200) {
+        toast.success('قرارداد رد شد'); setModal(null); fetchData(page)
+      } else { toast.error(res.message ?? res.caption ?? 'خطا') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSaving(false) }
+  }
+
   const handleDelete = async () => {
     if (isFinalized(form.status)) { toast.error('قرارداد قطعی‌شده قابل حذف نیست'); return }
     setSaving(true)
@@ -123,13 +148,6 @@ export default function AdminContracts() {
       } else { toast.error(res.message ?? res.caption ?? 'خطا در حذف') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
-  }
-
-  const handleWarrantyDownload = async () => {
-    if (!printData?.warrantyFileId) return
-    try {
-      await uploadApi.download(printData.warrantyFileId, 'ضمانت‌نامه')
-    } catch { toast.error('خطا در دانلود فایل ضمانت‌نامه') }
   }
 
   const activeCount  = data.filter(c => c.status?.includes('فعال') || c.status?.includes('تایید')).length
@@ -245,6 +263,7 @@ export default function AdminContracts() {
                     subscription: d.subscription,
                     address: d.address,
                     postalCode: d.postalCode,
+                    province: d.province,
                     startDate: d.startDate,
                     endDate: d.endDate,
                     contractRate: d.contractRate,
@@ -269,6 +288,12 @@ export default function AdminContracts() {
           <button onClick={() => openEdit(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
+          {!isFinalized(row.status) && !row.status?.includes('عدم تایید') && !row.status?.includes('رد') && (
+            <button onClick={() => openReject(row)} title="رد قرارداد"
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+              <XCircle className="h-3.5 w-3.5" />
+            </button>
+          )}
           {!isFinalized(row.status) && (
             <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
@@ -388,8 +413,33 @@ export default function AdminContracts() {
         open={!!printData}
         data={printData}
         onClose={() => setPrintData(null)}
-        onWarrantyDownload={printData?.warrantyFileId ? handleWarrantyDownload : undefined}
       />
+
+      {/* Reject Confirm */}
+      <Modal open={modal === 'reject'} onClose={() => setModal(null)} title="رد قرارداد" size="sm">
+        <p className="text-sm text-gray-600">
+          قرارداد <span className="font-bold text-gray-900">{form.contractNumber}</span> رد خواهد شد
+          و وضعیت آن به «عدم تایید» تغییر می‌یابد.
+        </p>
+        <div className="mt-4">
+          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+            علت رد <span className="font-normal text-gray-400">(اختیاری)</span>
+          </label>
+          <textarea
+            rows={3}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-red-400 focus:outline-none resize-none"
+            placeholder="دلیل رد قرارداد را بنویسید..."
+            value={rejectionReason}
+            onChange={e => setRejectionReason(e.target.value)}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
+          <Button variant="danger" loading={saving} onClick={handleReject}>
+            <XCircle className="h-4 w-4" /> رد قرارداد
+          </Button>
+        </div>
+      </Modal>
 
       {/* Delete Confirm */}
       <Modal open={modal === 'delete'} onClose={() => setModal(null)} title="حذف قرارداد" size="sm">

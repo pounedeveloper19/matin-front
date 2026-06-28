@@ -22,6 +22,7 @@ import AdminTickets from './pages/admin/AdminTickets'
 import AdminAnnouncements from './pages/admin/AdminAnnouncements'
 import AdminPowerEntities from './pages/admin/AdminPowerEntities'
 import AdminTariffCodes from './pages/admin/AdminTariffCodes'
+import AdminTariffPenalties from './pages/admin/AdminTariffPenalties'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminRoles from './pages/admin/AdminRoles'
 import AdminOrders from './pages/admin/AdminOrders'
@@ -30,7 +31,9 @@ import AdminTooltips from './pages/admin/AdminTooltips'
 import AdminReportContracts from './pages/admin/reports/AdminReportContracts'
 import AdminReportOrders from './pages/admin/reports/AdminReportOrders'
 import AdminReportPayments from './pages/admin/reports/AdminReportPayments'
+import AdminReportSavings from './pages/admin/reports/AdminReportSavings'
 import CustomerOrders from './pages/customer/Orders'
+import CustomerSavings from './pages/customer/CustomerSavings'
 import Register from './pages/Register'
 
 function ProtectedRoute({ children, role }: { children: JSX.Element; role?: 'admin' | 'customer' }) {
@@ -69,8 +72,9 @@ export default function App() {
         <Route path="bills" element={<CustomerBills />} />
         <Route path="bills/optimal" element={<BillOptimal />} />
         <Route path="bills/history" element={<BillHistory />} />
-        <Route path="tickets" element={<CustomerTickets />} />
-        <Route path="orders" element={<CustomerOrders />} />
+        <Route path="tickets"  element={<CustomerTickets />} />
+        <Route path="orders"   element={<CustomerOrders />} />
+        <Route path="savings"  element={<CustomerSavings />} />
       </Route>
 
       {/* Admin */}
@@ -95,7 +99,8 @@ export default function App() {
         <Route path="announcements"   element={<AdminAnnouncements />} />
         <Route path="pending-users"   element={<AdminPendingUsers />} />
         <Route path="power-entities"  element={<AdminPowerEntities />} />
-        <Route path="tariff-codes"    element={<AdminTariffCodes />} />
+        <Route path="tariff-codes"       element={<AdminTariffCodes />} />
+        <Route path="tariff-penalties"   element={<AdminTariffPenalties />} />
         <Route path="users"           element={<AdminUsers />} />
         <Route path="roles"           element={<AdminRoles />} />
         <Route path="orders"             element={<AdminOrders />} />
@@ -104,6 +109,7 @@ export default function App() {
         <Route path="reports/contracts" element={<AdminReportContracts />} />
         <Route path="reports/orders"    element={<AdminReportOrders />} />
         <Route path="reports/payments"  element={<AdminReportPayments />} />
+        <Route path="reports/savings"   element={<AdminReportSavings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

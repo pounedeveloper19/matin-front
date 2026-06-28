@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Plus, Pencil, Trash2, MapPin, Zap, FileText, Download,
+  Plus, Pencil, Trash2, MapPin, Zap, FileText,
   User2, Clock, BarChart3, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validateBillIdentifier } from '../../utils/validators'
 import { adminApi } from '../../api/admin'
-import { uploadApi } from '../../api/upload'
+import PreviewDownloadButton from '../ui/FilePreviewModal'
 import { lookupApi } from '../../api/lookup'
 import type { IdTitle, IdName } from '../../api/lookup'
 import Modal from '../ui/Modal'
@@ -214,7 +214,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
   const [addrSaving, setAddrSaving]         = useState(false)
 
   // ── subscription modals
-  const [subModal, setSubModal]             = useState<'create' | 'delete' | null>(null)
+  const [subModal, setSubModal]             = useState<'create' | 'edit' | 'delete' | null>(null)
   const [subForm, setSubForm]               = useState<AdminSubscription>(emptySub)
   const [subSaving, setSubSaving]           = useState(false)
 
@@ -425,6 +425,8 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
 
   // ── subscription CRUD
   const openCreateSub = () => { setSubForm(emptySub); setSubModal('create') }
+  const openEditSub   = (row: SubRow) =>
+    { setSubForm({ id: row.id, billIdentifier: row.billIdentifier, contractCapacityKw: row.contractCapacityKw, addressId: 0 }); setSubModal('edit') }
   const openDeleteSub = (row: SubRow) =>
     { setSubForm({ ...emptySub, id: row.id, billIdentifier: row.billIdentifier }); setSubModal('delete') }
 
@@ -436,6 +438,19 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
     try {
       const res = await adminApi.createAdminSubscription(subForm)
       if (res.code === 200) { toast.success('شناسه ثبت شد'); setSubModal(null); fetchSubscriptions() }
+      else { toast.error(res.message ?? res.caption ?? 'خطا') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSubSaving(false) }
+  }
+
+  const handleEditSub = async () => {
+    if (!subForm.billIdentifier) { toast.error('شناسه قبض الزامی است'); return }
+    if (!/^\d{13}$/.test(subForm.billIdentifier)) { toast.error('شناسه قبض باید دقیقاً ۱۳ رقم باشد'); return }
+    if (!validateBillIdentifier(subForm.billIdentifier)) { toast.error('شناسه قبض معتبر نیست (رقم کنترل اشتباه است)'); return }
+    setSubSaving(true)
+    try {
+      const res = await adminApi.updateAdminSubscription(subForm)
+      if (res.code === 200) { toast.success('شناسه ویرایش شد'); setSubModal(null); fetchSubscriptions() }
       else { toast.error(res.message ?? res.caption ?? 'خطا') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSubSaving(false) }
@@ -477,7 +492,7 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
   return (
     <>
       <Modal open={open} onClose={onClose} title={`پروفایل — ${customerTitle}`} size="2xl" noPadding>
-        <div className="flex" style={{ height: 'calc(82vh - 60px)', direction: 'rtl' }}>
+        <div className="flex h-full" style={{ direction: 'rtl' }}>
 
           {/* ── Right sidebar: vertical tabs */}
           <div className="w-44 shrink-0 border-l border-gray-100 bg-gray-50/80 p-2 space-y-0.5 overflow-y-auto">
@@ -592,6 +607,10 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           {s.contractCapacityKw != null && <Badge variant="blue">{s.contractCapacityKw} kW</Badge>}
+                          <button onClick={() => openEditSub(s)}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                           <button onClick={() => openDeleteSub(s)}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
                             <Trash2 className="h-3.5 w-3.5" />
@@ -885,11 +904,11 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
                     style={{ background: 'rgba(236,253,245,0.5)', border: '1px solid rgba(209,250,229,0.6)' }}>
                     <FileText className="h-5 w-5 shrink-0 text-emerald-500" />
                     <span className="flex-1 text-sm text-gray-700">مدرک شناسایی بارگذاری شده است</span>
-                    <button
-                      onClick={() => uploadApi.download(identityDocId).catch(() => {})}
-                      className="flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
-                      <Download className="h-3.5 w-3.5" /> دانلود
-                    </button>
+                    <PreviewDownloadButton
+                      fileId={identityDocId}
+                      label="پیش‌نمایش"
+                      className="flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    />
                   </div>
                 ) : (
                   <div className="py-10 text-center text-sm text-gray-400">
@@ -956,6 +975,21 @@ export default function CustomerDetailPanel({ open, profileId, customerTitle, cu
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSubModal(null)}>انصراف</Button>
           <Button loading={subSaving} onClick={handleSaveSub}>ثبت شناسه</Button>
+        </div>
+      </Modal>
+
+      <Modal open={subModal === 'edit'} onClose={() => setSubModal(null)} title="ویرایش شناسه قبض" size="md">
+        <div className="space-y-4">
+          <Input label="شناسه قبض *" value={subForm.billIdentifier}
+            onChange={e => setSubForm({ ...subForm, billIdentifier: e.target.value.replace(/\D/g, '') })}
+            placeholder="۱۳ رقم" maxLength={13} inputMode="numeric" />
+          <Input label="ظرفیت قرارداد (kW)" type="number" value={subForm.contractCapacityKw ?? ''}
+            onChange={e => setSubForm({ ...subForm, contractCapacityKw: e.target.value === '' ? null : +e.target.value })}
+            placeholder="مثلاً ۵۰۰" />
+        </div>
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <Button variant="secondary" onClick={() => setSubModal(null)}>انصراف</Button>
+          <Button loading={subSaving} onClick={handleEditSub}>ذخیره تغییرات</Button>
         </div>
       </Modal>
 

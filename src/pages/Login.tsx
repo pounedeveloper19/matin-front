@@ -28,10 +28,9 @@ export default function Login() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!mobile || !password) {
-      toast.error('لطفاً تمام فیلدها را پر کنید')
-      return
-    }
+    if (!mobile || !password) { toast.error('لطفاً تمام فیلدها را پر کنید'); return }
+    if (!/^09\d{9}$/.test(mobile)) { toast.error('شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
+    if (password.length < 6) { toast.error('رمز عبور باید حداقل ۶ کاراکتر باشد'); return }
     setLoading(true)
     try {
       const res = await authApi.login({ mobile, password })
@@ -62,6 +61,7 @@ export default function Login() {
   const handleForgotSendOtp = async (e: FormEvent) => {
     e.preventDefault()
     if (!forgotMobile) { toast.error('شماره موبایل را وارد کنید'); return }
+    if (!/^09\d{9}$/.test(forgotMobile)) { toast.error('شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود'); return }
     setForgotLoading(true)
     try {
       const res = await authApi.forgotSendOtp(forgotMobile)
@@ -81,6 +81,7 @@ export default function Login() {
   const handleForgotVerifyOtp = async (e: FormEvent) => {
     e.preventDefault()
     if (!forgotCode) { toast.error('کد تأیید را وارد کنید'); return }
+    if (!/^\d{4,8}$/.test(forgotCode)) { toast.error('کد تأیید باید عدد و ۴ تا ۸ رقم باشد'); return }
     setForgotLoading(true)
     try {
       const res = await authApi.forgotVerifyOtp(forgotMobile, forgotCode)
@@ -99,6 +100,7 @@ export default function Login() {
   const handleForgotReset = async (e: FormEvent) => {
     e.preventDefault()
     if (!forgotNewPass) { toast.error('رمز عبور جدید را وارد کنید'); return }
+    if (forgotNewPass.length < 6) { toast.error('رمز عبور باید حداقل ۶ کاراکتر باشد'); return }
     if (forgotNewPass !== forgotNewPass2) { toast.error('رمز عبور و تکرار آن یکسان نیستند'); return }
     setForgotLoading(true)
     try {

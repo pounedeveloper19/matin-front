@@ -78,13 +78,16 @@ export default function AdminTariffCodes() {
 
   // ── Code CRUD
   const handleSaveCode = async () => {
-    if (!codeForm.code.trim() || !codeForm.title.trim()) { toast.error('کد و عنوان الزامی است'); return }
+    if (!codeForm.code.trim()) { toast.error('کد تعرفه الزامی است'); return }
+    if (codeForm.code.trim().length > 20) { toast.error('کد تعرفه نباید بیشتر از ۲۰ کاراکتر باشد'); return }
+    if (!codeForm.title.trim()) { toast.error('عنوان کد تعرفه الزامی است'); return }
+    if (codeForm.title.trim().length > 100) { toast.error('عنوان نباید بیشتر از ۱۰۰ کاراکتر باشد'); return }
     setSaving(true)
     try {
       const res = codeModal === 'create'
         ? await adminApi.createTariffCode(codeForm)
         : await adminApi.updateTariffCode(codeForm)
-      if (res.type === 'Success') {
+      if (res.type === 'Success' || res.code === 200) {
         toast.success(codeModal === 'create' ? 'کد تعرفه ثبت شد' : 'کد تعرفه ویرایش شد')
         setCodeModal(null); fetchCodes()
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -96,7 +99,7 @@ export default function AdminTariffCodes() {
     setSaving(true)
     try {
       const res = await adminApi.deleteTariffCode(codeForm.id)
-      if (res.type === 'Success') {
+      if (res.type === 'Success' || res.code === 200) {
         toast.success('کد تعرفه حذف شد')
         setCodeModal(null)
         if (selectedCode?.id === codeForm.id) { setSelectedCode(null); setSelectedOption(null) }
@@ -121,12 +124,13 @@ export default function AdminTariffCodes() {
 
   const handleSaveOption = async () => {
     if (!optionForm.title.trim()) { toast.error('عنوان گزینه الزامی است'); return }
+    if (optionForm.title.trim().length > 100) { toast.error('عنوان گزینه نباید بیشتر از ۱۰۰ کاراکتر باشد'); return }
     setSaving(true)
     try {
       const res = optionModal === 'create'
         ? await adminApi.createTariffCodeOption(optionForm)
         : await adminApi.updateTariffCodeOption(optionForm)
-      if (res.type === 'Success') {
+      if (res.type === 'Success' || res.code === 200) {
         toast.success(optionModal === 'create' ? 'گزینه ثبت شد' : 'گزینه ویرایش شد')
         setOptionModal(null); if (selectedCode) fetchOptions(selectedCode.id)
       } else { toast.error(res.message ?? res.caption ?? 'خطا') }
@@ -138,7 +142,7 @@ export default function AdminTariffCodes() {
     setSaving(true)
     try {
       const res = await adminApi.deleteTariffCodeOption(optionForm.id)
-      if (res.type === 'Success') {
+      if (res.type === 'Success' || res.code === 200) {
         toast.success('گزینه حذف شد')
         setOptionModal(null)
         if (selectedOption?.id === optionForm.id) setSelectedOption(null)
@@ -150,13 +154,17 @@ export default function AdminTariffCodes() {
 
   // ── Rate CRUD
   const handleSaveRate = async () => {
-    if (rateForm.rateRialPerKwh <= 0) { toast.error('نرخ باید بزرگتر از صفر باشد'); return }
+    if (!rateForm.rateRialPerKwh || rateForm.rateRialPerKwh <= 0) { toast.error('نرخ میان‌بار الزامی و باید بزرگتر از صفر باشد'); return }
+    if (!rateForm.ratePeakRialPerKwh || rateForm.ratePeakRialPerKwh <= 0) { toast.error('نرخ اوج‌بار الزامی و باید بزرگتر از صفر باشد'); return }
+    if (!rateForm.rateLowRialPerKwh || rateForm.rateLowRialPerKwh <= 0) { toast.error('نرخ کم‌بار الزامی و باید بزرگتر از صفر باشد'); return }
+    if (rateForm.ratePeakRialPerKwh <= rateForm.rateRialPerKwh) { toast.error('نرخ اوج‌بار باید از نرخ میان‌بار بیشتر باشد'); return }
+    if (rateForm.rateLowRialPerKwh >= rateForm.rateRialPerKwh) { toast.error('نرخ کم‌بار باید از نرخ میان‌بار کمتر باشد'); return }
     setRateSaving(true)
     try {
       const res = rateModal === 'create'
         ? await adminApi.createTariffCodeOptionRate(rateForm)
         : await adminApi.updateTariffCodeOptionRate(rateForm)
-      if (res.type === 'Success' || res.code === 200) {
+      if (res.type === 'Success' || res.code === 200 || res.code === 200) {
         toast.success(rateModal === 'create' ? 'نرخ ثبت شد' : 'نرخ ویرایش شد')
         setRateModal(null); if (selectedOption) fetchRates(selectedOption.id)
       } else { toast.error(res.message ?? 'خطا') }
@@ -168,7 +176,7 @@ export default function AdminTariffCodes() {
     setRateSaving(true)
     try {
       const res = await adminApi.deleteTariffCodeOptionRate(rateForm.id)
-      if (res.type === 'Success' || res.code === 200) {
+      if (res.type === 'Success' || res.code === 200 || res.code === 200) {
         toast.success('نرخ حذف شد')
         setRateModal(null); if (selectedOption) fetchRates(selectedOption.id)
       } else { toast.error(res.message ?? 'خطا') }
@@ -282,14 +290,6 @@ export default function AdminTariffCodes() {
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-800">{opt.title}</p>
-                      <div className="mt-1.5 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                          جریمه ×{opt.penaltyMultiplier}
-                        </span>
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
-                          بستانکاری ×{opt.creditMultiplier}
-                        </span>
-                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <button
@@ -410,16 +410,7 @@ export default function AdminTariffCodes() {
             <Input label="عنوان گزینه *" value={optionForm.title} placeholder="مثلاً فشار متوسط"
               onChange={e => setOptionForm(f => ({ ...f, title: e.target.value }))} />
           </div>
-          <div>
-            <Input label="ضریب جریمه مازاد" type="number" value={optionForm.penaltyMultiplier}
-              onChange={e => setOptionForm(f => ({ ...f, penaltyMultiplier: +e.target.value }))} />
-            <p className="mt-1 text-[10px] text-gray-400">پیش‌فرض: ۱.۳</p>
-          </div>
-          <div>
-            <Input label="ضریب بستانکاری کسری" type="number" value={optionForm.creditMultiplier}
-              onChange={e => setOptionForm(f => ({ ...f, creditMultiplier: +e.target.value }))} />
-            <p className="mt-1 text-[10px] text-gray-400">پیش‌فرض: ۰.۷۵</p>
-          </div>
+          <p className="sm:col-span-2 text-[11px] text-gray-400">ضرایب و جرایم از صفحه «ضرایب و جرایم» قابل تنظیم است.</p>
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setOptionModal(null)}>انصراف</Button>

@@ -4,11 +4,10 @@ import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import Button from '../../components/ui/Button'
-import { DonutChart, AreaWave } from '../../components/ui/Charts'
+import { DonutChart } from '../../components/ui/Charts'
 import type { HourEntry } from '../../types'
-import { toArr } from '../../utils'
+import { toArr, MONTHS } from '../../utils'
 
-const JALALI_MONTHS = ['','فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 
 function getTouStyle(title: string): { bg: string; text: string } {
   if (title.includes('جمعه'))                          return { bg: 'bg-purple-500', text: 'text-white' }
@@ -32,6 +31,7 @@ export default function AdminTouSchedule() {
   const [copying, setCopying]       = useState(false)
   const [copyFromMonth, setCopyFromMonth] = useState<number>(1)
   const [dragging, setDragging]     = useState(false)
+  const [hoverHour, setHoverHour]   = useState<number | null>(null)
 
   // Range selection
   const [rangeFrom, setRangeFrom] = useState(0)
@@ -92,21 +92,13 @@ export default function AdminTouSchedule() {
     finally { setSaving(false) }
   }
 
-  const clearAll = () => setSchedule({})
-
-  const fillAll = (toutypeId: number) => {
-    const map: Record<number, number> = {}
-    for (let h = 0; h < 24; h++) map[h] = toutypeId
-    setSchedule(map)
-  }
-
   const handleCopy = async () => {
     if (copyFromMonth === month) { toast.error('ماه مبدأ و مقصد یکسان است'); return }
     setCopying(true)
     try {
       const res = await adminApi.copyTouFromMonth(entityId, copyFromMonth, month)
       if (res.code === 200) {
-        toast.success(`برنامه از ${JALALI_MONTHS[copyFromMonth]} کپی شد`)
+        toast.success(`برنامه از ${MONTHS[copyFromMonth - 1]} کپی شد`)
         setLoading(true)
         const r2 = await adminApi.getMonthSchedule(entityId, month)
         const hours = toArr(r2.result) as HourEntry[]
@@ -117,6 +109,14 @@ export default function AdminTouSchedule() {
       } else { toast.error(res.message ?? res.caption ?? 'خطا در کپی') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setCopying(false) }
+  }
+
+  const clearAll = () => setSchedule({})
+
+  const fillAll = (toutypeId: number) => {
+    const map: Record<number, number> = {}
+    for (let h = 0; h < 24; h++) map[h] = toutypeId
+    setSchedule(map)
   }
 
   // ── Excel upload ──────────────────────────────────────────────────────
@@ -180,6 +180,15 @@ export default function AdminTouSchedule() {
   const activeTouStyle = activeTou ? getTouStyle(touTypes.find(t => t.id === activeTou)?.title ?? '') : null
   const activeTouTitle = touTypes.find(t => t.id === activeTou)?.title ?? ''
 
+  // RTL: first JSX item → rightmost. Desired R→L: میان|اوج|کم → JSX order: [میان, اوج, کم]
+  const sortedTouTypes = [...touTypes].sort((a, b) => {
+    const rank = (t: string) =>
+      t.includes('میان') ? 0
+      : t.includes('اوج') || t.includes('پیک') ? 1
+      : t.includes('کم') || t.includes('کمبار') ? 2 : 3
+    return rank(a.title) - rank(b.title)
+  })
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -206,7 +215,7 @@ export default function AdminTouSchedule() {
             onChange={(e) => setMonth(+e.target.value)}
             className="rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
           >
-            {JALALI_MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+            {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>
         </div>
       </div>
@@ -214,7 +223,7 @@ export default function AdminTouSchedule() {
       {/* TOU type picker */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-gray-500">نوع فعال:</span>
-        {touTypes.map((t) => {
+        {sortedTouTypes.map((t) => {
           const s = getTouStyle(t.title)
           return (
             <button
@@ -232,7 +241,7 @@ export default function AdminTouSchedule() {
         >
           پاک کردن همه
         </button>
-        {touTypes.map((t) => {
+        {sortedTouTypes.map((t) => {
           const s = getTouStyle(t.title)
           return (
             <button
@@ -341,7 +350,7 @@ export default function AdminTouSchedule() {
               onChange={(e) => setCopyFromMonth(+e.target.value)}
               className="rounded border-0 bg-transparent text-xs text-gray-700 focus:outline-none"
             >
-              {JALALI_MONTHS.slice(1).map((m, i) => (
+              {MONTHS.map((m, i) => (
                 <option key={i + 1} value={i + 1}>{m}</option>
               ))}
             </select>
@@ -412,15 +421,28 @@ export default function AdminTouSchedule() {
         const totalSet = peakH + midH + lowH
         const offPeakPct = totalSet ? Math.round(((midH + lowH) / 24) * 100) : 0
 
-        const loadProfile = Array.from({ length: 24 }, (_, h) => {
+        const loadOf = (h: number): number => {
           const tou = schedule[h]
-          if (tou === peakId)  return 60 + Math.sin((h - 12) * 0.3) * 20 + Math.random() * 5
-          if (tou === midId)   return 35 + Math.sin((h - 6) * 0.4) * 10  + Math.random() * 4
-          if (tou === lowId)   return 15 + Math.random() * 5
-          return 25 + Math.random() * 8
-        })
+          const dayFactor = Math.sin(((h - 3) / 24) * Math.PI * 2)
+          if (tou === peakId)  return Math.round(70 + dayFactor * 15)
+          if (tou === midId)   return Math.round(38 + dayFactor * 10)
+          if (tou === lowId)   return Math.round(15 + dayFactor * 4)
+          return 25
+        }
 
-        const hourLabels = Array.from({ length: 24 }, (_, i) => i % 3 === 0 ? String(i).padStart(2, '0') : '')
+        const barData = Array.from({ length: 24 }, (_, h) => ({
+          h, v: loadOf(h), touId: schedule[h],
+        }))
+
+        const colorOf = (touId: number | undefined): string => {
+          if (!touId) return '#d1d5db'
+          const t = touTypes.find(t => t.id === touId)
+          if (!t) return '#d1d5db'
+          if (t.title.includes('اوج') || t.title.includes('پیک')) return '#ef4444'
+          if (t.title.includes('میان')) return '#eab308'
+          if (t.title.includes('کم')) return '#22c55e'
+          return '#9ca3af'
+        }
 
         return (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -435,16 +457,71 @@ export default function AdminTouSchedule() {
 
             <div className="col-span-2 rounded-2xl p-5"
               style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid rgba(209,250,229,0.6)' }}>
-              <p className="mb-3 text-xs font-semibold text-gray-600">توزیع بار شبانه‌روزی (شبیه‌سازی)</p>
-              <AreaWave
-                data={loadProfile}
-                color="#10b981"
-                height={110}
-                labels={hourLabels}
-              />
-              <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
-                <span>ابتدای شبانه‌روز</span>
-                <span>انتهای شبانه‌روز</span>
+              <p className="mb-4 text-xs font-semibold text-gray-600">توزیع بار شبانه‌روزی (شبیه‌سازی)</p>
+
+              <div className="flex items-stretch gap-2" dir="ltr">
+                {/* Y-axis labels */}
+                <div className="flex flex-col justify-between text-[10px] text-gray-400 leading-none pb-5 shrink-0" style={{ width: 28 }}>
+                  {[100, 75, 50, 25, 0].map(p => (
+                    <span key={p} className="text-right">{p}٪</span>
+                  ))}
+                </div>
+
+                {/* Chart + X-axis */}
+                <div className="flex-1 flex flex-col">
+                  {/* Bars */}
+                  <div className="relative flex items-end gap-px" style={{ height: 140 }}>
+                    {[75, 50, 25].map(p => (
+                      <div key={p}
+                        className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-gray-100"
+                        style={{ bottom: `${p}%` }}
+                      />
+                    ))}
+                    {barData.map(({ h, v, touId }) => {
+                      const isHovered = hoverHour === h
+                      return (
+                        <div
+                          key={h}
+                          className="relative flex-1 flex items-end cursor-pointer"
+                          style={{ height: '100%' }}
+                          onMouseEnter={() => setHoverHour(h)}
+                          onMouseLeave={() => setHoverHour(null)}
+                        >
+                          <div
+                            className="w-full rounded-t-sm transition-opacity duration-100"
+                            style={{
+                              height: `${v}%`,
+                              background: colorOf(touId),
+                              opacity: hoverHour !== null && !isHovered ? 0.45 : 1,
+                            }}
+                          />
+                          {isHovered && (
+                            <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap rounded-lg bg-gray-800 px-2 py-1 text-[10px] text-white shadow-lg text-center pointer-events-none">
+                              <div className="font-bold">{String(h).padStart(2, '0')}:00</div>
+                              <div>{v}٪</div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* X-axis labels */}
+                  <div className="flex gap-px mt-1">
+                    {barData.map(({ h }) => (
+                      <div key={h} className="flex-1 text-center text-[9px] text-gray-400 leading-none">
+                        {h % 3 === 0 ? String(h).padStart(2, '0') : ''}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Legend — JSX order reversed for RTL so L→R reads میان | اوج | کم */}
+              <div className="mt-3 flex flex-wrap gap-3 justify-center" dir="ltr">
+                {midId  && <div className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-400" /><span className="text-[10px] text-gray-500">میان‌بار</span></div>}
+                {peakId && <div className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /><span className="text-[10px] text-gray-500">اوج‌بار</span></div>}
+                {lowId  && <div className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500" /><span className="text-[10px] text-gray-500">کم‌بار</span></div>}
               </div>
             </div>
           </div>

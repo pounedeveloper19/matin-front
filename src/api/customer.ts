@@ -26,6 +26,9 @@ import type {
   CreateOrderRequest,
   SubmitPaymentRequest,
   PortfolioOptimizationResult,
+  ProformaData,
+  ProfitReportResult,
+  LastBillResult,
 } from '../types'
 
 export const customerApi = {
@@ -134,6 +137,9 @@ export const customerApi = {
   getOrderDetail: (id: number) =>
     client.get<ExecutionResult<OrderDetailResult>>(`/Order/GetOrderDetail/${id}`).then((r) => r.data),
 
+  getProformaData: (id: number) =>
+    client.get<ExecutionResult<ProformaData>>(`/Order/GetProformaData/${id}`).then((r) => r.data),
+
   createOrder: (data: CreateOrderRequest) =>
     client.post<ExecutionResult<number>>('/Order/CreateOrder', data).then((r) => r.data),
 
@@ -144,9 +150,24 @@ export const customerApi = {
   getAnnouncements: () =>
     client.get<ExecutionResult<AnnouncementItem[]>>('/Lookup/GetActiveAnnouncements').then((r) => r.data),
 
-  getProfileMeta: () =>
-    client.get<ExecutionResult<{ identityDocFileId: string | null }>>('/CustomerProfile/GetProfileMeta').then((r) => r.data),
+  getDocuments: () =>
+    client.get<ExecutionResult<import('../types').CustomerDocument[]>>('/CustomerProfile/GetDocuments').then((r) => r.data),
 
-  updateIdentityDoc: (fileId: string | null) =>
-    client.post<ExecutionResult>('/CustomerProfile/UpdateIdentityDoc', { fileId }).then((r) => r.data),
+  addDocument: (fileId: string, title?: string) =>
+    client.post<ExecutionResult>('/CustomerProfile/AddDocument', { fileId, title: title ?? null }).then((r) => r.data),
+
+  deleteDocument: (id: number) =>
+    client.delete<ExecutionResult>(`/CustomerProfile/DeleteDocument/${id}`).then((r) => r.data),
+
+  getMyProfitReport: () =>
+    client.get<ExecutionResult<ProfitReportResult>>('/CustomerReport/GetMyProfitReport').then((r) => r.data),
+
+  getLastBill: (subscriptionId: number) =>
+    client.get<ExecutionResult<LastBillResult | null>>(`/BillCalculation/GetLastBill/${subscriptionId}`).then((r) => r.data),
+
+  updateSubscription: (data: { id: number; billIdentifier: string; contractCapacityKw: number | null }) =>
+    client.put<ExecutionResult>('/CustomerProfile/UpdateSubscription', data).then((r) => r.data),
+
+  deleteSubscription: (id: number) =>
+    client.delete<ExecutionResult>(`/CustomerProfile/DeleteSubscription/${id}`).then((r) => r.data),
 }

@@ -19,7 +19,8 @@ type Tooltip = {
 const empty: Tooltip = { id: 0, pageKey: '', fieldKey: '', title: '', content: '', isActive: true }
 
 const PAGE_OPTIONS = [
-  { value: 'bill-optimal', label: 'بهینه‌ساز خرید (تحلیل قبض)' },
+  { value: 'bill-optimal', label: 'تحلیل قبض — ورودی‌ها' },
+  { value: 'bill_result',  label: 'تحلیل قبض — خروجی‌ها' },
   { value: 'orders',       label: 'سفارشات مشتری' },
   { value: 'contracts',    label: 'قراردادها' },
   { value: 'profile',      label: 'پروفایل' },
@@ -30,15 +31,28 @@ const FIELD_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'year',             label: 'سال شمسی' },
     { value: 'month',            label: 'ماه' },
     { value: 'totalKwh',         label: 'مصرف کل (kWh)' },
-    { value: 'midKwh',           label: 'مصرف میان بار (kWh)' },
     { value: 'peakKwh',          label: 'مصرف اوج بار (kWh)' },
+    { value: 'midKwh',           label: 'مصرف میان بار (kWh)' },
     { value: 'lowKwh',           label: 'مصرف کم بار (kWh)' },
     { value: 'contractDemandKw', label: 'دیماند قراردادی (kW)' },
     { value: 'actualDemandKw',   label: 'دیماند مصرفی (kW)' },
+    { value: 'bilateralKwh',     label: 'قرارداد دوجانبه — انرژی (kWh)' },
+    { value: 'bilateralRate',    label: 'قرارداد دوجانبه — نرخ (ریال/kWh)' },
+    { value: 'greenLawKwh',      label: 'برق سبز — انرژی (kWh)' },
+    { value: 'greenRate',        label: 'برق سبز — نرخ (ریال/kWh)' },
+    { value: 'exchangeKwh',      label: 'بورس برق — انرژی (kWh)' },
+    { value: 'exchangeRate',     label: 'بورس برق — نرخ (ریال/kWh)' },
+  ],
+  'bill_result': [
+    { value: 'output_summary',        label: 'خروجی نهایی (جدول هزینه)' },
+    { value: 'output_compare_chart',  label: 'نمودار مقایسه هزینه' },
+    { value: 'output_optimal_chart',  label: 'نمودار نقطه بهینه خرید از بورس' },
+    { value: 'output_saving_cards',   label: 'کارت‌های خلاصه مالی' },
+    { value: 'output_invoice_detail', label: 'جزئیات صورتحساب (دو ستونی)' },
   ],
   'orders': [
-    { value: 'requestedKwh', label: 'مقدار درخواستی (kWh)' },
-    { value: 'energyType',   label: 'نوع انرژی' },
+    { value: 'requestedKwh',   label: 'مقدار درخواستی (kWh)' },
+    { value: 'energyType',     label: 'نوع انرژی' },
     { value: 'isPriceRequest', label: 'استعلام قیمت' },
   ],
   'contracts': [

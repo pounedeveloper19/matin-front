@@ -42,11 +42,13 @@ export default function AdminMarketRates() {
     setLoading(true)
     adminApi.getMarketRates({ pageNumber: p, pageSize })
       .then((r) => {
+        if (r.code !== 200) { toast.error(r.caption ?? 'خطا در دریافت نرخ‌ها'); return }
         const res = r.result as any
         setData(res?.data ?? [])
         setTotal(res?.totalRecords ?? 0)
         setTotalPages(res?.totalPages ?? 1)
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -61,6 +63,11 @@ export default function AdminMarketRates() {
   const openDelete = (row: MonthlyMarketRate) => { setForm(row); setModal('delete') }
 
   const handleSave = async () => {
+    if (!form.year || form.year < 1390 || form.year > 1430) { toast.error('سال شمسی معتبر نیست'); return }
+    if (!form.month || form.month < 1 || form.month > 12) { toast.error('ماه معتبر نیست'); return }
+    if (form.marketAvg < 0 || form.marketPeak < 0 || form.marketMid < 0 || form.marketLow < 0) {
+      toast.error('نرخ‌ها نمی‌توانند منفی باشند'); return
+    }
     setSaving(true)
     try {
       const res = modal === 'create'

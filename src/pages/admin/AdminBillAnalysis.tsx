@@ -780,7 +780,7 @@ export default function AdminBillAnalysis() {
                 {form.consumptionMode === 'total' ? (
                   <Input label="مصرف کل *" value={form.totalKwh} onChange={set('totalKwh')} placeholder="kWh" inputMode="numeric" />
                 ) : (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Input label="میان بار *" value={form.midKwh}  onChange={set('midKwh')}  placeholder="kWh" inputMode="numeric" />
                     <Input label="اوج بار *"  value={form.peakKwh} onChange={set('peakKwh')} placeholder="kWh" inputMode="numeric" />
                     <Input label="کم بار *"   value={form.lowKwh}  onChange={set('lowKwh')}  placeholder="kWh" inputMode="numeric" />

@@ -82,6 +82,13 @@ export interface AddressResult {
   postalCode: string
 }
 
+export interface CustomerDocument {
+  id: number
+  fileId: string
+  title: string | null
+  createdAt: string
+}
+
 export interface SubscriptionResult {
   id: number
   billIdentifier: string
@@ -131,6 +138,7 @@ export interface ContractResult {
   contractVolumeKwh: number | null
   contractAmountRial: number | null
   paymentDeadline: string | null
+  rejectionReason?: string | null
 }
 
 export interface SubmitWarrantyRequest {
@@ -165,6 +173,7 @@ export interface AdminContract {
   contractVolumeKwh?: number | null
   contractAmountRial?: number | null
   paymentDeadline?: string | null
+  rejectionReason?: string | null
 }
 
 // Bills
@@ -330,6 +339,7 @@ export interface TariffCodeOptionRate {
   rateLowRialPerKwh: number    // نرخ کم‌بار
 }
 
+
 export interface AdvancedBillAnalysisResult {
   monthName: string
   year: number
@@ -415,6 +425,9 @@ export interface AdminLegalCustomer {
   registerNumber?: string
   ceoNationalId?: string
   gazetteDate?: string
+  agentFullName?: string
+  agentMobile?: string
+  password?: string
 }
 
 export interface AdminRealCustomer {
@@ -426,6 +439,7 @@ export interface AdminRealCustomer {
   familiarityType?: number
   customerTypeId?: number
   isActive?: boolean
+  password?: string
 }
 
 export interface AdminAddress {
@@ -689,6 +703,24 @@ export interface OrderDetailResult extends OrderResult {
   payments: PaymentResult[]
 }
 
+export interface ProformaData {
+  id: number
+  billIdentifier: string
+  requestedKwh: number
+  energyType: string
+  priceAtMoment: number
+  orderDate: string | null
+  buyerName: string | null
+  nationalId: string | null
+  economicCode: string | null
+  registerNumber: string | null
+  phone: string | null
+  address: string | null
+  postalCode: string | null
+  city: string | null
+  province: string | null
+}
+
 export interface AdminOrderResult {
   id: number
   billId: number
@@ -857,6 +889,74 @@ export interface DashboardMarketRate {
   marketLow: number | null
   greenBoardRate: number | null
   openBoardRate: number | null
+}
+
+export interface ProfitReportRow {
+  year: number
+  month: number
+  subscriptionId: number
+  billIdentifier: string
+  peakCons: number
+  midCons: number
+  lowCons: number
+  costWithoutMatin: number
+  costWithMatin: number
+  netSaving: number
+  cumulativeSaving: number
+}
+
+export interface ProfitReportSummary {
+  totalNetSaving: number
+  totalCostWithMatin: number
+  totalCostWithoutMatin: number
+  monthCount: number
+  savingPercent: number
+}
+
+export interface ProfitReportResult {
+  summary: ProfitReportSummary
+  rows: ProfitReportRow[]
+}
+
+export interface CustomerProfitSummary {
+  profileId: number
+  customerName: string
+  totalNetSaving: number
+  totalCostWithMatin: number
+  totalCostWithoutMatin: number
+  monthCount: number
+  savingPercent: number
+}
+
+export interface BillProfitRow {
+  id: number
+  profileId: number
+  customerName: string
+  year: number
+  month: number
+  billIdentifier: string
+  peakCons: number | null
+  midCons: number | null
+  lowCons: number | null
+  costWithMatin: number | null
+  costWithoutMatin: number | null
+  netSaving: number | null
+}
+
+export interface LastBillResult {
+  year: number
+  month: number
+  peakCons: number | null
+  midCons: number | null
+  lowCons: number | null
+  contractDemandKw: number | null
+  actualDemandKw: number | null
+  bilateralKwh: number | null
+  bilateralRate: number | null
+  exchangeKwh: number | null
+  exchangeRate: number | null
+  greenLawKwh: number | null
+  greenRate: number | null
 }
 
 export interface ActivityRow {

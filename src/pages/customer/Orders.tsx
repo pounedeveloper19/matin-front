@@ -1,19 +1,209 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Plus, CreditCard, RefreshCw, X,
-  ChevronDown, ChevronUp, Receipt, ArrowLeft, CheckCircle, Download,
+  ChevronDown, ChevronUp, Receipt, ArrowLeft, CheckCircle, FileText, Printer,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi, type IdTitle } from '../../api/lookup'
-import { uploadApi } from '../../api/upload'
+import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
 import FileUpload from '../../components/ui/FileUpload'
-import type { OrderResult, OrderDetailResult, SubscriptionResult, AdvancedBillAnalysisResult } from '../../types'
+import type { OrderResult, OrderDetailResult, SubscriptionResult, AdvancedBillAnalysisResult, ProformaData } from '../../types'
 import { toArr } from '../../utils'
 
 const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 const rial = (n: number) => fmt(n) + ' ریال'
+
+function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => void }) {
+  const subtotal = Math.round(data.requestedKwh * data.priceAtMoment)
+  const vat      = Math.round(subtotal * 0.10)
+  const total    = subtotal + vat
+  const num      = `PF-${String(data.id).padStart(5, '0')}`
+
+  const tdStyle = (center?: boolean): React.CSSProperties => ({
+    border: '1px solid #bbb', padding: '6px 8px', fontSize: '10px',
+    textAlign: center ? 'center' : 'right',
+  })
+  const thStyle = (center?: boolean): React.CSSProperties => ({
+    border: '1px solid #888', padding: '6px 8px', fontSize: '10px',
+    background: '#1e3a5f', color: '#fff', textAlign: center ? 'center' : 'right',
+  })
+  const infoRow = (label: string, value: string | null | undefined) => (
+    <span style={{ fontSize: '10px' }}><strong>{label}: </strong>{value ?? '—'}</span>
+  )
+
+  return createPortal(
+    <>
+      <style>{`@media print { body * { visibility: hidden !important; } #proforma-print, #proforma-print * { visibility: visible !important; } #proforma-print { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; } }`}</style>
+
+      {/* Screen modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white shadow-xl" dir="rtl">
+          <div className="flex items-center justify-between border-b px-5 py-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-indigo-600" />
+              <h2 className="font-bold text-gray-900">پیش فاکتور {num}</h2>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="space-y-3 p-5">
+            <div className="divide-y divide-gray-100 rounded-xl bg-gray-50 p-4 text-sm">
+              {([
+                ['خریدار',      data.buyerName ?? data.billIdentifier, false],
+                ['نوع انرژی',   data.energyType,                      false],
+                ['تاریخ',       data.orderDate ?? '—',                false],
+                ['مقدار',       `${fmt(data.requestedKwh)} kWh`,      true],
+                ['نرخ واحد',    `${fmt(data.priceAtMoment)} ریال/kWh`,true],
+              ] as [string, string, boolean][]).map(([label, value, mono]) => (
+                <div key={label} className="flex justify-between py-1.5">
+                  <span className="text-gray-500">{label}</span>
+                  <span className={`font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1.5 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">جمع کل</span>
+                <span className="font-mono font-semibold">{rial(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">مالیات ارزش افزوده ۱۰٪</span>
+                <span className="font-mono font-semibold">{rial(vat)}</span>
+              </div>
+              <div className="flex justify-between border-t border-indigo-200 pt-2 text-indigo-900">
+                <span className="font-bold">مبلغ قابل پرداخت</span>
+                <span className="font-mono font-bold text-base">{rial(total)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 border-t px-5 py-4">
+            <button onClick={onClose}
+              className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">بستن</button>
+            <button onClick={() => window.print()}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+              <Printer className="h-4 w-4" />
+              چاپ پیش فاکتور
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Print area — matches original template ── */}
+      <div id="proforma-print" style={{ display: 'none', direction: 'rtl', fontFamily: 'Tahoma, Arial, sans-serif', padding: '30px 40px', background: '#fff', color: '#000' }}>
+
+        {/* Title + serial */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e3a5f', paddingBottom: '10px', marginBottom: '12px' }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <p style={{ fontSize: '9px', margin: '0 0 3px' }}>بسمه تعالی</p>
+            <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px' }}>شرکت توسعه انرژی متین</p>
+            <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0', color: '#1e3a5f' }}>پیش فاکتور فروش کالا و خدمات</p>
+          </div>
+          <div style={{ fontSize: '10px', minWidth: '140px', textAlign: 'right' }}>
+            <div style={{ marginBottom: '4px' }}>شماره سریال: <strong>{num}</strong></div>
+            <div>تاریخ: <strong>{data.orderDate ?? '—'}</strong></div>
+          </div>
+        </div>
+
+        {/* Seller */}
+        <div style={{ border: '1px solid #bbb', marginBottom: '8px' }}>
+          <div style={{ background: '#f0f4f8', padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', borderBottom: '1px solid #bbb' }}>مشخصات فروشنده</div>
+          <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+            {infoRow('نام شخص حقوقی', 'شرکت توسعه انرژی متین')}
+            {infoRow('شماره اقتصادی', '411611349686')}
+            {infoRow('شماره ثبت', '527995')}
+          </div>
+          <div style={{ padding: '0 8px 6px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+            {infoRow('نشانی', 'تهران')}
+            {infoRow('شماره تلفن', '021-XXXXXXXX')}
+          </div>
+        </div>
+
+        {/* Buyer */}
+        <div style={{ border: '1px solid #bbb', marginBottom: '10px' }}>
+          <div style={{ background: '#f0f4f8', padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', borderBottom: '1px solid #bbb' }}>مشخصات خریدار</div>
+          <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+            {infoRow('نام شخص حقیقی/حقوقی', data.buyerName)}
+            {infoRow('شماره اقتصادی', data.economicCode)}
+            {infoRow('شماره ثبت/شماره ملی', data.nationalId)}
+          </div>
+          <div style={{ padding: '0 8px 6px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+            {infoRow('استان', data.province)}
+            {infoRow('شهر', data.city)}
+            {infoRow('کدپستی', data.postalCode)}
+            {infoRow('شماره تلفن', data.phone)}
+          </div>
+          {data.address && (
+            <div style={{ padding: '0 8px 6px' }}>{infoRow('نشانی', data.address)}</div>
+          )}
+        </div>
+
+        {/* Items table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '10px' }}>
+          <thead>
+            <tr>
+              <th style={thStyle(true)}>ردیف</th>
+              <th style={thStyle(true)}>کد کالا</th>
+              <th style={thStyle()}>شرح کالا یا خدمات</th>
+              <th style={thStyle(true)}>تعداد/<br/>مقدار</th>
+              <th style={thStyle(true)}>واحد</th>
+              <th style={thStyle(true)}>مبلغ واحد<br/>(ریال)</th>
+              <th style={thStyle(true)}>مبلغ کل<br/>(ریال)</th>
+              <th style={thStyle(true)}>تخفیف<br/>(ریال)</th>
+              <th style={thStyle(true)}>مبلغ پس از<br/>تخفیف (ریال)</th>
+              <th style={thStyle(true)}>مالیات و<br/>عوارض (ریال)</th>
+              <th style={thStyle(true)}>جمع کل<br/>(ریال)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={tdStyle(true)}>۱</td>
+              <td style={tdStyle(true)}>—</td>
+              <td style={tdStyle()}>انرژی الکتریکی</td>
+              <td style={tdStyle(true)}>{fmt(data.requestedKwh)}</td>
+              <td style={tdStyle(true)}>کیلووات ساعت</td>
+              <td style={tdStyle(true)}>{fmt(data.priceAtMoment)}</td>
+              <td style={tdStyle(true)}>{fmt(subtotal)}</td>
+              <td style={tdStyle(true)}>—</td>
+              <td style={tdStyle(true)}>{fmt(subtotal)}</td>
+              <td style={tdStyle(true)}>{fmt(vat)}</td>
+              <td style={tdStyle(true)}>{fmt(total)}</td>
+            </tr>
+            {/* Totals row */}
+            <tr style={{ background: '#f8f8f8', fontWeight: 'bold' }}>
+              <td colSpan={8} style={{ ...tdStyle(), textAlign: 'center', fontSize: '10px' }}>جمع کل</td>
+              <td style={tdStyle(true)}>{fmt(subtotal)}</td>
+              <td style={tdStyle(true)}>{fmt(vat)}</td>
+              <td style={tdStyle(true)}>{fmt(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Payment terms */}
+        <div style={{ fontSize: '10px', marginBottom: '8px' }}>
+          <strong>شرایط و نحوه فروش: </strong>نقدی ☐ &nbsp;&nbsp; غیر نقدی ☐
+        </div>
+
+        {/* Description line */}
+        <div style={{ fontSize: '10px', border: '1px solid #bbb', padding: '6px 8px', marginBottom: '16px' }}>
+          بابت فروش برق {data.orderDate?.split('/').slice(0, 2).join('/')} به {data.buyerName ?? data.billIdentifier}
+        </div>
+
+        {/* Signatures */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '30px', fontSize: '10px' }}>
+          <div style={{ textAlign: 'center', minWidth: '180px' }}>
+            <div style={{ borderTop: '1px solid #999', paddingTop: '8px' }}>مهر و امضاء فروشنده: شرکت توسعه انرژی متین</div>
+          </div>
+          <div style={{ textAlign: 'center', minWidth: '180px' }}>
+            <div style={{ borderTop: '1px solid #999', paddingTop: '8px' }}>مهر و امضاء خریدار</div>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  )
+}
 
 const ORDER_STATUS: Record<number, { bg: string; text: string; label: string }> = {
   1: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'در انتظار بررسی' },
@@ -50,6 +240,8 @@ export default function Orders() {
   const [detail, setDetail]           = useState<OrderDetailResult | null>(null)
   const [showDetail, setShowDetail]   = useState(false)
   const [saving, setSaving]           = useState(false)
+  const [proformaData, setProformaData]   = useState<ProformaData | null>(null)
+  const [proformaLoading, setProformaLoading] = useState(false)
   const [newOrderId]                  = useState<number | undefined>(navState?.newOrderId)
 
   const [createForm, setCreateForm] = useState({
@@ -70,9 +262,9 @@ export default function Orders() {
 
   useEffect(() => {
     loadOrders()
-    customerApi.getSubscriptions().then(r => { if (r.code === 200) setSubs(toArr(r.result)) })
-    lookupApi.getEnergyTypes().then(r => { if (r.code === 200) setETypes(toArr(r.result)) })
-    lookupApi.getPaymentMethods().then(r => { if (r.code === 200) setPayMethods(toArr(r.result)) })
+    customerApi.getSubscriptions().then(r => { if (r.code === 200) setSubs(toArr(r.result)) }).catch(() => {})
+    lookupApi.getEnergyTypes().then(r => { if (r.code === 200) setETypes(toArr(r.result)) }).catch(() => {})
+    lookupApi.getPaymentMethods().then(r => { if (r.code === 200) setPayMethods(toArr(r.result)) }).catch(() => {})
     // Clear navigation state so refresh doesn't re-trigger
     window.history.replaceState({}, '')
   }, [])
@@ -88,7 +280,11 @@ export default function Orders() {
   const loadOrders = () => {
     setLoading(true)
     customerApi.getMyOrders()
-      .then(r => { if (r.code === 200) setOrders(toArr(r.result)) })
+      .then(r => {
+        if (r.code === 200) setOrders(toArr(r.result))
+        else toast.error(r.caption ?? 'خطا در دریافت سفارش‌ها')
+      })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setLoading(false))
   }
 
@@ -112,13 +308,14 @@ export default function Orders() {
   }
 
   const handleCreate = () => {
-    if (!createForm.subscriptionId || !createForm.requestedKwh || !createForm.energyTypeId) {
-      toast.error('همه فیلدهای الزامی را وارد کنید'); return
-    }
+    if (!createForm.subscriptionId) { toast.error('اشتراک را انتخاب کنید'); return }
+    if (!createForm.energyTypeId) { toast.error('نوع انرژی را انتخاب کنید'); return }
+    const kwh = parseFloat(createForm.requestedKwh)
+    if (!createForm.requestedKwh || isNaN(kwh) || kwh <= 0) { toast.error('مقدار kWh درخواستی باید بزرگتر از صفر باشد'); return }
     setSaving(true)
     customerApi.createOrder({
       subscriptionId: createForm.subscriptionId as number,
-      requestedKwh: parseFloat(createForm.requestedKwh),
+      requestedKwh: kwh,
       energyTypeId: createForm.energyTypeId as number,
       isPriceRequest: createForm.isPriceRequest,
     })
@@ -130,13 +327,14 @@ export default function Orders() {
           loadOrders()
         } else { toast.error(r.message ?? r.caption ?? 'خطا در ثبت سفارش') }
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setSaving(false))
   }
 
   const handlePay = () => {
-    if (!payForm.amount || !payForm.methodId) {
-      toast.error('مبلغ و روش پرداخت را وارد کنید'); return
-    }
+    if (!payForm.methodId) { toast.error('روش پرداخت را انتخاب کنید'); return }
+    const amount = parseFloat(payForm.amount)
+    if (!payForm.amount || isNaN(amount) || amount <= 0) { toast.error('مبلغ پرداخت باید بزرگتر از صفر باشد'); return }
     setSaving(true)
     customerApi.submitPayment({
       orderId: payForm.orderId,
@@ -310,6 +508,24 @@ export default function Orders() {
                           className="rounded-lg px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors">
                           جزئیات
                         </button>
+                        {o.priceAtMoment > 0 && (
+                          <button
+                            disabled={proformaLoading}
+                            onClick={() => {
+                              setProformaLoading(true)
+                              customerApi.getProformaData(o.id)
+                                .then(r => {
+                                  if (r.code === 200 && r.result) setProformaData(r.result)
+                                  else toast.error(r.message ?? 'خطا در بارگذاری پیش فاکتور')
+                                })
+                                .catch(() => toast.error('خطا در ارتباط با سرور'))
+                                .finally(() => setProformaLoading(false))
+                            }}
+                            className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-50">
+                            {proformaLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                            پیش فاکتور
+                          </button>
+                        )}
                         {payable && (
                           <button onClick={() => openPay(o)}
                             className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
@@ -473,6 +689,11 @@ export default function Orders() {
         </div>
       )}
 
+      {/* ── Proforma Invoice Modal ── */}
+      {proformaData && (
+        <ProformaModal data={proformaData} onClose={() => setProformaData(null)} />
+      )}
+
       {/* ── Order Detail Modal ── */}
       {showDetail && detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -536,12 +757,11 @@ export default function Orders() {
                           )}
                           {p.receiptFileId && (
                             <div className="mt-1">
-                              <button
-                                onClick={() => uploadApi.download(p.receiptFileId as string).catch(() => toast.error('خطا در دانلود فیش'))}
-                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100">
-                                <Download className="h-3.5 w-3.5" />
-                                دانلود فیش
-                              </button>
+                              <PreviewDownloadButton
+                                fileId={p.receiptFileId as string}
+                                label="مشاهده فیش"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                              />
                             </div>
                           )}
                           <p className="mt-0.5 text-[10px] text-gray-400">{p.createdAt ?? ''}</p>

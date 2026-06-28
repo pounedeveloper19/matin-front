@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Download, Upload, Printer } from 'lucide-react'
+import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Upload, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi, type IdTitle } from '../../api/lookup'
-import { uploadApi } from '../../api/upload'
+import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
 import FileUpload from '../../components/ui/FileUpload'
 import ProformaInvoicePrintModal, { type ProformaInvoiceData } from '../../components/ui/ProformaInvoicePrintModal'
 import type { AdminOrderResult } from '../../types'
@@ -107,8 +107,9 @@ export default function AdminOrders() {
     })
       .then(r => {
         if (r.code === 200) { setShowStatus(false); load() }
-        else alert(r.message || 'خطا')
+        else toast.error(r.message ?? r.caption ?? 'خطا در به‌روزرسانی وضعیت')
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setSaving(false))
   }
 
@@ -118,8 +119,9 @@ export default function AdminOrders() {
       .then(r => {
         if (r.code === 200) {
           if (detail) openDetail(detail.id)
-        } else alert(r.message || 'خطا')
+        } else toast.error(r.message ?? r.caption ?? 'خطا در تایید پرداخت')
       })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
       .finally(() => setSaving(false))
   }
 
@@ -347,13 +349,11 @@ export default function AdminOrders() {
                             )}
                             {p.receiptFileId && (
                               <div className="mt-1">
-                                <button
-                                  onClick={() => uploadApi.download(p.receiptFileId as string).catch(() => alert('خطا در دانلود فیش'))}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
-                                >
-                                  <Download className="h-3.5 w-3.5" />
-                                  دانلود فیش
-                                </button>
+                                <PreviewDownloadButton
+                                  fileId={p.receiptFileId as string}
+                                  label="مشاهده فیش"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                />
                               </div>
                             )}
                             <p className="mt-0.5 text-[10px] text-gray-400">{p.createdAt ?? ''}</p>

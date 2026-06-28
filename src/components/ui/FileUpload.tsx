@@ -1,8 +1,10 @@
 import { useRef, useState, useEffect } from 'react'
-import { Paperclip, X, Download, FileText } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Paperclip, Trash2, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { uploadApi, type EntityType } from '../../api/upload'
 import Button from './Button'
+import PreviewDownloadButton from './FilePreviewModal'
 
 interface Props {
   fileId?: string | null
@@ -28,6 +30,7 @@ export default function FileUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [currentFile, setCurrentFile] = useState<{ id: string; name: string } | null>(
     fileId ? { id: fileId, name: 'فایل پیوست' } : null,
   )
@@ -76,8 +79,40 @@ export default function FileUpload({
     }
   }
 
+  const confirmDialog = confirmDelete ? createPortal(
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      onClick={() => setConfirmDelete(false)}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="mb-1 text-sm font-semibold text-gray-800">حذف فایل پیوست</p>
+        <p className="mb-5 text-sm text-gray-500">آیا از حذف این فایل اطمینان دارید؟ این عملیات قابل بازگشت نیست.</p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="rounded-xl px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            انصراف
+          </button>
+          <button
+            onClick={() => { setConfirmDelete(false); handleDelete() }}
+            className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+            حذف
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   return (
-    <div>
+    <>
       {label && (
         <label className="mb-1.5 block text-sm font-medium text-gray-700">{label}</label>
       )}
@@ -86,20 +121,14 @@ export default function FileUpload({
         <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
           <FileText className="h-4 w-4 shrink-0 text-primary-600" />
           <span className="flex-1 truncate text-sm text-gray-700">{currentFile.name}</span>
-          <button
-            onClick={() => uploadApi.download(currentFile.id, currentFile.name).catch(() => toast.error('خطا در دانلود'))}
-            title="دانلود"
-            className="rounded p-1 text-gray-400 hover:text-primary-600"
-          >
-            <Download className="h-4 w-4" />
-          </button>
+          <PreviewDownloadButton fileId={currentFile.id} iconOnly />
           {!readOnly && (
             <button
-              onClick={handleDelete}
+              onClick={() => setConfirmDelete(true)}
               title="حذف فایل"
-              className="rounded p-1 text-gray-400 hover:text-red-500"
+              className="rounded p-1 text-gray-400 hover:text-red-500 transition-colors"
             >
-              <X className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -134,6 +163,8 @@ export default function FileUpload({
           </p>
         </div>
       )}
-    </div>
+
+      {confirmDialog}
+    </>
   )
 }

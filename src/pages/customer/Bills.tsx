@@ -9,9 +9,8 @@ import Input from '../../components/ui/Input'
 import HelpTooltip from '../../components/ui/HelpTooltip'
 import BillAnalysisPrintModal from '../../components/ui/BillAnalysisPrintModal'
 import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult, PortfolioOptimizationResult } from '../../types'
-import { toArr, constraintLabel } from '../../utils'
-
-const MONTHS = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
+import { toArr, constraintLabel, MONTHS } from '../../utils'
+import type { LastBillResult } from '../../types'
 
 function jalaliYear(): number {
   const d = new Date(), m = d.getMonth() + 1, day = d.getDate()
@@ -80,7 +79,7 @@ function OptimalPurchaseLineChart({ data, onSelect }: { data: OptimalPurchaseCur
   const isAtOptimal = Math.abs((hovered?.contractCapacityKw ?? -99) - optKw) < stepSize * 0.6
 
   return (
-    <div className="select-none space-y-4" dir="ltr">
+    <div className="select-none space-y-4 px-3" dir="ltr">
       <div className="flex justify-between text-xs font-medium">
         <span className="text-red-400">← کمترین سود</span>
         <span className="text-emerald-600">بیشترین سود →</span>
@@ -410,6 +409,18 @@ export default function CustomerBills() {
   const [portfolio, setPortfolio]     = useState<PortfolioOptimizationResult | null>(null)
   const [portLoading, setPortLoading] = useState(false)
   const [showPrint, setShowPrint]     = useState(false)
+  const [lastBill, setLastBill]       = useState<LastBillResult | null>(null)
+  const [lastBillLoading, setLBLoad]  = useState(false)
+  const [customerName, setCustomerName] = useState('')
+
+  useEffect(() => {
+    customerApi.getCustomer().then(r => {
+      if (r.code === 200 && r.result) {
+        const c = r.result as any
+        setCustomerName(c.companyName ?? (c.firstName ? `${c.firstName} ${c.lastName ?? ''}`.trim() : ''))
+      }
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     customerApi.getSubscriptions().then(r => {
@@ -531,7 +542,36 @@ export default function CustomerBills() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {subscriptions.map(s => (
                 <button key={s.id}
-                  onClick={() => { setSelectedSubId(s.id); setResult(null); setCurveData(null); setSelectedCurveKwh(null) }}
+                  onClick={() => {
+                    setSelectedSubId(s.id); setResult(null); setCurveData(null); setSelectedCurveKwh(null); setLastBill(null)
+                    setLBLoad(true)
+                    customerApi.getLastBill(s.id)
+                      .then(r => {
+                        if (r.code === 200 && r.result) {
+                          const lb = r.result
+                          setLastBill(lb)
+                          setForm({
+                            year:  String(lb.year),
+                            month: String(lb.month),
+                            consumptionMode: 'split',
+                            totalKwh: '',
+                            peakKwh: String(lb.peakCons ?? ''),
+                            midKwh:  String(lb.midCons  ?? ''),
+                            lowKwh:  String(lb.lowCons  ?? ''),
+                            contractDemandKw: String(lb.contractDemandKw ?? ''),
+                            actualDemandKw:   String(lb.actualDemandKw   ?? ''),
+                            bilateralKwh:  String(lb.bilateralKwh  ?? 0),
+                            bilateralRate: String(lb.bilateralRate ?? 0),
+                            exchangeKwh:   String(lb.exchangeKwh   ?? 0),
+                            exchangeRate:  String(lb.exchangeRate  ?? 0),
+                            greenLawKwh:   String(lb.greenLawKwh   ?? 0),
+                            greenRate:     String(lb.greenRate     ?? 0),
+                          })
+                          toast.success(`اطلاعات ${MONTHS[(lb.month ?? 1) - 1]} ${lb.year} بارگذاری شد`, { duration: 2500 })
+                        }
+                      })
+                      .finally(() => setLBLoad(false))
+                  }}
                   className={`rounded-xl p-4 text-right transition-all ${
                     selectedSubId === s.id
                       ? 'border-2 border-emerald-500 bg-emerald-50 shadow-sm'
@@ -560,6 +600,17 @@ export default function CustomerBills() {
               <Zap className="h-4 w-4 shrink-0 text-amber-500" />
               <span className="text-xs font-semibold text-amber-800">{selectedSub.billIdentifier}</span>
               <span className="text-xs text-amber-600">{selectedSub.powerEntity} · {selectedSub.mainAddress}</span>
+              {lastBillLoading && (
+                <span className="mr-auto flex items-center gap-1.5 text-xs text-amber-600">
+                  <span className="h-3 w-3 animate-spin rounded-full border border-amber-500 border-t-transparent" />
+                  در حال بارگذاری...
+                </span>
+              )}
+              {lastBill && !lastBillLoading && (
+                <span className="mr-auto text-xs text-amber-600">
+                  ↩ اطلاعات {MONTHS[(lastBill.month ?? 1) - 1]} {lastBill.year} بارگذاری شد
+                </span>
+              )}
             </div>
           )}
 
@@ -585,7 +636,7 @@ export default function CustomerBills() {
                   <label className="mb-1.5 block text-xs font-semibold text-gray-600">ماه *</label>
                   <select value={form.month} onChange={set('month')}
                     className="block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
-                    {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                    {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
               </div>
@@ -615,7 +666,7 @@ export default function CustomerBills() {
                       placeholder="kWh — سیستم بر اساس ساعات TOU توزیع می‌کند" inputMode="numeric" />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {([
                       { fk: 'midKwh',  lbl: 'میان بار *',  key: 'midKwh'  as const },
                       { fk: 'peakKwh', lbl: 'اوج بار *',   key: 'peakKwh' as const },
@@ -721,6 +772,7 @@ export default function CustomerBills() {
                 <div className="overflow-hidden rounded-2xl" style={{ border: '2px solid #fbbf24' }}>
                   <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5">
                     <span className="text-sm font-bold text-amber-900">خروجی نهایی</span>
+                    <HelpTooltip pageKey="bill_result" fieldKey="output_summary" />
                   </div>
                   <table className="w-full text-sm">
                     <tbody>
@@ -761,10 +813,11 @@ export default function CustomerBills() {
 
                   return (
                     <div className="glass-card overflow-hidden rounded-2xl">
-                      <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
                         <BarChart3 className="h-4 w-4 text-emerald-700" />
                         <span className="text-sm font-bold text-gray-700">نمودار مقایسه هزینه</span>
                         <span className="text-xs text-gray-400">({chartUnitLabel})</span>
+                        <HelpTooltip pageKey="bill_result" fieldKey="output_compare_chart" />
                         <div className="mr-auto flex items-center gap-4 text-xs">
                           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-red-400"></span>بدون قرارداد</span>
                           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500"></span>با قرارداد</span>
@@ -802,19 +855,50 @@ export default function CustomerBills() {
 
                 {/* ── نمودار بهینه خرید ظرفیت ── */}
                 {(curveData || curveLoading) && (
-                  <div className="glass-card overflow-hidden rounded-2xl">
-                    <div className="flex items-center gap-3 px-5 py-4"
-                      style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                      <Activity className="h-4 w-4 text-violet-600" />
-                      <div>
-                        <h3 className="font-semibold text-gray-900">نمودار بهینه خرید از بورس برق</h3>
-                        <p className="text-xs text-gray-400">بهترین مقدار خرید از بورس برق را بیابید — نشانگر موس را روی خط بکشید</p>
+                  <div className="overflow-hidden rounded-2xl" style={{ border: '2px solid #7c3aed', boxShadow: '0 4px 24px rgba(124,58,237,0.10)' }}>
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+                      style={{ background: 'linear-gradient(135deg,#4c1d95 0%,#6d28d9 60%,#7c3aed 100%)' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                          <Activity className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white">نمودار بهینه خرید از بورس برق</h3>
+                          <p className="text-xs text-violet-200">روی خط بکشید تا سود هر سطح خرید را ببینید، سپس کلیک کنید تا انتخاب شود</p>
+                        </div>
                       </div>
+                      <HelpTooltip pageKey="bill_result" fieldKey="output_optimal_chart" />
                     </div>
-                    <div className="p-5">
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap items-center gap-4 border-b border-violet-100 bg-violet-50 px-5 py-2.5 text-xs">
+                      <span className="flex items-center gap-1.5 font-semibold text-violet-700">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[9px] text-white shadow">★</span>
+                        نقطه بهینه — بیشترین سود
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-blue-600">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500">
+                          <span className="h-2 w-2 rounded-full bg-white" />
+                        </span>
+                        سطح فعلی قرارداد
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-violet-600">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[9px] font-bold text-white shadow ring-2 ring-violet-300">✓</span>
+                        انتخاب شما
+                      </span>
+                      <span className="mr-auto flex items-center gap-1 text-gray-400">
+                        <span className="h-2.5 w-8 rounded-full bg-gradient-to-l from-emerald-500 to-red-400 opacity-80" />
+                        رنگ = میزان سودآوری
+                      </span>
+                    </div>
+
+                    {/* Chart */}
+                    <div className="bg-white p-5">
                       {curveLoading ? (
-                        <div className="flex justify-center py-8">
-                          <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
+                        <div className="flex flex-col items-center justify-center py-12 text-violet-400">
+                          <div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
+                          <p className="mt-3 text-xs">در حال محاسبه نقطه بهینه...</p>
                         </div>
                       ) : curveData ? (
                         <OptimalPurchaseLineChart data={curveData} onSelect={setSelectedCurveKwh} />
@@ -829,6 +913,10 @@ export default function CustomerBills() {
                 )}
 
                 {/* کارت‌های خلاصه */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-700">خلاصه مالی</span>
+                  <HelpTooltip pageKey="bill_result" fieldKey="output_saving_cards" />
+                </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="rounded-2xl p-4" style={{ background: 'rgba(254,242,242,0.8)', border: '1px solid rgba(252,165,165,0.4)' }}>
                     <p className="text-xs font-semibold text-red-500">بدون قرارداد متین</p>
@@ -848,6 +936,10 @@ export default function CustomerBills() {
                 </div>
 
                 {/* صورتحساب دو ستون */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-700">جزئیات صورتحساب</span>
+                  <HelpTooltip pageKey="bill_result" fieldKey="output_invoice_detail" />
+                </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="rounded-xl p-4" style={{ background: 'rgba(254,242,242,0.5)', border: '1px solid rgba(252,165,165,0.3)' }}>
                     <p className="mb-3 text-xs font-bold text-red-600">هزینه بدون قرارداد متین</p>
@@ -1029,8 +1121,8 @@ export default function CustomerBills() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {[
-                                { l: 'اوج بار',  c: r.peakKwh, m: r.marketEnergyPeak, rem: r.remainingPeak },
                                 { l: 'میان بار', c: r.midKwh,  m: r.marketEnergyMid,  rem: r.remainingMid  },
+                                { l: 'اوج بار',  c: r.peakKwh, m: r.marketEnergyPeak, rem: r.remainingPeak },
                                 { l: 'کم بار',   c: r.lowKwh,  m: r.marketEnergyLow,  rem: r.remainingLow  },
                               ].map(row => (
                                 <tr key={row.l} className="hover:bg-gray-50">
@@ -1082,6 +1174,7 @@ export default function CustomerBills() {
           result={result}
           recommendation={portfolio}
           billIdentifier={selectedSub?.billIdentifier}
+          customerName={customerName || undefined}
         />
       )}
 
