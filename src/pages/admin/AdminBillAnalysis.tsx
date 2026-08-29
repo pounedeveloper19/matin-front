@@ -420,11 +420,11 @@ export default function AdminBillAnalysis() {
     setCustomerLoading(true)
     try {
       if (customerType === 'real') {
-        const r = await adminApi.getRealCustomers({ pageSize: 20, Search_Name: searchTerm })
+        const r = await adminApi.getRealCustomers({ pageSize: 20, Search_Name: searchTerm, Search_IsActive: 'true' })
         const res = r.result as any
         setCustomers(res?.data ?? [])
       } else {
-        const r = await adminApi.getLegalCustomers({ pageSize: 20, Search_CompanyName: searchTerm })
+        const r = await adminApi.getLegalCustomers({ pageSize: 20, Search_CompanyName: searchTerm, Search_IsActive: 'true' })
         const res = r.result as any
         setCustomers(res?.data ?? [])
       }
@@ -1080,7 +1080,7 @@ export default function AdminBillAnalysis() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  مقدار درخواستی (kWh) *
+                  مقدار انرژی (kWh) *
                   <span className="mr-2 text-xs font-normal text-gray-400">— از تحلیل: {result.totalKwh.toLocaleString('fa-IR')} kWh</span>
                 </label>
                 <input type="number" min="0"

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap, TrendingDown, AlertTriangle, BarChart3, FlaskConical, ChevronDown, ChevronUp, ShoppingCart, Activity, FileDown } from 'lucide-react'
+import { Zap, TrendingDown, AlertTriangle, BarChart3, FlaskConical, ChevronDown, ChevronUp, ShoppingCart, Activity, FileDown, Tag, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi, type IdTitle } from '../../api/lookup'
 import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
+import Input, { Select } from '../../components/ui/Input'
 import HelpTooltip from '../../components/ui/HelpTooltip'
 import BillAnalysisPrintModal from '../../components/ui/BillAnalysisPrintModal'
-import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult, PortfolioOptimizationResult } from '../../types'
+import type { SubscriptionResult, AdvancedBillAnalysisResult, OptimalPurchaseCurveResult, PortfolioOptimizationResult, CustomerTariffInfo, TariffCode, TariffCodeOption } from '../../types'
 import { toArr, constraintLabel, MONTHS } from '../../utils'
 import type { LastBillResult } from '../../types'
 
@@ -412,6 +412,14 @@ export default function CustomerBills() {
   const [lastBill, setLastBill]       = useState<LastBillResult | null>(null)
   const [lastBillLoading, setLBLoad]  = useState(false)
   const [customerName, setCustomerName] = useState('')
+  const [tariffInfo, setTariffInfo]         = useState<CustomerTariffInfo | null>(null)
+  const [tariffLoading, setTariffLoading]   = useState(false)
+  const [editingTariff, setEditingTariff]   = useState(false)
+  const [tariffCodes, setTariffCodes]       = useState<TariffCode[]>([])
+  const [tariffOptions, setTariffOptions]   = useState<TariffCodeOption[]>([])
+  const [selTariffCodeId, setSelTariffCodeId] = useState<number>(0)
+  const [selOptionId, setSelOptionId]         = useState<number | null>(null)
+  const [savingTariff, setSavingTariff]       = useState(false)
 
   useEffect(() => {
     customerApi.getCustomer().then(r => {
@@ -420,7 +428,53 @@ export default function CustomerBills() {
         setCustomerName(c.companyName ?? (c.firstName ? `${c.firstName} ${c.lastName ?? ''}`.trim() : ''))
       }
     }).catch(() => {})
+    lookupApi.getTariffCodes().then(r => { if (r.code === 200) setTariffCodes(toArr(r.result)) })
   }, [])
+
+  useEffect(() => {
+    if (!selTariffCodeId) { setTariffOptions([]); return }
+    lookupApi.getTariffCodeOptions(selTariffCodeId).then(r => {
+      if (r.code === 200) setTariffOptions(toArr(r.result))
+    })
+  }, [selTariffCodeId])
+
+  // تعرفه‌ی معتبر برای دوره‌ی انتخاب‌شده (سال/ماه) را می‌خواند — ماه به ماه فرق دارد
+  useEffect(() => {
+    if (selectedSubId === '' || !form.year || !form.month) return
+    setEditingTariff(false)
+    setTariffLoading(true)
+    customerApi.getTariffForMonth(+form.year, +form.month)
+      .then(r => {
+        if (r.code === 200) {
+          const t = r.result ?? null
+          setTariffInfo(t)
+          setSelTariffCodeId(t?.tariffCodeId ?? 0)
+          setSelOptionId(t?.tariffCodeOptionId ?? null)
+        }
+      })
+      .finally(() => setTariffLoading(false))
+  }, [selectedSubId, form.year, form.month])
+
+  const handleSaveTariffForMonth = async () => {
+    if (!selOptionId) return
+    setSavingTariff(true)
+    try {
+      const res = await customerApi.setTariffForMonth(+form.year, +form.month, selOptionId)
+      if (res.code === 200) {
+        toast.success('تعرفه این ماه ذخیره شد')
+        setEditingTariff(false)
+        const option = tariffOptions.find(o => o.id === selOptionId)
+        const code = tariffCodes.find(c => c.id === selTariffCodeId)
+        setTariffInfo({
+          tariffCodeOptionId: selOptionId,
+          tariffCodeId: selTariffCodeId,
+          tariffCodeTitle: code?.title ?? null,
+          tariffCodeOptionTitle: option?.title ?? null,
+        })
+      } else toast.error(res.message ?? res.caption ?? 'خطا در ذخیره تعرفه')
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setSavingTariff(false) }
+  }
 
   useEffect(() => {
     customerApi.getSubscriptions().then(r => {
@@ -616,11 +670,58 @@ export default function CustomerBills() {
 
           {/* فرم ورودی */}
           <div className="glass-card overflow-hidden rounded-2xl">
-            <div className="flex items-center gap-3 px-5 py-4"
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
               style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-              <FlaskConical className="h-4 w-4 text-emerald-700" />
-              <h3 className="font-semibold text-gray-900">ورودی‌های تحلیل قبض</h3>
+              <div className="flex items-center gap-3">
+                <FlaskConical className="h-4 w-4 text-emerald-700" />
+                <h3 className="font-semibold text-gray-900">ورودی‌های تحلیل قبض</h3>
+              </div>
+              {!editingTariff && (
+                tariffLoading ? (
+                  <span className="text-xs text-gray-400">در حال بارگذاری تعرفه...</span>
+                ) : tariffInfo ? (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
+                    <Tag className="h-3.5 w-3.5 text-violet-400" />
+                    <span className="text-violet-400">تعرفه {MONTHS[+form.month - 1]}:</span>
+                    {tariffInfo.tariffCodeTitle}
+                    {tariffInfo.tariffCodeOptionTitle && <span> — {tariffInfo.tariffCodeOptionTitle}</span>}
+                    <button onClick={() => setEditingTariff(true)}
+                      className="mr-1 flex items-center gap-1 font-bold text-violet-500 hover:text-violet-700">
+                      <Pencil className="h-3 w-3" /> تغییر
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingTariff(true)}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+                    تعرفه {MONTHS[+form.month - 1]} تنظیم نشده — تنظیم تعرفه
+                  </button>
+                )
+              )}
             </div>
+
+            {editingTariff && (
+              <div className="flex flex-wrap items-end gap-3 border-b border-violet-100 bg-violet-50/50 px-5 py-4">
+                <div className="min-w-[180px] flex-1">
+                  <Select label={`کد تعرفه — ${MONTHS[+form.month - 1]} ${form.year}`} value={selTariffCodeId || ''}
+                    options={tariffCodes.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` }))}
+                    onChange={(v) => { setSelTariffCodeId(+v); setSelOptionId(null) }} />
+                </div>
+                <div className="min-w-[160px] flex-1">
+                  <Select label="گزینه تعرفه" value={selOptionId ?? ''}
+                    options={tariffOptions.map(o => ({ value: o.id, label: o.title }))}
+                    onChange={(v) => setSelOptionId(+v || null)}
+                    disabled={!selTariffCodeId || tariffOptions.length === 0} />
+                </div>
+                <Button variant="secondary" onClick={() => {
+                  setEditingTariff(false)
+                  setSelTariffCodeId(tariffInfo?.tariffCodeId ?? 0)
+                  setSelOptionId(tariffInfo?.tariffCodeOptionId ?? null)
+                }}>انصراف</Button>
+                <Button loading={savingTariff} onClick={handleSaveTariffForMonth} disabled={!selOptionId}>
+                  ذخیره تعرفه این ماه
+                </Button>
+              </div>
+            )}
 
             <div className="space-y-6 p-5">
               {/* دوره */}

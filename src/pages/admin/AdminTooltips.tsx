@@ -19,11 +19,11 @@ type Tooltip = {
 const empty: Tooltip = { id: 0, pageKey: '', fieldKey: '', title: '', content: '', isActive: true }
 
 const PAGE_OPTIONS = [
-  { value: 'bill-optimal', label: 'تحلیل قبض — ورودی‌ها' },
-  { value: 'bill_result',  label: 'تحلیل قبض — خروجی‌ها' },
-  { value: 'orders',       label: 'سفارشات مشتری' },
-  { value: 'contracts',    label: 'قراردادها' },
-  { value: 'profile',      label: 'پروفایل' },
+  { value: 'bill-optimal',        label: 'تحلیل قبض — ورودی‌ها' },
+  { value: 'bill_result',         label: 'تحلیل قبض — خروجی‌ها' },
+  { value: 'orders',              label: 'سفارشات مشتری' },
+  { value: 'customer-contracts',  label: 'قراردادهای من (مشتری)' },
+  { value: 'profile',             label: 'پروفایل' },
 ]
 
 const FIELD_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -55,9 +55,17 @@ const FIELD_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'energyType',     label: 'نوع انرژی' },
     { value: 'isPriceRequest', label: 'استعلام قیمت' },
   ],
-  'contracts': [
-    { value: 'contractRate',     label: 'نرخ قرارداد' },
-    { value: 'contractCapacity', label: 'ظرفیت قرارداد' },
+  'customer-contracts': [
+    { value: 'startDate',          label: 'تاریخ شروع' },
+    { value: 'endDate',            label: 'تاریخ پایان' },
+    { value: 'contractRate',       label: 'نرخ قرارداد (ریال/kWh)' },
+    { value: 'contractPowerKw',    label: 'قدرت قرارداد (kW)' },
+    { value: 'contractVolumeKwh',  label: 'حجم قرارداد (kWh)' },
+    { value: 'contractAmountRial', label: 'مبلغ قرارداد (ریال)' },
+    { value: 'paymentDeadline',    label: 'مهلت پرداخت' },
+    { value: 'warrantyType',       label: 'نوع ضمانت‌نامه' },
+    { value: 'warrantyAmount',     label: 'مبلغ ضمانت' },
+    { value: 'warrantyFile',       label: 'مدرک ضمانت‌نامه' },
   ],
   'profile': [
     { value: 'mobile', label: 'شماره موبایل' },

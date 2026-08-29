@@ -9,16 +9,17 @@ export function validateNationalCode(code: string): boolean {
   return d[9] === check
 }
 
-/** Iranian 11-digit company national ID (شناسه ملی شرکت) */
+/**
+ * Iranian 11-digit company national ID (شناسه ملی شرکت).
+ * Only format is checked (11 digits, not all-repeated) — there is no single
+ * reliable checksum formula for this field across all company ID series, and
+ * the backend itself only enforces length, not a checksum. A too-strict
+ * checksum here was rejecting real, valid company IDs.
+ */
 export function validateNationalId(id: string): boolean {
   if (!/^\d{11}$/.test(id)) return false
   if (new Set(id).size === 1) return false
-  const d = id.split('').map(Number)
-  const w = [29, 27, 23, 19, 17, 29, 27, 23, 19, 17]
-  const sum = d.slice(0, 10).reduce((acc, n, i) => acc + n * w[i], 0)
-  const rem = sum % 11
-  const check = rem === 10 ? 0 : rem
-  return d[10] === check
+  return true
 }
 
 /** Iranian mobile: exactly 11 digits, starts with 09 */

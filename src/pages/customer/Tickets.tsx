@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   MessageSquare, Plus, Send, CheckCircle,
   AlertTriangle, Clock, RefreshCw, XCircle, MousePointer,
@@ -31,6 +32,9 @@ const avatarColors = [
 ]
 
 export default function CustomerTickets() {
+  const location = useLocation()
+  const navState  = location.state as { prefillSubject?: string; prefillBody?: string } | null
+
   const [tickets, setTickets]       = useState<TicketSummary[]>([])
   const [loading, setLoading]       = useState(true)
   const [selected, setSelected]     = useState<TicketSummary | null>(null)
@@ -41,9 +45,9 @@ export default function CustomerTickets() {
   const [attachFileId, setAttachFileId] = useState<string | null>(null)
   const [attachFileName, setAttachName] = useState<string | null>(null)
   const [uploading, setUploading]       = useState(false)
-  const [modal, setModal]           = useState(false)
-  const [subject, setSubject]       = useState('')
-  const [body, setBody]             = useState('')
+  const [modal, setModal]           = useState(!!(navState?.prefillSubject || navState?.prefillBody))
+  const [subject, setSubject]       = useState(navState?.prefillSubject ?? '')
+  const [body, setBody]             = useState(navState?.prefillBody ?? '')
   const [creating, setCreating]     = useState(false)
   const msgEndRef  = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -56,7 +60,10 @@ export default function CustomerTickets() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchTickets() }, [])
+  useEffect(() => {
+    fetchTickets()
+    window.history.replaceState({}, '')
+  }, [])
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })

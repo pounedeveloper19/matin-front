@@ -124,6 +124,9 @@ export const adminApi = {
   deleteContract: (id: number) =>
     client.delete<ExecutionResult>(`/AdminContract/Delete/${id}`).then((r) => r.data),
 
+  deleteOrder: (id: number) =>
+    client.delete<ExecutionResult>(`/AdminOrder/Delete/${id}`).then((r) => r.data),
+
   rejectContract: (contractId: number, reason: string | null) =>
     client.post<ExecutionResult>('/AdminContract/RejectContract', { contractId, reason }).then((r) => r.data),
 
@@ -461,10 +464,10 @@ export const adminApi = {
   getContractReport: (params?: { search?: string; statusId?: number; fromDate?: string; toDate?: string }) =>
     client.get<ExecutionResult<ContractReportResult>>('/AdminReport/ContractReport', { params }).then(r => r.data),
 
-  getOrderReport: (params?: { statusId?: number; energyTypeId?: number; isPriceRequest?: boolean; fromDate?: string; toDate?: string }) =>
+  getOrderReport: (params?: { statusId?: number; energyTypeId?: number; isPriceRequest?: boolean; year?: number; month?: number }) =>
     client.get<ExecutionResult<OrderReportResult>>('/AdminReport/OrderReport', { params }).then(r => r.data),
 
-  getPaymentReport: (params?: { statusId?: number; methodId?: number; fromDate?: string; toDate?: string }) =>
+  getPaymentReport: (params?: { statusId?: number; methodId?: number; year?: number; month?: number }) =>
     client.get<ExecutionResult<PaymentReportResult>>('/AdminReport/PaymentReport', { params }).then(r => r.data),
 
   // Bill analysis (admin-side)

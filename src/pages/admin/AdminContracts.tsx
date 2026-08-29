@@ -10,10 +10,17 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select, DatePicker } from '../../components/ui/Input'
 import FileUpload from '../../components/ui/FileUpload'
-import Badge, { contractStatusVariant } from '../../components/ui/Badge'
+import Badge, { contractStatusVariantById } from '../../components/ui/Badge'
 import ContractPrintModal, { type PrintableContract } from '../../components/ui/ContractPrintModal'
 import type { AdminContract } from '../../types'
 import { toArr } from '../../utils'
+import { useAuth } from '../../contexts/AuthContext'
+
+function addOneYear(dateStr: string): string {
+  const d = new Date(dateStr)
+  d.setFullYear(d.getFullYear() + 1)
+  return d.toISOString().slice(0, 10)
+}
 
 const emptyForm: AdminContract = {
   id: 0, contractNumber: '', contractRate: 0, statusId: 1,
@@ -30,6 +37,7 @@ const avatarColors = [
 ]
 
 export default function AdminContracts() {
+  const { isAdminRole } = useAuth()
   const [data, setData] = useState<AdminContract[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -101,6 +109,8 @@ export default function AdminContracts() {
 
   const handleSave = async () => {
     if (!form.subscriptionId) { toast.error('لطفاً شناسه اشتراک را انتخاب کنید'); return }
+    if (!form.startDate) { toast.error('تاریخ شروع قرارداد الزامی است'); return }
+    if (!form.endDate) { toast.error('تاریخ پایان قرارداد الزامی است'); return }
     if (!form.contractRate || form.contractRate <= 0) { toast.error('نرخ قرارداد باید بزرگتر از صفر باشد'); return }
     if (form.contractPowerKw != null && form.contractPowerKw <= 0) { toast.error('قدرت قرارداد باید بزرگتر از صفر باشد'); return }
     if (form.contractVolumeKwh != null && form.contractVolumeKwh <= 0) { toast.error('حجم قرارداد باید بزرگتر از صفر باشد'); return }
@@ -139,7 +149,7 @@ export default function AdminContracts() {
   }
 
   const handleDelete = async () => {
-    if (isFinalized(form.status)) { toast.error('قرارداد قطعی‌شده قابل حذف نیست'); return }
+    if (isFinalized(form.statusId)) { toast.error('قرارداد قطعی‌شده قابل حذف نیست'); return }
     setSaving(true)
     try {
       const res = await adminApi.deleteContract(form.id)
@@ -150,14 +160,16 @@ export default function AdminContracts() {
     finally { setSaving(false) }
   }
 
-  const activeCount  = data.filter(c => c.status?.includes('فعال') || c.status?.includes('تایید')).length
-  const pendingCount = data.filter(c => c.status?.includes('انتظار') || c.status?.includes('بررسی')).length
-  const expiredCount = data.filter(c => c.status?.includes('منقضی') || c.status?.includes('لغو') || c.status?.includes('رد')).length
+  // نگاشت دقیق بر اساس EnumContractStatuses واقعی دیتابیس:
+  // 1=پیش‌نویس، 2=فعال، 3=منقضی شده، 4=فسخ شده، 5=عدم تایید
+  const activeCount  = data.filter(c => c.statusId === 2).length
+  const pendingCount = data.filter(c => c.statusId === 1).length
+  const expiredCount = data.filter(c => c.statusId === 3 || c.statusId === 4 || c.statusId === 5).length
 
   const filteredData =
-    statusFilter === 'active'  ? data.filter(c => c.status?.includes('فعال') || c.status?.includes('تایید')) :
-    statusFilter === 'pending' ? data.filter(c => c.status?.includes('انتظار') || c.status?.includes('بررسی')) :
-    statusFilter === 'expired' ? data.filter(c => c.status?.includes('منقضی') || c.status?.includes('لغو') || c.status?.includes('رد')) :
+    statusFilter === 'active'  ? data.filter(c => c.statusId === 2) :
+    statusFilter === 'pending' ? data.filter(c => c.statusId === 1) :
+    statusFilter === 'expired' ? data.filter(c => c.statusId === 3 || c.statusId === 4 || c.statusId === 5) :
     data
 
   const handleExportCsv = () => {
@@ -174,8 +186,7 @@ export default function AdminContracts() {
     URL.revokeObjectURL(url)
   }
 
-  const isFinalized = (status?: string | null) =>
-    !!(status?.includes('فعال') || status?.includes('تایید'))
+  const isFinalized = (statusId?: number | null) => statusId === 2
 
   const filterTabs = [
     { key: 'all' as const,     label: 'همه',         count: data.length },
@@ -186,7 +197,14 @@ export default function AdminContracts() {
 
   const columns = [
     { key: 'contractNumber', header: 'شماره قرارداد', render: (row: AdminContract) => (
-      <span className="font-mono text-xs font-semibold text-primary-700">{row.contractNumber}</span>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-xs font-semibold text-primary-700">{row.contractNumber}</span>
+        {row.statusId === 1 && !row.contractRate && (
+          <span className="w-fit rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700" title="نرخ هنوز تعیین نشده — احتمالاً درخواست مشتری است">
+            نیازمند بررسی نرخ
+          </span>
+        )}
+      </div>
     )},
     {
       key: 'customerName',
@@ -207,7 +225,7 @@ export default function AdminContracts() {
       key: 'status',
       header: 'وضعیت',
       render: (row: AdminContract) => (
-        <Badge variant={contractStatusVariant(row.status ?? '')}>{row.status ?? '—'}</Badge>
+        <Badge variant={contractStatusVariantById(row.statusId)}>{row.status ?? '—'}</Badge>
       ),
     },
     {
@@ -272,6 +290,7 @@ export default function AdminContracts() {
                     contractAmountRial: d.contractAmountRial,
                     paymentDeadline: d.paymentDeadline ?? row.paymentDeadline ?? null,
                     status: d.status,
+                    statusId: d.statusId,
                     warrantyAmount: d.warrantyAmount,
                     warrantyType: d.warrantyType,
                     warrantyFileId: d.warrantyFileId ?? row.warrantyFileId ?? null,
@@ -288,13 +307,13 @@ export default function AdminContracts() {
           <button onClick={() => openEdit(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          {!isFinalized(row.status) && !row.status?.includes('عدم تایید') && !row.status?.includes('رد') && (
+          {row.statusId === 1 && (
             <button onClick={() => openReject(row)} title="رد قرارداد"
               className="rounded-lg p-1.5 text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
               <XCircle className="h-3.5 w-3.5" />
             </button>
           )}
-          {!isFinalized(row.status) && (
+          {!isFinalized(row.statusId) && isAdminRole && (
             <button onClick={() => openDelete(row)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -316,7 +335,7 @@ export default function AdminContracts() {
         <StatCard title="مجموع قراردادها" value={total.toLocaleString('fa-IR')} icon={<FileText className="h-5 w-5" />} color="green" />
         <StatCard title="فعال / تأیید شده" value={activeCount.toLocaleString('fa-IR')} icon={<CheckCircle className="h-5 w-5" />} color="blue" subtitle="در صفحه جاری" />
         <StatCard title="در انتظار تأیید" value={pendingCount.toLocaleString('fa-IR')} icon={<Clock className="h-5 w-5" />} color="amber" subtitle="در صفحه جاری" />
-        <StatCard title="لغو / رد شده" value={data.filter(c => c.status?.includes('لغو') || c.status?.includes('رد')).length.toLocaleString('fa-IR')} icon={<XCircle className="h-5 w-5" />} color="red" subtitle="در صفحه جاری" />
+        <StatCard title="منقضی / فسخ / رد شده" value={expiredCount.toLocaleString('fa-IR')} icon={<XCircle className="h-5 w-5" />} color="red" subtitle="در صفحه جاری" />
       </div>
 
       {/* Filter tabs + actions */}
@@ -360,8 +379,9 @@ export default function AdminContracts() {
               options={contractStatuses.map(s => ({ value: s.id, label: s.title }))}
               onChange={(v) => setForm({ ...form, statusId: +v })} />
           )}
-          <Input label="نرخ قرارداد (ریال/kWh)" type="number" value={form.contractRate}
-            onChange={(e) => setForm({ ...form, contractRate: +e.target.value })} />
+          <Input label="نرخ قرارداد (ریال/kWh)" type="number" value={form.contractRate || ''}
+            placeholder="نرخ را وارد کنید"
+            onChange={(e) => setForm({ ...form, contractRate: e.target.value === '' ? 0 : +e.target.value })} />
           <Select label="مشتری" value={selectedCustomer} loading={subsLoading}
             options={customerOptions.map(name => ({ value: name, label: name }))}
             onChange={(v) => { setSelectedCustomer(String(v)); setForm({ ...form, subscriptionId: 0 }) }} />
@@ -373,15 +393,14 @@ export default function AdminContracts() {
           {/* ── New contract fields ── */}
           <Input label="قدرت قرارداد (kW)" type="number" value={form.contractPowerKw ?? ''}
             placeholder="مثلاً ۵۰۰"
-            onChange={(e) => setForm({ ...form, contractPowerKw: e.target.value === '' ? null : +e.target.value })} />
-          <div>
-            <Input label="حجم قرارداد (kWh)" type="number" value={form.contractVolumeKwh ?? ''}
-              placeholder={form.contractPowerKw ? `حداکثر ${(form.contractPowerKw * 720).toLocaleString('fa-IR')}` : 'مثلاً ۳۶۰۰۰۰'}
-              onChange={(e) => setForm({ ...form, contractVolumeKwh: e.target.value === '' ? null : +e.target.value })} />
-            {form.contractVolumeKwh != null && form.contractPowerKw != null && form.contractVolumeKwh > form.contractPowerKw * 720 && (
-              <p className="mt-1 text-xs text-red-500">حجم از ظرفیت ماهانه ({(form.contractPowerKw * 720).toLocaleString('fa-IR')} kWh) بیشتر است</p>
-            )}
-          </div>
+            onChange={(e) => {
+              const powerKw = e.target.value === '' ? null : +e.target.value
+              setForm({ ...form, contractPowerKw: powerKw, contractVolumeKwh: powerKw != null ? powerKw * 8760 : null })
+            }} />
+          <Input label="حجم قرارداد (kWh)" type="number" value={form.contractVolumeKwh ?? ''}
+            disabled
+            hint="خودکار از قدرت قرارداد × ۸۷۶۰ ساعت (یک سال) محاسبه می‌شود"
+            onChange={() => {}} />
           <Input label="مبلغ قرارداد (ریال)" type="number" value={form.contractAmountRial ?? ''}
             placeholder="مبلغ کل قرارداد"
             onChange={(e) => setForm({ ...form, contractAmountRial: e.target.value === '' ? null : +e.target.value })} />
@@ -390,8 +409,10 @@ export default function AdminContracts() {
 
           <Input label="مبلغ ضمانت (ریال)" type="number" value={form.amount || ''}
             onChange={(e) => setForm({ ...form, amount: +e.target.value })} />
-          <DatePicker label="تاریخ شروع" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} />
-          <DatePicker label="تاریخ پایان" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} />
+          <DatePicker label="تاریخ شروع" value={form.startDate}
+            onChange={(v) => setForm({ ...form, startDate: v, endDate: v ? addOneYear(v) : form.endDate })} />
+          <DatePicker label="تاریخ پایان (خودکار = شروع + ۱ سال)" value={form.endDate} disabled
+            onChange={() => {}} />
           <Select label="نوع ضمانت" value={form.typeId ?? ''} loading={guaranteeLoading}
             options={guaranteeTypes.map(t => ({ value: t.id, label: t.title }))}
             onChange={(v) => setForm({ ...form, typeId: +v })} />

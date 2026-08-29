@@ -24,6 +24,8 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string
   role: 'admin' | 'customer'
+  roleTitle: string | null
+  roleId: number | null
   fullName: string
 }
 
@@ -174,6 +176,14 @@ export interface AdminContract {
   contractAmountRial?: number | null
   paymentDeadline?: string | null
   rejectionReason?: string | null
+}
+
+export interface CreateContractRequest {
+  subscriptionId: number
+  contractPowerKw?: number | null
+  contractVolumeKwh?: number | null
+  startDate?: string | null
+  endDate?: string | null
 }
 
 // Bills
@@ -428,6 +438,7 @@ export interface AdminLegalCustomer {
   agentFullName?: string
   agentMobile?: string
   password?: string
+  createdAt?: string
 }
 
 export interface AdminRealCustomer {
@@ -440,6 +451,7 @@ export interface AdminRealCustomer {
   customerTypeId?: number
   isActive?: boolean
   password?: string
+  createdAt?: string
 }
 
 export interface AdminAddress {
@@ -683,6 +695,7 @@ export interface OrderResult {
   statusId: number
   orderDate: string | null
   isPriceRequest: boolean
+  isGreenEnergy: boolean
   paymentCount: number
   lastPaymentStatusId?: number | null
 }
@@ -719,6 +732,8 @@ export interface ProformaData {
   postalCode: string | null
   city: string | null
   province: string | null
+  isGreenEnergy: boolean
+  greenRate: number | null
 }
 
 export interface AdminOrderResult {
@@ -744,6 +759,9 @@ export interface CreateOrderRequest {
   requestedKwh: number
   energyTypeId: number
   isPriceRequest: boolean
+  year?: number | null
+  month?: number | null
+  isGreenEnergy?: boolean
 }
 
 export interface SubmitPaymentRequest {
@@ -794,6 +812,7 @@ export interface OrderReportItem {
   statusId: number
   orderDate: string | null
   isPriceRequest: boolean
+  isGreenEnergy: boolean
   paymentCount: number
   paidAmount: number
 }
@@ -827,7 +846,15 @@ export interface ContractReportResult {
 
 export interface OrderReportResult {
   items: OrderReportItem[]
-  summary: { total: number; byStatus: ReportByStatus[]; totalRequestedKwh: number; totalPaidRial: number }
+  summary: {
+    total: number
+    byStatus: ReportByStatus[]
+    totalRequestedKwh: number
+    greenOrdersCount: number
+    greenKwh: number
+    normalKwh: number
+    totalPaidRial: number
+  }
 }
 
 export interface PaymentReportResult {

@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Zap, History, RefreshCw } from 'lucide-react'
+import { Zap, History, RefreshCw, FileDown } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
-import type { SubscriptionResult } from '../../types'
+import type { SubscriptionResult, AdvancedBillAnalysisResult } from '../../types'
 import { toArr, monthName } from '../../utils'
+import BillAnalysisPrintModal from '../../components/ui/BillAnalysisPrintModal'
 
 export default function BillHistory() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionResult[]>([])
   const [selectedSubId, setSelectedSubId] = useState<number | ''>('')
   const [history, setHistory]       = useState<any[]>([])
   const [loading, setLoading]       = useState(false)
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null)
+  const [printResult, setPrintResult]   = useState<AdvancedBillAnalysisResult | null>(null)
 
   useEffect(() => {
     customerApi.getSubscriptions().then(r => {
@@ -30,6 +34,17 @@ export default function BillHistory() {
     customerApi.getBillHistory(subId)
       .then(r => { if (r.code === 200) setHistory(toArr(r.result)); else setHistory([]) })
       .finally(() => setLoading(false))
+  }
+
+  const openPdf = (reportId: number) => {
+    setPdfLoadingId(reportId)
+    customerApi.getHistoryAnalysis(reportId)
+      .then(r => {
+        if (r.code === 200 && r.result) setPrintResult(r.result)
+        else toast.error(r.message ?? r.caption ?? 'خطا در بازسازی تحلیل')
+      })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
+      .finally(() => setPdfLoadingId(null))
   }
 
   const selectedSub = subscriptions.find(s => s.id === selectedSubId)
@@ -125,6 +140,7 @@ export default function BillHistory() {
                         <th className="pb-3 text-left font-semibold">با متین</th>
                         <th className="pb-3 text-left font-semibold">صرفه‌جویی</th>
                         <th className="pb-3 text-left font-semibold">تاریخ ثبت</th>
+                        <th className="pb-3 text-left font-semibold">تحلیل</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y" style={{ borderColor: 'rgba(209,250,229,0.3)' }}>
@@ -153,6 +169,17 @@ export default function BillHistory() {
                             <td className="py-3 text-left text-xs text-gray-400">
                               {h.createdAt?.split('T')[0] ?? '—'}
                             </td>
+                            <td className="py-3 text-left">
+                              <button
+                                onClick={() => openPdf(h.id)}
+                                disabled={pdfLoadingId === h.id}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+                                {pdfLoadingId === h.id
+                                  ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                                  : <FileDown className="h-3.5 w-3.5" />}
+                                PDF
+                              </button>
+                            </td>
                           </tr>
                         )
                       })}
@@ -170,6 +197,15 @@ export default function BillHistory() {
           <Zap className="mb-3 h-10 w-10 text-gray-300" />
           <p className="font-semibold text-gray-500">یک شناسه را از بالا انتخاب کنید</p>
         </div>
+      )}
+
+      {printResult && (
+        <BillAnalysisPrintModal
+          open={!!printResult}
+          onClose={() => setPrintResult(null)}
+          result={printResult}
+          billIdentifier={selectedSub?.billIdentifier}
+        />
       )}
     </div>
   )

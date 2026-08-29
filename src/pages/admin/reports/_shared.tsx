@@ -2,9 +2,17 @@ import { BarChart2, Download, RefreshCw, Search } from 'lucide-react'
 import PreviewDownloadButton from '../../../components/ui/FilePreviewModal'
 import { DatePicker } from '../../../components/ui/Input'
 export { MONTHS, monthName } from '../../../utils'
+import { MONTHS } from '../../../utils'
 
 export const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 export const rial = (n: number) => fmt(n) + ' ریال'
+
+export function jalaliYear(): number {
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate()
+  return (m > 3 || (m === 3 && day >= 20)) ? d.getFullYear() - 621 : d.getFullYear() - 622
+}
+
+export const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => jalaliYear() - 2 + i)
 
 export function exportCSV(headers: string[], rows: (string | number | null)[][], filename: string) {
   const bom = '﻿'
@@ -80,6 +88,33 @@ export function FilterDate({ label, value, onChange }: {
   label: string; value: string; onChange: (v: string) => void
 }) {
   return <DatePicker label={label} value={value || null} onChange={v => onChange(v)} />
+}
+
+export function FilterMonth({ label, year, month, onYearChange, onMonthChange }: {
+  label: string; year: string; month: string
+  onYearChange: (v: string) => void; onMonthChange: (v: string) => void
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-gray-600">{label}</label>
+      <div className="flex gap-1">
+        <select
+          className="rounded-xl border border-gray-200 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+          value={year}
+          onChange={e => onYearChange(e.target.value)}>
+          <option value="">سال</option>
+          {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select
+          className="rounded-xl border border-gray-200 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+          value={month}
+          onChange={e => onMonthChange(e.target.value)}>
+          <option value="">ماه</option>
+          {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+        </select>
+      </div>
+    </div>
+  )
 }
 
 export function ApplyBtn({ loading, onApply }: { loading: boolean; onApply: () => void }) {

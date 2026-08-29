@@ -5,7 +5,7 @@ import { adminApi } from '../../../api/admin'
 import type { OrderReportResult } from '../../../types'
 import {
   fmt, rial, exportCSV,
-  PageHeader, FilterRow, FilterSelect, FilterDate, ApplyBtn, CsvBtn,
+  PageHeader, FilterRow, FilterSelect, FilterMonth, ApplyBtn, CsvBtn,
   StatCard, TableWrap, THead, Td, Badge, EmptyRow, EmptyState,
 } from './_shared'
 
@@ -19,15 +19,14 @@ const STATUS: Record<number, { bg: string; text: string }> = {
 export default function AdminReportOrders() {
   const [data, setData]       = useState<OrderReportResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [filters, setFilters] = useState({ statusId: '', isPriceRequest: '', fromDate: '', toDate: '' })
+  const [filters, setFilters] = useState({ statusId: '', isPriceRequest: '', year: '', month: '' })
 
   const load = useCallback(() => {
     setLoading(true)
     const p: Record<string, unknown> = {}
     if (filters.statusId)            p.statusId      = Number(filters.statusId)
     if (filters.isPriceRequest !== '') p.isPriceRequest = filters.isPriceRequest === 'true'
-    if (filters.fromDate)            p.fromDate      = filters.fromDate
-    if (filters.toDate)              p.toDate        = filters.toDate
+    if (filters.year && filters.month) { p.year = Number(filters.year); p.month = Number(filters.month) }
     adminApi.getOrderReport(p as never)
       .then(r => {
         if (r.code === 200 && r.result) setData(r.result)
@@ -42,8 +41,8 @@ export default function AdminReportOrders() {
   const doExport = () => {
     if (!data) return
     exportCSV(
-      ['#', 'شناسه', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ'],
-      data.items.map((o, i) => [i + 1, o.billIdentifier, o.customerName, o.energyType, o.requestedKwh, o.priceAtMoment, o.paidAmount, o.status, o.orderDate]),
+      ['#', 'شناسه', 'مشتری', 'نوع انرژی', 'درخواستی kWh', 'قیمت ریال/kWh', 'پرداخت شده ریال', 'وضعیت', 'تاریخ', 'برق سبز'],
+      data.items.map((o, i) => [i + 1, o.billIdentifier, o.customerName, o.energyType, o.requestedKwh, o.priceAtMoment, o.paidAmount, o.status, o.orderDate, o.isGreenEnergy ? 'بله' : 'خیر']),
       'orders-report.csv',
     )
   }
@@ -69,8 +68,13 @@ export default function AdminReportOrders() {
               <option value="false">خرید برق</option>
               <option value="true">استعلام قیمت</option>
             </FilterSelect>
-            <FilterDate label="از تاریخ" value={filters.fromDate} onChange={v => setFilters(p => ({ ...p, fromDate: v }))} />
-            <FilterDate label="تا تاریخ" value={filters.toDate}   onChange={v => setFilters(p => ({ ...p, toDate: v }))} />
+            <FilterMonth
+              label="ماه"
+              year={filters.year}
+              month={filters.month}
+              onYearChange={v => setFilters(p => ({ ...p, year: v }))}
+              onMonthChange={v => setFilters(p => ({ ...p, month: v }))}
+            />
             <ApplyBtn loading={loading} onApply={load} />
             {data && <CsvBtn onExport={doExport} />}
           </FilterRow>
@@ -85,6 +89,8 @@ export default function AdminReportOrders() {
                 ))}
                 <StatCard label="مجموع درخواستی"         value={`${fmt(data.summary.totalRequestedKwh)} kWh`} color="blue" />
                 <StatCard label="پرداخت تایید شده"        value={rial(data.summary.totalPaidRial)}             color="emerald" />
+                <StatCard label="برق سبز (۴٪ سفارشات سبز)" value={`${fmt(data.summary.greenKwh)} kWh`}          color="emerald" />
+                <StatCard label="برق عادی"                value={`${fmt(data.summary.normalKwh)} kWh`}         color="gray" />
               </div>
 
               {/* Table */}
@@ -103,7 +109,14 @@ export default function AdminReportOrders() {
                           <Td>
                             {o.isPriceRequest
                               ? <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">استعلام</span>
-                              : o.energyType}
+                              : (
+                                <span className="flex items-center gap-1">
+                                  {o.energyType}
+                                  {o.isGreenEnergy && (
+                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">۴٪ سبز</span>
+                                  )}
+                                </span>
+                              )}
                           </Td>
                           <Td mono bold>{fmt(o.requestedKwh)}</Td>
                           <Td mono>{o.priceAtMoment > 0 ? fmt(o.priceAtMoment) : '—'}</Td>

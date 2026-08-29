@@ -4,7 +4,7 @@ import { FileText, Zap, MessageSquare, User, ArrowLeft, Megaphone, CheckCircle, 
 import { useAuth } from '../../contexts/AuthContext'
 import { customerApi } from '../../api/customer'
 import { StatCard } from '../../components/ui/Card'
-import Badge, { contractStatusVariant } from '../../components/ui/Badge'
+import Badge, { contractStatusVariantById } from '../../components/ui/Badge'
 import type { ContractResult, TicketSummary, AnnouncementItem, ProfitReportSummary } from '../../types'
 import { toArr } from '../../utils'
 
@@ -24,7 +24,7 @@ export default function CustomerDashboard() {
     customerApi.getMyProfitReport().then((r) => { if (r.code === 200 && r.result) setProfitSummary(r.result.summary) })
   }, [])
 
-  const activeContracts = contracts.filter((c) => c.status.includes('فعال')).length
+  const activeContracts = contracts.filter((c) => c.statusId === 2).length
   const openTickets     = tickets.filter((t) => !t.status.includes('بسته')).length
 
   const quickLinks = [
@@ -129,7 +129,7 @@ export default function CustomerDashboard() {
                   <p className="font-mono text-sm font-semibold text-gray-800">{c.contractNumber}</p>
                   <p className="mt-0.5 text-xs text-gray-400">{c.startDate} تا {c.endDate}</p>
                 </div>
-                <Badge variant={contractStatusVariant(c.status)}>{c.status}</Badge>
+                <Badge variant={contractStatusVariantById(c.statusId)}>{c.status}</Badge>
               </div>
             ))}
           </div>

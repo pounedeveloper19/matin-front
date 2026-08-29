@@ -36,11 +36,7 @@ export default function AdminPendingUsers() {
       const res = await adminApi.getPendingUsers()
       if (res.code === 200) {
         const list = (res.result as PendingUser[]) ?? []
-        list.sort((a, b) => {
-          const da = a.registeredAt ? new Date(a.registeredAt).getTime() : a.id
-          const db = b.registeredAt ? new Date(b.registeredAt).getTime() : b.id
-          return db - da
-        })
+        list.sort((a, b) => b.id - a.id)
         setUsers(list)
       }
     } finally { setLoading(false) }
@@ -98,8 +94,8 @@ export default function AdminPendingUsers() {
     if (u.mainAddress) return u.mainAddress
     return '—'
   }
-  const formatDate = (value?: string | null) =>
-    value ? new Date(value).toLocaleDateString('fa-IR') : '—'
+  // registeredAt از سرور از قبل به تاریخ شمسی (yyyy/MM/dd) تبدیل شده؛ اینجا فقط نمایش داده می‌شود
+  const formatDate = (value?: string | null) => value ?? '—'
 
   return (
     <div className="space-y-6">

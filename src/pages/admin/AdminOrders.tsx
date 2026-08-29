@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Upload, Printer } from 'lucide-react'
+import { ShoppingCart, RefreshCw, ChevronLeft, ChevronRight, X, CreditCard, CheckCircle, XCircle, Upload, Printer, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { adminApi } from '../../api/admin'
 import { lookupApi, type IdTitle } from '../../api/lookup'
@@ -8,6 +8,7 @@ import FileUpload from '../../components/ui/FileUpload'
 import ProformaInvoicePrintModal, { type ProformaInvoiceData } from '../../components/ui/ProformaInvoicePrintModal'
 import type { AdminOrderResult } from '../../types'
 import { toArr } from '../../utils'
+import { useAuth } from '../../contexts/AuthContext'
 
 const STATUS_COLOR: Record<number, string> = {
   1: 'bg-yellow-100 text-yellow-800',
@@ -23,6 +24,7 @@ const PAY_STATUS_COLOR: Record<number, string> = {
 }
 
 export default function AdminOrders() {
+  const { isAdminRole } = useAuth()
   const [orders, setOrders]         = useState<AdminOrderResult[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
@@ -43,6 +45,21 @@ export default function AdminOrders() {
   const [paySubmitting, setPaySubmitting] = useState(false)
 
   const [proformaData, setProformaData] = useState<ProformaInvoiceData | null>(null)
+
+  const [deleteTarget, setDeleteTarget] = useState<AdminOrderResult | null>(null)
+  const [deleting, setDeleting]         = useState(false)
+
+  const handleDelete = () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    adminApi.deleteOrder(deleteTarget.id)
+      .then(r => {
+        if (r.code === 200) { toast.success('سفارش حذف شد'); setDeleteTarget(null); load() }
+        else toast.error(r.message ?? r.caption ?? 'خطا در حذف سفارش')
+      })
+      .catch(() => toast.error('خطا در ارتباط با سرور'))
+      .finally(() => setDeleting(false))
+  }
 
   const openProforma = async (orderId: number) => {
     try {
@@ -247,6 +264,13 @@ export default function AdminOrders() {
                                 className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                                 title="پیش‌فاکتور">
                                 <Printer className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {isAdminRole && (
+                              <button onClick={() => setDeleteTarget(o)}
+                                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="حذف سفارش">
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             )}
                           </div>
@@ -493,6 +517,33 @@ export default function AdminOrders() {
               <button onClick={handleUpdateStatus} disabled={saving || !statusForm.statusId}
                 className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                 {saving ? 'در حال ذخیره...' : 'ذخیره'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <h2 className="font-bold text-gray-900">حذف سفارش #{deleteTarget.id}</h2>
+              <button onClick={() => setDeleteTarget(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 text-sm text-gray-600">
+              آیا از حذف کامل این سفارش (به‌همراه فیش‌های پرداخت وابسته) اطمینان دارید؟ این عملیات غیرقابل بازگشت است.
+            </div>
+            <div className="flex justify-end gap-3 border-t px-5 py-4">
+              <button onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                انصراف
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="rounded-xl bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                {deleting ? 'در حال حذف...' : 'حذف'}
               </button>
             </div>
           </div>

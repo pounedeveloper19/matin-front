@@ -19,6 +19,8 @@ export interface ProformaInvoiceData {
   city?: string | null
   province?: string | null
   postalCode?: string | null
+  isGreenEnergy?: boolean
+  greenRate?: number | null
 }
 
 interface Props {
@@ -56,7 +58,16 @@ export default function ProformaInvoicePrintModal({ open, data, onClose }: Props
 
   const hasContract = data.contractRate != null && data.contractRate > 0
   const rate        = hasContract ? data.contractRate! : (parseFloat(manualRate) || 0)
-  const total       = data.requestedKwh * rate
+
+  // اگر برق سبز درخواست شده باشد: ۴٪ انرژی با نرخ برق سبز و ۹۶٪ با نرخ عادی محاسبه می‌شود
+  const isGreen       = !!data.isGreenEnergy
+  const normalKwh     = isGreen ? data.requestedKwh * 0.96 : data.requestedKwh
+  const greenKwh      = isGreen ? data.requestedKwh * 0.04 : 0
+  const effGreenRate  = isGreen ? (data.greenRate && data.greenRate > 0 ? data.greenRate : rate) : rate
+  const normalAmount  = Math.round(normalKwh * rate)
+  const greenAmount   = isGreen ? Math.round(greenKwh * effGreenRate) : 0
+
+  const total       = normalAmount + greenAmount
   const vat         = Math.round(total * 0.1)
   const grandTotal  = total + vat
   const invoiceNo   = `PF-${new Date().getFullYear()}-${String(data.id).padStart(5, '0')}`
@@ -91,6 +102,7 @@ export default function ProformaInvoicePrintModal({ open, data, onClose }: Props
               <div><b>شماره:</b> {invoiceNo}</div>
               <div><b>تاریخ:</b> {_(data.orderDate, printDate)}</div>
               <div><b>تاریخ چاپ:</b> {printDate}</div>
+              <div style={{ color: '#b91c1c', fontWeight: 700 }}>مدت اعتبار ۲۴ ساعت</div>
             </td>
           </tr>
         </tbody>
@@ -105,19 +117,23 @@ export default function ProformaInvoicePrintModal({ open, data, onClose }: Props
           </tr>
           <tr>
             <td style={LBL}>نام شخص حقوقی:</td>
-            <td style={VAL}>شرکت توسعه انرژی متین</td>
-            <td style={LBL}>شناسه ملی:</td>
-            <td style={VAL}>۱۴۰۰۴۸۱۵۲۲۰</td>
+            <td style={VAL}>شرکت توسعه انرژی متین تام</td>
+            <td style={LBL}>شناسه ملی / شماره ثبت:</td>
+            <td style={VAL}>10103303952</td>
+          </tr>
+          <tr>
+            <td style={LBL}>شماره اقتصادی:</td>
+            <td colSpan={3} style={VAL}>411114955475</td>
           </tr>
           <tr>
             <td style={LBL}>نشانی:</td>
-            <td colSpan={3} style={VAL}>تهران، ...</td>
+            <td colSpan={3} style={VAL}>تهران، خیابان ملاصدرا، ابتدای شیخ بهایی شمالی، کوچه سلمان، پلاک ۹</td>
           </tr>
           <tr>
             <td style={LBL}>شماره تلفن / نمابر:</td>
-            <td style={VAL}>۰۲۱-XXXXXXXX</td>
+            <td style={VAL}>021-88211483 تا 4 / نمابر: 021-88211485</td>
             <td style={LBL}>کد پستی:</td>
-            <td style={VAL}>XXXXXXXXXX</td>
+            <td style={VAL}>1991716764</td>
           </tr>
 
           {/* خریدار */}
@@ -192,16 +208,31 @@ export default function ProformaInvoicePrintModal({ open, data, onClose }: Props
           <tr>
             <td style={TD}>۱</td>
             <td style={TD}>—</td>
-            <td style={TDL}>انرژی الکتریکی ({_(data.energyType)})</td>
-            <td style={{ ...TD, fontWeight: 700 }}>{num(data.requestedKwh)}</td>
+            <td style={TDL}>انرژی الکتریکی ({_(data.energyType)}){isGreen ? ' — برق عادی ۹۶٪' : ''}</td>
+            <td style={{ ...TD, fontWeight: 700 }}>{num(normalKwh)}</td>
             <td style={TD}>کیلووات ساعت</td>
-            <td style={{ ...TD, fontWeight: 700 }}>{num(data.contractRate)}</td>
-            <td style={{ ...TD, fontWeight: 700 }}>{rial(total)}</td>
+            <td style={{ ...TD, fontWeight: 700 }}>{num(rate)}</td>
+            <td style={{ ...TD, fontWeight: 700 }}>{rial(normalAmount)}</td>
             <td style={TD}>—</td>
-            <td style={{ ...TD, fontWeight: 700 }}>{rial(total)}</td>
-            <td style={{ ...TD, fontWeight: 700 }}>{rial(vat)}</td>
-            <td style={{ ...TD, fontWeight: 900 }}>{rial(grandTotal)}</td>
+            <td style={{ ...TD, fontWeight: 700 }}>{rial(normalAmount)}</td>
+            <td style={{ ...TD, fontWeight: 700 }}>{rial(Math.round(normalAmount * 0.1))}</td>
+            <td style={{ ...TD, fontWeight: 900 }}>{rial(normalAmount + Math.round(normalAmount * 0.1))}</td>
           </tr>
+          {isGreen && (
+            <tr>
+              <td style={TD}>۲</td>
+              <td style={TD}>—</td>
+              <td style={TDL}>انرژی الکتریکی ({_(data.energyType)}) — برق سبز ۴٪</td>
+              <td style={{ ...TD, fontWeight: 700 }}>{num(greenKwh)}</td>
+              <td style={TD}>کیلووات ساعت</td>
+              <td style={{ ...TD, fontWeight: 700 }}>{num(effGreenRate)}</td>
+              <td style={{ ...TD, fontWeight: 700 }}>{rial(greenAmount)}</td>
+              <td style={TD}>—</td>
+              <td style={{ ...TD, fontWeight: 700 }}>{rial(greenAmount)}</td>
+              <td style={{ ...TD, fontWeight: 700 }}>{rial(Math.round(greenAmount * 0.1))}</td>
+              <td style={{ ...TD, fontWeight: 900 }}>{rial(greenAmount + Math.round(greenAmount * 0.1))}</td>
+            </tr>
+          )}
         </tbody>
         <tfoot>
           <tr>

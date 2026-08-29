@@ -5,6 +5,8 @@ import { lookupApi } from '../api/lookup'
 interface AuthUser {
   token: string
   role: 'admin' | 'customer'
+  roleTitle: string | null
+  roleId: number | null
   fullName: string
 }
 
@@ -15,6 +17,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   hasPermission: (controlKey: string) => boolean
   permissionsLoaded: boolean
+  isAdminRole: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -62,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const login = (data: LoginResponse) => {
-    setUser({ token: data.token, role: data.role, fullName: data.fullName })
+    setUser({ token: data.token, role: data.role, roleTitle: data.roleTitle, roleId: data.roleId, fullName: data.fullName })
   }
 
   const logout = () => setUser(null)
@@ -74,8 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return permissions.has(controlKey)
   }, [user, permissions])
 
+  // نقش «ادمین» = RoleId 5 در جدول Role (طبق تایید مستقیم روی دیتابیس)
+  const isAdminRole = user?.roleId === 5
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasPermission, permissionsLoaded }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasPermission, permissionsLoaded, isAdminRole }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Building2, Plus, Pencil, Trash2, Eye, Trash, UserCheck, UserX, Briefcase, MoreHorizontal } from 'lucide-react'
+import { Search, Building2, Plus, Pencil, Eye, Trash, UserCheck, UserX, Briefcase, MoreHorizontal } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validateMobile, validateNationalCode, validateNationalId } from '../../utils/validators'
 import { adminApi } from '../../api/admin'
@@ -46,7 +46,7 @@ export default function AdminLegalCustomers() {
   const [totalPages, setTotalPages] = useState(1)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState({ companyName: '', nationalId: '', ceoFullName: '', isActive: '' })
+  const [search, setSearch] = useState({ companyName: '', nationalId: '', ceoFullName: '', isActive: 'true' })
   const [applied, setApplied] = useState(search)
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [form, setForm] = useState<AdminLegalCustomer>(emptyForm)
@@ -96,19 +96,19 @@ export default function AdminLegalCustomers() {
 
   const handleSearch = () => { setPage(1); setApplied(search); setSelectedIds([]) }
   const handleReset = () => {
-    const e = { companyName: '', nationalId: '', ceoFullName: '', isActive: '' }
+    const e = { companyName: '', nationalId: '', ceoFullName: '', isActive: 'true' }
     setSearch(e); setApplied(e); setPage(1); setSelectedIds([])
   }
 
   const handleBulkDelete = async () => {
     if (!selectedIds.length) return
-    if (!window.confirm(`آیا از حذف ${selectedIds.length} مشتری اطمینان دارید؟`)) return
+    if (!window.confirm(`آیا از غیرفعال‌سازی ${selectedIds.length} مشتری اطمینان دارید؟`)) return
     setBulkDeleting(true)
     try {
       await Promise.all(selectedIds.map((id) => adminApi.deleteLegalCustomer(id)))
-      toast.success(`${selectedIds.length} مشتری حذف شد`)
+      toast.success(`${selectedIds.length} مشتری غیرفعال شد`)
       setSelectedIds([]); fetchData(page, applied); fetchStats()
-    } catch { toast.error('خطا در حذف گروهی') }
+    } catch { toast.error('خطا در غیرفعال‌سازی گروهی') }
     finally { setBulkDeleting(false) }
   }
 
@@ -153,8 +153,8 @@ export default function AdminLegalCustomers() {
     try {
       const res = await adminApi.deleteLegalCustomer(form.id)
       if (res.code === 200) {
-        toast.success('مشتری حذف شد'); setModal(null); fetchData(page, applied); fetchStats()
-      } else { toast.error(res.message ?? res.caption ?? 'خطا در حذف') }
+        toast.success('مشتری غیرفعال شد'); setModal(null); fetchData(page, applied); fetchStats()
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در غیرفعال‌سازی') }
     } catch { toast.error('خطا در ارتباط با سرور') }
     finally { setSaving(false) }
   }
@@ -185,6 +185,13 @@ export default function AdminLegalCustomers() {
     { key: 'ceoFullName', header: 'مدیرعامل' },
     { key: 'ceoMobile', header: 'موبایل' },
     {
+      key: 'createdAt',
+      header: 'تاریخ ثبت‌نام',
+      render: (row: AdminLegalCustomer) => (
+        <span className="text-xs text-gray-500">{row.createdAt ?? '—'}</span>
+      ),
+    },
+    {
       key: 'isActive',
       header: 'وضعیت',
       render: (row: AdminLegalCustomer) => (
@@ -205,9 +212,9 @@ export default function AdminLegalCustomers() {
             className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => openDelete(row)}
+          <button onClick={() => openDelete(row)} title="غیرفعال‌سازی"
             className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <Trash2 className="h-3.5 w-3.5" />
+            <UserX className="h-3.5 w-3.5" />
           </button>
         </div>
       ),
@@ -278,7 +285,7 @@ export default function AdminLegalCustomers() {
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <Button size="sm" variant="danger" loading={bulkDeleting} onClick={handleBulkDelete}>
-              <Trash className="h-4 w-4" /> حذف انتخاب‌شده‌ها
+              <Trash className="h-4 w-4" /> غیرفعال‌سازی انتخاب‌شده‌ها
             </Button>
           )}
           <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> مشتری جدید</Button>
@@ -360,16 +367,16 @@ export default function AdminLegalCustomers() {
         </div>
       </Modal>
 
-      {/* Delete Confirm */}
-      <Modal open={modal === 'delete'} onClose={() => setModal(null)} title="حذف مشتری حقوقی" size="sm">
+      {/* Deactivate Confirm */}
+      <Modal open={modal === 'delete'} onClose={() => setModal(null)} title="غیرفعال‌سازی مشتری حقوقی" size="sm">
         <p className="text-sm text-gray-600">
-          آیا از حذف شرکت <span className="font-bold text-gray-900">{form.companyName}</span> اطمینان دارید؟
-          این عملیات قابل بازگشت نیست.
+          آیا از غیرفعال‌سازی شرکت <span className="font-bold text-gray-900">{form.companyName}</span> اطمینان دارید؟
+          این مشتری حذف نمی‌شود و می‌توانید بعداً از طریق ویرایش دوباره فعالش کنید.
         </p>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setModal(null)}>انصراف</Button>
           <Button variant="danger" loading={saving} onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" /> حذف
+            <UserX className="h-4 w-4" /> غیرفعال کردن
           </Button>
         </div>
       </Modal>

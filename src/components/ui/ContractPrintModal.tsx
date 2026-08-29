@@ -18,6 +18,7 @@ export interface PrintableContract {
   endDate?: string | null
   contractRate?: number | null
   status?: string | null
+  statusId?: number | null
   warrantyAmount?: number | null
   warrantyType?: string | null
   warrantyFileId?: string | null
@@ -226,7 +227,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
               style={{ border: '1px solid rgba(255,255,255,0.18)' }}>
               بستن
             </button>
-            {!data.status?.includes('عدم تایید') && (
+            {data.statusId !== 5 && (
               <button onClick={handlePrint}
                 className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95"
                 style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.25)' }}>
@@ -311,7 +312,7 @@ export default function ContractPrintModal({ open, data, onClose }: Props) {
               </div>
             </Row>
             <Row n="۵">پرداخت مالیات بر ارزش افزوده مطابق با قانون بر عهده «خریدار» می‌باشد. فروشنده موظف است در سامانه مالیات بر ارزش افزوده ثبت‌نام کرده و گواهی مربوطه را دریافت نماید و در صورتحساب‌های ماهیانه، مالیات بر ارزش افزوده را به مبلغ صورتحساب افزوده و پس از دریافت از خریدار، به سازمان امور مالیاتی پرداخت نماید.</Row>
-            <Row n="۶">کلیه پرداخت‌ها به فروشنده به شماره حساب 366-868-5078821-1 با شماره شبای <b>IR800590036676705078821001</b> نزد بانک سینا به نام شرکت توسعه انرژی متین تام صورت می‌پذیرد.</Row>
+            <Row n="۶">کلیه پرداخت‌ها به فروشنده به شماره حساب 1-5078821-767-366 با شماره شبای <b>IR800590036676705078821001</b> نزد بانک سینا به نام شرکت توسعه انرژی متین تام صورت می‌پذیرد.</Row>
             <Row n="۷">نرخ و حجم فروش برق تجدیدپذیر (موضوع بند ۲ ماده ۱) براساس توافقات صورت‌گرفته با خریدار برای هر دوره مصرف، ۱۰ روز قبل از شروع دوره تعیین، و پس از ارسال صورتحساب از سمت فروشنده پرداخت می‌گردد. در صورت عدم توافق در خصوص نرخ فروش برق تجدیدپذیر، خریدار مجاز خواهد بود برق تجدیدپذیر خود را از منبع دیگری تأمین نماید.</Row>
           </Art>
 

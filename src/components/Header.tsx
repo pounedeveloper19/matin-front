@@ -1,4 +1,5 @@
-import { Bell, Search, Send } from 'lucide-react'
+import { Search, Send, ShoppingCart } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 interface HeaderProps {
@@ -34,23 +35,24 @@ export default function Header({ title, role }: HeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
+          <Link
+            to="/admin/bill-analysis"
+            title="ثبت سفارش خرید برق برای مشتری"
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: ADMIN.mint, color: ADMIN.primary }}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            <span className="hidden sm:inline">ثبت سفارش خرید</span>
+          </Link>
+
+          <Link
+            to="/admin/announcements"
             className="hidden items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:flex"
             style={{ background: ADMIN.primary }}
           >
             <Send className="h-4 w-4" />
             ارسال اعلان
-          </button>
-
-          <button
-            type="button"
-            className="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100"
-            title="اعلانات"
-          >
-            <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-          </button>
+          </Link>
 
           <div className="hidden h-8 w-px bg-gray-200 sm:block" />
 
@@ -96,6 +98,17 @@ export default function Header({ title, role }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <Link
+          to="/customer/orders"
+          state={{ openCreate: true }}
+          title="خرید برق"
+          className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ background: 'var(--app-primary)' }}
+        >
+          <ShoppingCart style={{ width: '16px', height: '16px' }} />
+          <span className="hidden sm:inline">خرید برق</span>
+        </Link>
+
         <div className="flex items-center gap-2.5 rounded-xl px-3 py-1.5" style={{ background: '#edeeef', border: '1px solid #e1e3e4' }}>
           <div
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
@@ -105,10 +118,6 @@ export default function Header({ title, role }: HeaderProps) {
           </div>
           <span className="hidden text-sm font-medium sm:block" style={{ color: '#294e3f' }}>{user?.fullName}</span>
         </div>
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-emerald-50" style={{ color: '#416656' }} title="اعلانات">
-          <Bell style={{ width: '18px', height: '18px' }} />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-        </button>
       </div>
     </header>
   )

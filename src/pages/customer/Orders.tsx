@@ -11,13 +11,43 @@ import { lookupApi, type IdTitle } from '../../api/lookup'
 import PreviewDownloadButton from '../../components/ui/FilePreviewModal'
 import FileUpload from '../../components/ui/FileUpload'
 import type { OrderResult, OrderDetailResult, SubscriptionResult, AdvancedBillAnalysisResult, ProformaData } from '../../types'
-import { toArr } from '../../utils'
+import { toArr, MONTHS } from '../../utils'
 
 const fmt  = (n: number) => n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 const rial = (n: number) => fmt(n) + ' ریال'
 
+function jalaliYear(): number {
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate()
+  return (m > 3 || (m === 3 && day >= 20)) ? d.getFullYear() - 621 : d.getFullYear() - 622
+}
+const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => jalaliYear() - 2 + i)
+
+type BillHistoryItem = {
+  year: number | null
+  month: number | null
+  peakCons: number | null
+  midCons: number | null
+  lowCons: number | null
+  costWithMatin: number | null
+}
+
+// اگر برق سبز درخواست شده باشد: ۴٪ انرژی با نرخ برق سبز و ۹۶٪ با نرخ عادی محاسبه می‌شود
+function splitEnergyAmount(kwh: number, normalRate: number, isGreen?: boolean, greenRate?: number | null) {
+  if (!isGreen) {
+    const amount = Math.round(kwh * normalRate)
+    return { normalKwh: kwh, greenKwh: 0, normalRate, greenRate: normalRate, normalAmount: amount, greenAmount: 0, subtotal: amount }
+  }
+  const normalKwh = kwh * 0.96
+  const greenKwh  = kwh * 0.04
+  const effGreenRate = greenRate && greenRate > 0 ? greenRate : normalRate
+  const normalAmount = Math.round(normalKwh * normalRate)
+  const greenAmount  = Math.round(greenKwh * effGreenRate)
+  return { normalKwh, greenKwh, normalRate, greenRate: effGreenRate, normalAmount, greenAmount, subtotal: normalAmount + greenAmount }
+}
+
 function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => void }) {
-  const subtotal = Math.round(data.requestedKwh * data.priceAtMoment)
+  const split    = splitEnergyAmount(data.requestedKwh, data.priceAtMoment, data.isGreenEnergy, data.greenRate)
+  const subtotal = split.subtotal
   const vat      = Math.round(subtotal * 0.10)
   const total    = subtotal + vat
   const num      = `PF-${String(data.id).padStart(5, '0')}`
@@ -51,17 +81,38 @@ function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => v
           <div className="space-y-3 p-5">
             <div className="divide-y divide-gray-100 rounded-xl bg-gray-50 p-4 text-sm">
               {([
-                ['خریدار',      data.buyerName ?? data.billIdentifier, false],
-                ['نوع انرژی',   data.energyType,                      false],
-                ['تاریخ',       data.orderDate ?? '—',                false],
-                ['مقدار',       `${fmt(data.requestedKwh)} kWh`,      true],
-                ['نرخ واحد',    `${fmt(data.priceAtMoment)} ریال/kWh`,true],
+                ['خریدار',    data.buyerName ?? data.billIdentifier, false],
+                ['نوع انرژی', data.energyType,                      false],
+                ['تاریخ',     data.orderDate ?? '—',                false],
               ] as [string, string, boolean][]).map(([label, value, mono]) => (
                 <div key={label} className="flex justify-between py-1.5">
                   <span className="text-gray-500">{label}</span>
                   <span className={`font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
                 </div>
               ))}
+              {data.isGreenEnergy ? (
+                <>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">برق عادی (۹۶٪)</span>
+                    <span className="font-mono font-semibold">{fmt(split.normalKwh)} kWh × {fmt(split.normalRate)} ر</span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">برق سبز (۴٪)</span>
+                    <span className="font-mono font-semibold">{fmt(split.greenKwh)} kWh × {fmt(split.greenRate)} ر</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">مقدار</span>
+                    <span className="font-mono font-semibold">{fmt(data.requestedKwh)} kWh</span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">نرخ واحد</span>
+                    <span className="font-mono font-semibold">{fmt(data.priceAtMoment)} ریال/kWh</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="space-y-1.5 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm">
               <div className="flex justify-between">
@@ -97,12 +148,13 @@ function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => v
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e3a5f', paddingBottom: '10px', marginBottom: '12px' }}>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <p style={{ fontSize: '9px', margin: '0 0 3px' }}>بسمه تعالی</p>
-            <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px' }}>شرکت توسعه انرژی متین</p>
+            <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px' }}>شرکت توسعه انرژی متین تام</p>
             <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0', color: '#1e3a5f' }}>پیش فاکتور فروش کالا و خدمات</p>
           </div>
           <div style={{ fontSize: '10px', minWidth: '140px', textAlign: 'right' }}>
             <div style={{ marginBottom: '4px' }}>شماره سریال: <strong>{num}</strong></div>
-            <div>تاریخ: <strong>{data.orderDate ?? '—'}</strong></div>
+            <div style={{ marginBottom: '4px' }}>تاریخ: <strong>{data.orderDate ?? '—'}</strong></div>
+            <div style={{ color: '#b91c1c', fontWeight: 'bold' }}>مدت اعتبار ۲۴ ساعت</div>
           </div>
         </div>
 
@@ -110,13 +162,14 @@ function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => v
         <div style={{ border: '1px solid #bbb', marginBottom: '8px' }}>
           <div style={{ background: '#f0f4f8', padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', borderBottom: '1px solid #bbb' }}>مشخصات فروشنده</div>
           <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
-            {infoRow('نام شخص حقوقی', 'شرکت توسعه انرژی متین')}
-            {infoRow('شماره اقتصادی', '411611349686')}
-            {infoRow('شماره ثبت', '527995')}
+            {infoRow('نام شخص حقوقی', 'شرکت توسعه انرژی متین تام')}
+            {infoRow('شماره اقتصادی', '411114955475')}
+            {infoRow('شناسه ملی / شماره ثبت', '10103303952')}
           </div>
           <div style={{ padding: '0 8px 6px', display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
-            {infoRow('نشانی', 'تهران')}
-            {infoRow('شماره تلفن', '021-XXXXXXXX')}
+            {infoRow('نشانی', 'تهران، خیابان ملاصدرا، ابتدای شیخ بهایی شمالی، کوچه سلمان، پلاک ۹')}
+            {infoRow('شماره تلفن / نمابر', '021-88211483 تا 4 / 021-88211485')}
+            {infoRow('کدپستی', '1991716764')}
           </div>
         </div>
 
@@ -160,16 +213,31 @@ function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => v
             <tr>
               <td style={tdStyle(true)}>۱</td>
               <td style={tdStyle(true)}>—</td>
-              <td style={tdStyle()}>انرژی الکتریکی</td>
-              <td style={tdStyle(true)}>{fmt(data.requestedKwh)}</td>
+              <td style={tdStyle()}>انرژی الکتریکی{data.isGreenEnergy ? ' (برق عادی ۹۶٪)' : ''}</td>
+              <td style={tdStyle(true)}>{fmt(split.normalKwh)}</td>
               <td style={tdStyle(true)}>کیلووات ساعت</td>
-              <td style={tdStyle(true)}>{fmt(data.priceAtMoment)}</td>
-              <td style={tdStyle(true)}>{fmt(subtotal)}</td>
+              <td style={tdStyle(true)}>{fmt(split.normalRate)}</td>
+              <td style={tdStyle(true)}>{fmt(split.normalAmount)}</td>
               <td style={tdStyle(true)}>—</td>
-              <td style={tdStyle(true)}>{fmt(subtotal)}</td>
-              <td style={tdStyle(true)}>{fmt(vat)}</td>
-              <td style={tdStyle(true)}>{fmt(total)}</td>
+              <td style={tdStyle(true)}>{fmt(split.normalAmount)}</td>
+              <td style={tdStyle(true)}>{fmt(Math.round(split.normalAmount * 0.10))}</td>
+              <td style={tdStyle(true)}>{fmt(split.normalAmount + Math.round(split.normalAmount * 0.10))}</td>
             </tr>
+            {data.isGreenEnergy && (
+              <tr>
+                <td style={tdStyle(true)}>۲</td>
+                <td style={tdStyle(true)}>—</td>
+                <td style={tdStyle()}>انرژی الکتریکی (برق سبز ۴٪)</td>
+                <td style={tdStyle(true)}>{fmt(split.greenKwh)}</td>
+                <td style={tdStyle(true)}>کیلووات ساعت</td>
+                <td style={tdStyle(true)}>{fmt(split.greenRate)}</td>
+                <td style={tdStyle(true)}>{fmt(split.greenAmount)}</td>
+                <td style={tdStyle(true)}>—</td>
+                <td style={tdStyle(true)}>{fmt(split.greenAmount)}</td>
+                <td style={tdStyle(true)}>{fmt(Math.round(split.greenAmount * 0.10))}</td>
+                <td style={tdStyle(true)}>{fmt(split.greenAmount + Math.round(split.greenAmount * 0.10))}</td>
+              </tr>
+            )}
             {/* Totals row */}
             <tr style={{ background: '#f8f8f8', fontWeight: 'bold' }}>
               <td colSpan={8} style={{ ...tdStyle(), textAlign: 'center', fontSize: '10px' }}>جمع کل</td>
@@ -186,14 +254,20 @@ function ProformaModal({ data, onClose }: { data: ProformaData; onClose: () => v
         </div>
 
         {/* Description line */}
-        <div style={{ fontSize: '10px', border: '1px solid #bbb', padding: '6px 8px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '10px', border: '1px solid #bbb', padding: '6px 8px', marginBottom: '8px' }}>
           بابت فروش برق {data.orderDate?.split('/').slice(0, 2).join('/')} به {data.buyerName ?? data.billIdentifier}
+        </div>
+
+        {/* Payment instructions */}
+        <div style={{ fontSize: '10px', border: '1px solid #bbb', padding: '6px 8px', marginBottom: '16px', lineHeight: '1.8' }}>
+          خواهشمند است، صورتحساب مذکور را به شماره حساب <strong>1-5078821-767-366</strong> با شماره شبای{' '}
+          <strong>IR800590036676705078821001</strong> نزد بانک سینا پرداخت نمایید.
         </div>
 
         {/* Signatures */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '30px', fontSize: '10px' }}>
           <div style={{ textAlign: 'center', minWidth: '180px' }}>
-            <div style={{ borderTop: '1px solid #999', paddingTop: '8px' }}>مهر و امضاء فروشنده: شرکت توسعه انرژی متین</div>
+            <div style={{ borderTop: '1px solid #999', paddingTop: '8px' }}>مهر و امضاء فروشنده: شرکت توسعه انرژی متین تام</div>
           </div>
           <div style={{ textAlign: 'center', minWidth: '180px' }}>
             <div style={{ borderTop: '1px solid #999', paddingTop: '8px' }}>مهر و امضاء خریدار</div>
@@ -224,7 +298,7 @@ const canPay = (o: OrderResult | OrderDetailResult) =>
 export default function Orders() {
   const location = useLocation()
   const navigate  = useNavigate()
-  const navState  = location.state as { newOrderId?: number; analysis?: AdvancedBillAnalysisResult } | null
+  const navState  = location.state as { newOrderId?: number; analysis?: AdvancedBillAnalysisResult; openCreate?: boolean } | null
 
   const [orders, setOrders]         = useState<OrderResult[]>([])
   const [loading, setLoading]       = useState(false)
@@ -235,21 +309,50 @@ export default function Orders() {
   const [analysis, setAnalysis]         = useState<AdvancedBillAnalysisResult | null>(navState?.analysis ?? null)
   const [analysisOpen, setAnalysisOpen] = useState(true)
 
-  const [showCreate, setShowCreate]   = useState(false)
+  const [showCreate, setShowCreate]   = useState(navState?.openCreate ?? false)
   const [showPay, setShowPay]         = useState(false)
   const [detail, setDetail]           = useState<OrderDetailResult | null>(null)
   const [showDetail, setShowDetail]   = useState(false)
   const [saving, setSaving]           = useState(false)
   const [proformaData, setProformaData]   = useState<ProformaData | null>(null)
   const [proformaLoading, setProformaLoading] = useState(false)
+  const [payProforma, setPayProforma]           = useState<ProformaData | null>(null)
+  const [payProformaLoading, setPayProformaLoading] = useState(false)
   const [newOrderId]                  = useState<number | undefined>(navState?.newOrderId)
+
+  // وقتی از هدر روی «خرید برق» کلیک می‌شود در حالی که کاربر از قبل در همین صفحه است،
+  // مسیر عوض نمی‌شود (فقط state جدید push می‌شود) پس مقداردهی اولیه‌ی useState بالا
+  // دوباره اجرا نمی‌شود — این افکت آن حالت را هم می‌گیرد و state ناوبری را پاک می‌کند
+  useEffect(() => {
+    if (navState?.openCreate) {
+      setShowCreate(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [createForm, setCreateForm] = useState({
     subscriptionId: '' as number | '',
     requestedKwh: '',
     energyTypeId: '' as number | '',
     isPriceRequest: false,
+    isGreenEnergy: false,
+    year: jalaliYear(),
+    month: 1,
   })
+  const [billHistory, setBillHistory] = useState<BillHistoryItem[]>([])
+  const [billHistoryLoading, setBillHistoryLoading] = useState(false)
+
+  useEffect(() => {
+    if (!createForm.subscriptionId) { setBillHistory([]); return }
+    setBillHistoryLoading(true)
+    customerApi.getBillHistory(createForm.subscriptionId as number)
+      .then(r => { if (r.code === 200) setBillHistory(toArr(r.result) as BillHistoryItem[]) })
+      .catch(() => {})
+      .finally(() => setBillHistoryLoading(false))
+  }, [createForm.subscriptionId])
+
+  const matchedBill = billHistory.find(h => h.year === createForm.year && h.month === createForm.month) ?? null
+  const matchedBillKwh = matchedBill ? (matchedBill.peakCons ?? 0) + (matchedBill.midCons ?? 0) + (matchedBill.lowCons ?? 0) : 0
 
   const [payForm, setPayForm] = useState({
     orderId: 0,
@@ -302,10 +405,28 @@ export default function Orders() {
   }
 
   const openPay = (o: OrderResult) => {
-    const suggested = o.priceAtMoment > 0 ? Math.round(o.requestedKwh * o.priceAtMoment) : 0
-    setPayForm({ orderId: o.id, amount: suggested > 0 ? String(suggested) : '', methodId: '', referenceNumber: '', receiptFileId: '', suggestedAmount: suggested })
+    setPayForm({ orderId: o.id, amount: '', methodId: '', referenceNumber: '', receiptFileId: '', suggestedAmount: 0 })
+    setPayProforma(null)
     setShowPay(true)
+
+    // نرخ همیشه از سرور خواسته می‌شود، نه فقط وقتی priceAtMoment خام سفارش پر باشد؛
+    // چون سرور خودش نرخ پیش‌فرض را از قرارداد فعال یا آخرین قبض محاسبه می‌کند
+    setPayProformaLoading(true)
+    customerApi.getProformaData(o.id)
+      .then(r => {
+        if (r.code === 200 && r.result) {
+          setPayProforma(r.result)
+          if (r.result.priceAtMoment > 0) {
+            const suggested = splitEnergyAmount(o.requestedKwh, r.result.priceAtMoment, r.result.isGreenEnergy, r.result.greenRate).subtotal
+            setPayForm(p => ({ ...p, amount: String(suggested), suggestedAmount: suggested }))
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPayProformaLoading(false))
   }
+
+  const closePay = () => { setShowPay(false); setPayProforma(null) }
 
   const handleCreate = () => {
     if (!createForm.subscriptionId) { toast.error('اشتراک را انتخاب کنید'); return }
@@ -318,12 +439,15 @@ export default function Orders() {
       requestedKwh: kwh,
       energyTypeId: createForm.energyTypeId as number,
       isPriceRequest: createForm.isPriceRequest,
+      isGreenEnergy: createForm.isGreenEnergy,
+      year: createForm.year,
+      month: createForm.month,
     })
       .then(r => {
         if (r.code === 200) {
           toast.success('سفارش ثبت شد')
           setShowCreate(false)
-          setCreateForm({ subscriptionId: '', requestedKwh: '', energyTypeId: '', isPriceRequest: false })
+          setCreateForm({ subscriptionId: '', requestedKwh: '', energyTypeId: '', isPriceRequest: false, isGreenEnergy: false, year: jalaliYear(), month: 1 })
           loadOrders()
         } else { toast.error(r.message ?? r.caption ?? 'خطا در ثبت سفارش') }
       })
@@ -346,7 +470,7 @@ export default function Orders() {
       .then(r => {
         if (r.code === 200) {
           toast.success('فیش پرداخت ثبت شد — ادمین بررسی خواهد کرد')
-          setShowPay(false)
+          closePay()
           loadOrders()
           if (showDetail && detail?.id === payForm.orderId) {
             openDetail(payForm.orderId)
@@ -484,6 +608,9 @@ export default function Orders() {
                           <span className="font-semibold text-gray-700">{o.energyType}</span>
                           <span className="text-gray-300">·</span>
                           <span className="font-bold text-gray-900">{fmt(o.requestedKwh)} kWh</span>
+                          {o.isGreenEnergy && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">۴٪ برق سبز</span>
+                          )}
                           {o.priceAtMoment > 0 && (
                             <>
                               <span className="text-gray-300">·</span>
@@ -508,24 +635,22 @@ export default function Orders() {
                           className="rounded-lg px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors">
                           جزئیات
                         </button>
-                        {o.priceAtMoment > 0 && (
-                          <button
-                            disabled={proformaLoading}
-                            onClick={() => {
-                              setProformaLoading(true)
-                              customerApi.getProformaData(o.id)
-                                .then(r => {
-                                  if (r.code === 200 && r.result) setProformaData(r.result)
-                                  else toast.error(r.message ?? 'خطا در بارگذاری پیش فاکتور')
-                                })
-                                .catch(() => toast.error('خطا در ارتباط با سرور'))
-                                .finally(() => setProformaLoading(false))
-                            }}
-                            className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-50">
-                            {proformaLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
-                            پیش فاکتور
-                          </button>
-                        )}
+                        <button
+                          disabled={proformaLoading}
+                          onClick={() => {
+                            setProformaLoading(true)
+                            customerApi.getProformaData(o.id)
+                              .then(r => {
+                                if (r.code === 200 && r.result && r.result.priceAtMoment > 0) setProformaData(r.result)
+                                else toast.error('نرخی برای این سفارش پیدا نشد — نه قرارداد فعالی هست، نه سابقه‌ی تحلیل قبض')
+                              })
+                              .catch(() => toast.error('خطا در ارتباط با سرور'))
+                              .finally(() => setProformaLoading(false))
+                          }}
+                          className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-50">
+                          {proformaLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                          پیش فاکتور
+                        </button>
                         {payable && (
                           <button onClick={() => openPay(o)}
                             className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
@@ -584,17 +709,69 @@ export default function Orders() {
                   {subscriptions.map(s => <option key={s.id} value={s.id}>{s.billIdentifier} — {s.powerEntity}</option>)}
                 </select>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">سال شمسی</label>
+                  <select className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                    value={createForm.year}
+                    onChange={e => setCreateForm(p => ({ ...p, year: Number(e.target.value) }))}>
+                    {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">ماه</label>
+                  <select className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                    value={createForm.month}
+                    onChange={e => setCreateForm(p => ({ ...p, month: Number(e.target.value) }))}>
+                    {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+              {createForm.subscriptionId && (
+                billHistoryLoading ? (
+                  <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 py-4">
+                    <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+                  </div>
+                ) : matchedBill ? (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-bold text-emerald-800">اطلاعات قبض این ماه</span>
+                      <button type="button"
+                        onClick={() => setCreateForm(p => ({ ...p, requestedKwh: String(Math.round(matchedBillKwh)) }))}
+                        className="text-[11px] font-semibold text-emerald-700 hover:underline">
+                        استفاده از این مقدار
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>میزان مصرف</span>
+                      <span className="font-mono font-semibold">{fmt(matchedBillKwh)} kWh</span>
+                    </div>
+                    {matchedBill.costWithMatin != null && (
+                      <div className="mt-1 flex justify-between text-gray-600">
+                        <span>قیمت قبض</span>
+                        <span className="font-mono font-semibold">{rial(matchedBill.costWithMatin)}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">برای این ماه، تحلیل قبضی ثبت نشده است.</p>
+                )
+              )}
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">نوع انرژی *</label>
                 <select className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   value={createForm.energyTypeId}
-                  onChange={e => setCreateForm(p => ({ ...p, energyTypeId: e.target.value ? Number(e.target.value) : '' }))}>
+                  onChange={e => {
+                    const id = e.target.value ? Number(e.target.value) : ''
+                    const isGreenType = energyTypes.find(t => t.id === id)?.title?.includes('سبز') ?? false
+                    setCreateForm(p => ({ ...p, energyTypeId: id, isGreenEnergy: isGreenType ? false : p.isGreenEnergy }))
+                  }}>
                   <option value="">انتخاب کنید...</option>
                   {energyTypes.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">مقدار درخواستی (kWh) *</label>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">مقدار انرژی (kWh) *</label>
                 <input type="number" min="0"
                   className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   placeholder="مثال: ۱۰۰۰"
@@ -610,6 +787,17 @@ export default function Orders() {
                   <p className="text-xs text-gray-500">بدون تعهد خرید</p>
                 </div>
               </label>
+              {!(energyTypes.find(t => t.id === createForm.energyTypeId)?.title?.includes('سبز') ?? false) && (
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 hover:bg-emerald-50">
+                  <input type="checkbox" className="h-4 w-4 rounded accent-emerald-600"
+                    checked={createForm.isGreenEnergy}
+                    onChange={e => setCreateForm(p => ({ ...p, isGreenEnergy: e.target.checked }))} />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">برق سبز می‌خواهم</p>
+                    <p className="text-xs text-gray-500">۴٪ از انرژی درخواستی به‌عنوان برق سبز و ۹۶٪ برق عادی محاسبه می‌شود</p>
+                  </div>
+                </label>
+              )}
             </div>
             <div className="flex justify-end gap-3 border-t px-5 py-4">
               <button onClick={() => setShowCreate(false)}
@@ -632,9 +820,86 @@ export default function Orders() {
                 <Receipt className="h-5 w-5 text-emerald-600" />
                 <h2 className="font-bold text-gray-900">ثبت فیش پرداخت</h2>
               </div>
-              <button onClick={() => setShowPay(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              <button onClick={closePay} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4 p-5">
+              {/* پیش‌فاکتور — قبل از ثبت فیش باید به مشتری نمایش داده شود */}
+              {payProformaLoading ? (
+                <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 py-6">
+                  <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+                </div>
+              ) : payProforma && payProforma.priceAtMoment > 0 ? (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-indigo-600" />
+                      <span className="text-xs font-bold text-indigo-900">پیش فاکتور این سفارش</span>
+                    </div>
+                    <button
+                      onClick={() => setProformaData(payProforma)}
+                      className="text-[11px] font-semibold text-indigo-600 hover:underline">
+                      مشاهده کامل
+                    </button>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    {payProforma.isGreenEnergy ? (
+                      <>
+                        <div className="flex justify-between text-gray-600">
+                          <span>برق عادی (۹۶٪)</span>
+                          <span className="font-mono font-semibold">
+                            {fmt(splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, true, payProforma.greenRate).normalKwh)} kWh ×{' '}
+                            {rial(payProforma.priceAtMoment)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>برق سبز (۴٪)</span>
+                          <span className="font-mono font-semibold">
+                            {fmt(splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, true, payProforma.greenRate).greenKwh)} kWh ×{' '}
+                            {rial(splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, true, payProforma.greenRate).greenRate)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between text-gray-600">
+                        <span>مقدار</span>
+                        <span className="font-mono font-semibold">{fmt(payProforma.requestedKwh)} kWh</span>
+                      </div>
+                    )}
+                    {!payProforma.isGreenEnergy && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>نرخ واحد</span>
+                        <span className="font-mono font-semibold">{rial(payProforma.priceAtMoment)}/kWh</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-gray-600">
+                      <span>جمع کل</span>
+                      <span className="font-mono font-semibold">
+                        {rial(splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, payProforma.isGreenEnergy, payProforma.greenRate).subtotal)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>مالیات ارزش افزوده ۱۰٪</span>
+                      <span className="font-mono font-semibold">
+                        {rial(Math.round(splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, payProforma.isGreenEnergy, payProforma.greenRate).subtotal * 0.10))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-indigo-200 pt-1.5 text-indigo-900">
+                      <span className="font-bold">مبلغ قابل پرداخت</span>
+                      <span className="font-mono font-bold">
+                        {(() => {
+                          const s = splitEnergyAmount(payProforma.requestedKwh, payProforma.priceAtMoment, payProforma.isGreenEnergy, payProforma.greenRate).subtotal
+                          return rial(s + Math.round(s * 0.10))
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  نرخی برای این سفارش پیدا نشد (نه قرارداد فعالی برای این اشتراک هست، نه سابقه‌ی تحلیل قبض). با پشتیبانی تماس بگیرید یا منتظر اعلام نرخ توسط ادمین بمانید.
+                </div>
+              )}
+
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                 پس از ثبت فیش، ادمین اطلاعات را بررسی و تایید می‌کند. شماره مرجع را دقیق وارد کنید.
               </div>
@@ -677,7 +942,7 @@ export default function Orders() {
               />
             </div>
             <div className="flex justify-end gap-3 border-t px-5 py-4">
-              <button onClick={() => setShowPay(false)}
+              <button onClick={closePay}
                 className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">انصراف</button>
               <button onClick={handlePay} disabled={saving}
                 className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
@@ -712,7 +977,7 @@ export default function Orders() {
                 {[
                   { label: 'شناسه',           value: detail.billIdentifier,  mono: true },
                   { label: 'نوع انرژی',      value: detail.energyType },
-                  { label: 'مقدار درخواستی', value: `${fmt(detail.requestedKwh)} kWh`, mono: true },
+                  { label: 'مقدار انرژی', value: `${fmt(detail.requestedKwh)} kWh`, mono: true },
                   { label: 'قیمت اعلامی',    value: detail.priceAtMoment > 0 ? rial(detail.priceAtMoment) : 'در انتظار اعلام', mono: detail.priceAtMoment > 0 },
                 ].map(({ label, value, mono }) => (
                   <div key={label} className="rounded-xl bg-gray-50 p-3">

@@ -24,11 +24,13 @@ import type {
   OrderResult,
   OrderDetailResult,
   CreateOrderRequest,
+  CreateContractRequest,
   SubmitPaymentRequest,
   PortfolioOptimizationResult,
   ProformaData,
   ProfitReportResult,
   LastBillResult,
+  CustomerTariffInfo,
 } from '../types'
 
 export const customerApi = {
@@ -90,6 +92,9 @@ export const customerApi = {
   submitWarranty: (data: SubmitWarrantyRequest) =>
     client.post<ExecutionResult>('/Contract/SubmitWarranty', data).then((r) => r.data),
 
+  createContract: (data: CreateContractRequest) =>
+    client.post<ExecutionResult<number>>('/Contract/CreateContract', data).then((r) => r.data),
+
   // Bill Analysis
   manualBillAnalysis: (data: ManualBillRequest) =>
     client.post<ExecutionResult<BillAnalysisResult>>('/BillCalculation/ManualAnalysis', data).then((r) => r.data),
@@ -109,9 +114,18 @@ export const customerApi = {
   getBillHistory: (subscriptionId: number) =>
     client.get<ExecutionResult>(`/BillCalculation/GetBillHistory/${subscriptionId}`).then((r) => r.data),
 
+  getHistoryAnalysis: (reportId: number) =>
+    client.get<ExecutionResult<AdvancedBillAnalysisResult>>(`/BillCalculation/GetHistoryAnalysis/${reportId}`).then((r) => r.data),
+
   // Tariff code selection
   updateTariffCode: (tariffCodeOptionId: number | null) =>
     client.put<ExecutionResult>('/CustomerProfile/UpdateTariffCode', { tariffCodeOptionId }).then((r) => r.data),
+
+  getTariffForMonth: (year: number, month: number) =>
+    client.get<ExecutionResult<CustomerTariffInfo>>(`/CustomerProfile/GetTariffForMonth/${year}/${month}`).then((r) => r.data),
+
+  setTariffForMonth: (year: number, month: number, tariffCodeOptionId: number) =>
+    client.put<ExecutionResult>('/CustomerProfile/SetTariffForMonth', { year, month, tariffCodeOptionId }).then((r) => r.data),
 
   // Address delete
   deleteAddress: (id: number) =>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FileText, Upload, CheckCircle, Clock, XCircle, Pencil, Printer, Shield, Zap, Calendar, BatteryCharging, BarChart2, CreditCard, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { FileText, Upload, CheckCircle, Clock, XCircle, Pencil, Printer, Shield, Zap, Calendar, BatteryCharging, BarChart2, CreditCard, AlertCircle, Plus, MessageSquareText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { customerApi } from '../../api/customer'
 import { lookupApi } from '../../api/lookup'
@@ -7,15 +8,28 @@ import type { IdTitle } from '../../api/lookup'
 import { StatCard } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import { Select } from '../../components/ui/Input'
+import { Select, DatePicker } from '../../components/ui/Input'
 import Input from '../../components/ui/Input'
-import Badge, { contractStatusVariant } from '../../components/ui/Badge'
+import Badge, { contractStatusVariantById } from '../../components/ui/Badge'
 import FileUpload from '../../components/ui/FileUpload'
 import ContractPrintModal, { type PrintableContract } from '../../components/ui/ContractPrintModal'
-import type { ContractResult, SubmitWarrantyRequest } from '../../types'
+import HelpTooltip from '../../components/ui/HelpTooltip'
+import type { ContractResult, SubmitWarrantyRequest, SubscriptionResult, CreateContractRequest } from '../../types'
 import { toArr } from '../../utils'
 
+const emptyRequestForm: CreateContractRequest = {
+  subscriptionId: 0, contractPowerKw: null, contractVolumeKwh: null, startDate: null, endDate: null,
+}
+
+function addOneYear(dateStr: string): string {
+  const d = new Date(dateStr)
+  d.setFullYear(d.getFullYear() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function CustomerContracts() {
+  const navigate = useNavigate()
+
   const [contracts, setContracts]           = useState<ContractResult[]>([])
   const [loading, setLoading]               = useState(true)
   const [guaranteeTypes, setGuaranteeTypes] = useState<IdTitle[]>([])
@@ -23,6 +37,12 @@ export default function CustomerContracts() {
   const [form, setForm]                     = useState<SubmitWarrantyRequest>({ contractId: 0, amount: 0, typeId: 0 })
   const [saving, setSaving]                 = useState(false)
   const [printData, setPrintData]           = useState<PrintableContract | null>(null)
+
+  const [subscriptions, setSubscriptions]   = useState<SubscriptionResult[]>([])
+  const [showRequest, setShowRequest]       = useState(false)
+  const [requestForm, setRequestForm]       = useState<CreateContractRequest>(emptyRequestForm)
+  const [requesting, setRequesting]         = useState(false)
+  const [acceptedTerms, setAcceptedTerms]   = useState(false)
 
   const fetchContracts = () => {
     setLoading(true)
@@ -36,6 +56,8 @@ export default function CustomerContracts() {
     fetchContracts()
     lookupApi.getGuaranteeTypes()
       .then((r) => { if (r.code === 200) setGuaranteeTypes(toArr(r.result) as IdTitle[]) })
+    customerApi.getSubscriptions()
+      .then((r) => { if (r.code === 200) setSubscriptions(toArr(r.result) as SubscriptionResult[]) })
   }, [])
 
   const openWarrantyModal = (c: ContractResult) => {
@@ -57,13 +79,55 @@ export default function CustomerContracts() {
     finally { setSaving(false) }
   }
 
-  const activeCount   = contracts.filter(c => c.statusId === 3).length
-  const pendingCount  = contracts.filter(c => c.statusId === 1 || c.statusId === 2).length
-  const rejectedCount = contracts.filter(c => c.statusId === 4).length
+  const openRequestModal  = () => { setRequestForm(emptyRequestForm); setAcceptedTerms(false); setShowRequest(true) }
+  const closeRequestModal = () => setShowRequest(false)
+
+  const handleRequestSubmit = async () => {
+    if (!requestForm.subscriptionId) { toast.error('شناسه اشتراک را انتخاب کنید'); return }
+    if (!requestForm.contractPowerKw && !requestForm.contractVolumeKwh) {
+      toast.error('حداقل قدرت یا انرژی درخواستی را وارد کنید'); return
+    }
+    if (requestForm.startDate && requestForm.endDate && requestForm.startDate > requestForm.endDate) {
+      toast.error('تاریخ پایان باید بعد از تاریخ شروع باشد'); return
+    }
+    if (!acceptedTerms) { toast.error('برای ثبت درخواست باید قوانین و مقررات را بپذیرید'); return }
+    setRequesting(true)
+    try {
+      const res = await customerApi.createContract(requestForm)
+      if (res.code === 200) {
+        toast.success('درخواست قرارداد ثبت شد — پس از بررسی و تایید ادمین نهایی می‌شود')
+        setShowRequest(false); fetchContracts()
+      } else { toast.error(res.message ?? res.caption ?? 'خطا در ثبت درخواست') }
+    } catch { toast.error('خطا در ارتباط با سرور') }
+    finally { setRequesting(false) }
+  }
+
+  const goToTicketInstead = () => {
+    const sub = subscriptions.find(s => s.id === requestForm.subscriptionId)
+    setShowRequest(false)
+    navigate('/customer/tickets', {
+      state: {
+        prefillSubject: 'درخواست ثبت قرارداد جدید',
+        prefillBody: [
+          'با سلام، درخواست ثبت قرارداد جدید دارم و ترجیح می‌دهم خودتان اطلاعات را ثبت کنید.',
+          sub ? `شناسه اشتراک: ${sub.billIdentifier} — ${sub.mainAddress}` : '',
+          requestForm.contractPowerKw ? `قدرت درخواستی: ${requestForm.contractPowerKw} kW` : '',
+          requestForm.contractVolumeKwh ? `انرژی درخواستی: ${requestForm.contractVolumeKwh} kWh` : '',
+        ].filter(Boolean).join('\n'),
+      },
+    })
+  }
+
+  // نگاشت دقیق بر اساس EnumContractStatuses واقعی دیتابیس:
+  // 1=پیش‌نویس، 2=فعال، 3=منقضی شده، 4=فسخ شده، 5=عدم تایید
+  const activeCount   = contracts.filter(c => c.statusId === 2).length
+  const pendingCount  = contracts.filter(c => c.statusId === 1).length
+  const rejectedCount = contracts.filter(c => c.statusId === 3 || c.statusId === 4 || c.statusId === 5).length
 
   const StatusIcon = ({ statusId }: { statusId: number }) => {
-    if (statusId === 3) return <CheckCircle className="h-4 w-4 text-emerald-500" />
-    if (statusId === 4) return <XCircle className="h-4 w-4 text-red-500" />
+    const variant = contractStatusVariantById(statusId)
+    if (variant === 'green') return <CheckCircle className="h-4 w-4 text-emerald-500" />
+    if (variant === 'red') return <XCircle className="h-4 w-4 text-red-500" />
     return <Clock className="h-4 w-4 text-amber-500" />
   }
 
@@ -77,6 +141,15 @@ export default function CustomerContracts() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">قراردادهای من</h2>
+          <p className="mt-0.5 text-xs text-gray-400">می‌توانید خودتان درخواست قرارداد جدید ثبت کنید یا از ادمین بخواهید ثبتش کند</p>
+        </div>
+        <Button onClick={openRequestModal}><Plus className="h-4 w-4" /> درخواست قرارداد جدید</Button>
+      </div>
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard title="مجموع قراردادها" value={contracts.length} icon={<FileText className="h-5 w-5" />} color="green" />
@@ -92,7 +165,18 @@ export default function CustomerContracts() {
         >
           <FileText className="mb-3 h-12 w-12 text-gray-300" />
           <h3 className="font-semibold text-gray-600">هنوز قراردادی ثبت نشده</h3>
-          <p className="mt-1 text-sm text-gray-400">قراردادهای شما پس از ثبت توسط ادمین اینجا نمایش داده می‌شود</p>
+          <p className="mt-1 text-sm text-gray-400">می‌توانید خودتان درخواست ثبت کنید یا از ادمین بخواهید ثبتش کند</p>
+          <div className="mt-5 flex gap-3">
+            <Button onClick={openRequestModal}><Plus className="h-4 w-4" /> درخواست قرارداد جدید</Button>
+            <button
+              onClick={() => navigate('/customer/tickets', { state: {
+                prefillSubject: 'درخواست ثبت قرارداد جدید',
+                prefillBody: 'با سلام، درخواست ثبت قرارداد جدید دارم و ترجیح می‌دهم خودتان اطلاعات را ثبت کنید.',
+              } })}
+              className="flex items-center gap-1.5 rounded-xl border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+              <MessageSquareText className="h-4 w-4" /> ثبت تیکت برای ادمین
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -120,8 +204,8 @@ export default function CustomerContracts() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusIcon statusId={c.statusId} />
-                  <Badge variant={contractStatusVariant(c.status)}>{c.status}</Badge>
-                  {!c.status?.includes('عدم تایید') && (
+                  <Badge variant={contractStatusVariantById(c.statusId)}>{c.status}</Badge>
+                  {c.statusId !== 5 && (
                     <button
                       onClick={async () => {
                         try {
@@ -146,6 +230,7 @@ export default function CustomerContracts() {
                               contractVolumeKwh: d.contractVolumeKwh,
                               contractAmountRial: d.contractAmountRial,
                               status: d.status,
+                              statusId: d.statusId,
                               warrantyAmount: d.warrantyAmount,
                               warrantyType: d.warrantyType,
                             })
@@ -164,7 +249,7 @@ export default function CustomerContracts() {
               </div>
 
               {/* Rejection reason banner */}
-              {c.status?.includes('عدم تایید') && c.rejectionReason && (
+              {c.statusId === 5 && c.rejectionReason && (
                 <div className="flex items-start gap-2 px-5 py-3 text-sm" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
                   <span className="mt-0.5 shrink-0 text-red-400">⚠</span>
                   <div>
@@ -177,23 +262,32 @@ export default function CustomerContracts() {
               {/* Contract details bento */}
               <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
                 <div className="rounded-xl bg-gray-50 p-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Calendar className="h-3 w-3 text-gray-400" />
-                    <p className="text-[10px] text-gray-400">تاریخ شروع</p>
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-gray-400" />
+                      <p className="text-[10px] text-gray-400">تاریخ شروع</p>
+                    </div>
+                    <HelpTooltip pageKey="customer-contracts" fieldKey="startDate" />
                   </div>
                   <p className="text-sm font-semibold text-gray-700">{c.startDate || '—'}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 p-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Calendar className="h-3 w-3 text-gray-400" />
-                    <p className="text-[10px] text-gray-400">تاریخ پایان</p>
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-gray-400" />
+                      <p className="text-[10px] text-gray-400">تاریخ پایان</p>
+                    </div>
+                    <HelpTooltip pageKey="customer-contracts" fieldKey="endDate" />
                   </div>
                   <p className="text-sm font-semibold text-gray-700">{c.endDate || '—'}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 p-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Zap className="h-3 w-3 text-gray-400" />
-                    <p className="text-[10px] text-gray-400">نرخ قرارداد</p>
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="h-3 w-3 text-gray-400" />
+                      <p className="text-[10px] text-gray-400">نرخ قرارداد</p>
+                    </div>
+                    <HelpTooltip pageKey="customer-contracts" fieldKey="contractRate" />
                   </div>
                   <p className="text-sm font-semibold text-gray-700">
                     {c.contractRate?.toLocaleString('fa-IR')}
@@ -208,9 +302,12 @@ export default function CustomerContracts() {
                 {/* ── New contract fields ── */}
                 {c.contractPowerKw != null && (
                   <div className="rounded-xl p-3" style={{ background: 'rgba(219,234,254,0.4)', border: '1px solid rgba(147,197,253,0.3)' }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <BatteryCharging className="h-3 w-3 text-blue-500" />
-                      <p className="text-[10px] text-blue-500">قدرت قرارداد</p>
+                    <div className="mb-1 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <BatteryCharging className="h-3 w-3 text-blue-500" />
+                        <p className="text-[10px] text-blue-500">قدرت قرارداد</p>
+                      </div>
+                      <HelpTooltip pageKey="customer-contracts" fieldKey="contractPowerKw" />
                     </div>
                     <p className="text-sm font-bold text-blue-700">
                       {c.contractPowerKw.toLocaleString('fa-IR')}
@@ -220,9 +317,12 @@ export default function CustomerContracts() {
                 )}
                 {c.contractVolumeKwh != null && (
                   <div className="rounded-xl p-3" style={{ background: 'rgba(237,233,254,0.4)', border: '1px solid rgba(196,181,253,0.3)' }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <BarChart2 className="h-3 w-3 text-violet-500" />
-                      <p className="text-[10px] text-violet-500">حجم قرارداد</p>
+                    <div className="mb-1 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <BarChart2 className="h-3 w-3 text-violet-500" />
+                        <p className="text-[10px] text-violet-500">حجم قرارداد</p>
+                      </div>
+                      <HelpTooltip pageKey="customer-contracts" fieldKey="contractVolumeKwh" />
                     </div>
                     <p className="text-sm font-bold text-violet-700">
                       {c.contractVolumeKwh.toLocaleString('fa-IR')}
@@ -232,9 +332,12 @@ export default function CustomerContracts() {
                 )}
                 {c.contractAmountRial != null && (
                   <div className="rounded-xl p-3" style={{ background: 'rgba(209,250,229,0.4)', border: '1px solid rgba(110,231,183,0.3)' }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <CreditCard className="h-3 w-3 text-emerald-600" />
-                      <p className="text-[10px] text-emerald-600">مبلغ قرارداد</p>
+                    <div className="mb-1 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <CreditCard className="h-3 w-3 text-emerald-600" />
+                        <p className="text-[10px] text-emerald-600">مبلغ قرارداد</p>
+                      </div>
+                      <HelpTooltip pageKey="customer-contracts" fieldKey="contractAmountRial" />
                     </div>
                     <p className="text-sm font-bold text-emerald-700">
                       {c.contractAmountRial.toLocaleString('fa-IR')}
@@ -244,9 +347,12 @@ export default function CustomerContracts() {
                 )}
                 {c.paymentDeadline && (
                   <div className="rounded-xl p-3" style={{ background: 'rgba(255,251,235,0.5)', border: '1px solid rgba(252,211,77,0.3)' }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <AlertCircle className="h-3 w-3 text-amber-500" />
-                      <p className="text-[10px] text-amber-600">مهلت پرداخت</p>
+                    <div className="mb-1 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className="h-3 w-3 text-amber-500" />
+                        <p className="text-[10px] text-amber-600">مهلت پرداخت</p>
+                      </div>
+                      <HelpTooltip pageKey="customer-contracts" fieldKey="paymentDeadline" />
                     </div>
                     <p className="text-sm font-bold text-amber-700">{c.paymentDeadline}</p>
                   </div>
@@ -262,7 +368,7 @@ export default function CustomerContracts() {
                     <Shield className="h-4 w-4 text-emerald-700" />
                     <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">ضمانت‌نامه</p>
                   </div>
-                  {(c.statusId === 1 || c.statusId === 4) && (
+                  {(c.statusId === 1 || c.statusId === 5) && (
                     <Button size="sm" variant="secondary" onClick={() => openWarrantyModal(c)}>
                       {c.warrantyAmount > 0
                         ? <><Pencil className="h-3.5 w-3.5" /> ویرایش</>
@@ -305,31 +411,113 @@ export default function CustomerContracts() {
       {/* Warranty Modal */}
       <Modal open={!!selected} onClose={() => setSelected(null)} title="ثبت / ویرایش ضمانت‌نامه" size="md">
         <div className="space-y-4">
-          <Select
-            label="نوع ضمانت‌نامه *"
-            value={form.typeId || ''}
-            options={guaranteeTypes.map(g => ({ value: g.id, label: g.title }))}
-            onChange={(v) => setForm(f => ({ ...f, typeId: +v }))}
-          />
-          <Input
-            label="مبلغ ضمانت (ریال) *"
-            type="number"
-            value={form.amount || ''}
-            onChange={(e) => setForm(f => ({ ...f, amount: +e.target.value }))}
-            placeholder="مثال: ۵۰۰۰۰۰۰۰"
-          />
-          <FileUpload
-            label="مدرک ضمانت‌نامه"
-            fileId={form.fileId ?? null}
-            accept="image/*,.pdf"
-            onUploaded={(fileId) => setForm(f => ({ ...f, fileId }))}
-            onDeleted={() => setForm(f => ({ ...f, fileId: null }))}
-          />
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">نوع ضمانت‌نامه *</span>
+              <HelpTooltip pageKey="customer-contracts" fieldKey="warrantyType" />
+            </div>
+            <Select
+              value={form.typeId || ''}
+              options={guaranteeTypes.map(g => ({ value: g.id, label: g.title }))}
+              onChange={(v) => setForm(f => ({ ...f, typeId: +v }))}
+            />
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">مبلغ ضمانت (ریال) *</span>
+              <HelpTooltip pageKey="customer-contracts" fieldKey="warrantyAmount" />
+            </div>
+            <Input
+              type="number"
+              value={form.amount || ''}
+              onChange={(e) => setForm(f => ({ ...f, amount: +e.target.value }))}
+              placeholder="مثال: ۵۰۰۰۰۰۰۰"
+            />
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">مدرک ضمانت‌نامه</span>
+              <HelpTooltip pageKey="customer-contracts" fieldKey="warrantyFile" />
+            </div>
+            <FileUpload
+              label=""
+              fileId={form.fileId ?? null}
+              accept="image/*,.pdf"
+              onUploaded={(fileId) => setForm(f => ({ ...f, fileId }))}
+              onDeleted={() => setForm(f => ({ ...f, fileId: null }))}
+            />
+          </div>
           <p className="text-xs text-gray-400">پس از ثبت، قرارداد جهت تایید نهایی به ادمین ارسال می‌شود.</p>
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button variant="secondary" onClick={() => setSelected(null)}>انصراف</Button>
           <Button loading={saving} onClick={handleSubmit}>ثبت ضمانت‌نامه</Button>
+        </div>
+      </Modal>
+
+      {/* Request New Contract Modal */}
+      <Modal open={showRequest} onClose={closeRequestModal} title="درخواست قرارداد جدید" size="md">
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-gray-700">شناسه اشتراک *</label>
+            <select
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              value={requestForm.subscriptionId || ''}
+              onChange={e => setRequestForm(f => ({ ...f, subscriptionId: e.target.value ? Number(e.target.value) : 0 }))}>
+              <option value="">انتخاب کنید...</option>
+              {subscriptions.map(s => <option key={s.id} value={s.id}>{s.billIdentifier} — {s.mainAddress}</option>)}
+            </select>
+          </div>
+          <Input
+            label="قدرت درخواستی (kW)"
+            type="number"
+            value={requestForm.contractPowerKw ?? ''}
+            placeholder="مثلاً ۵۰۰"
+            onChange={(e) => {
+              const powerKw = e.target.value === '' ? null : +e.target.value
+              setRequestForm(f => ({ ...f, contractPowerKw: powerKw, contractVolumeKwh: powerKw != null ? powerKw * 8760 : null }))
+            }}
+          />
+          <Input
+            label="انرژی درخواستی (kWh)"
+            type="number"
+            value={requestForm.contractVolumeKwh ?? ''}
+            disabled
+            hint="خودکار از قدرت درخواستی × ۸۷۶۰ ساعت (یک سال) محاسبه می‌شود"
+            onChange={() => {}}
+          />
+          <DatePicker
+            label="تاریخ شروع پیشنهادی"
+            value={requestForm.startDate ?? null}
+            onChange={(v) => setRequestForm(f => ({ ...f, startDate: v ?? null, endDate: v ? addOneYear(v) : f.endDate }))}
+          />
+          <DatePicker
+            label="تاریخ پایان پیشنهادی (خودکار = شروع + ۱ سال)"
+            value={requestForm.endDate ?? null}
+            disabled
+            onChange={() => {}}
+          />
+          <p className="text-xs text-gray-400">
+            این فقط یک درخواسته — نرخ نهایی و تایید قرارداد بعد از بررسی توسط ادمین مشخص می‌شود.
+          </p>
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-gray-200 p-3 hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-emerald-600"
+            />
+            <span className="text-sm text-gray-700">قوانین و مقررات را می‌پذیرم</span>
+          </label>
+        </div>
+        <div className="mt-6 flex flex-col gap-3 border-t border-gray-100 pt-4">
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={closeRequestModal}>انصراف</Button>
+            <Button loading={requesting} disabled={!acceptedTerms} onClick={handleRequestSubmit}>ثبت درخواست</Button>
+          </div>
+          <button onClick={goToTicketInstead} className="self-center text-xs font-semibold text-blue-600 hover:underline">
+            ترجیح می‌دم برای این کار به ادمین تیکت بزنم
+          </button>
         </div>
       </Modal>
     </div>

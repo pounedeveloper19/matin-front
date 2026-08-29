@@ -71,7 +71,7 @@ export function Select({ label, error, hint, placeholder = 'انتخاب کنی�
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <label htmlFor={inputId} className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">
           {label}
         </label>
       )}

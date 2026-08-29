@@ -30,6 +30,7 @@ export default function AdminUsers() {
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [search, setSearch]     = useState('')
+  const [isActive, setIsActive] = useState<'' | 'true' | 'false'>('true')
   const [totalRecords, setTotalRecords] = useState(0)
   const [page, setPage]         = useState(1)
   const pageSize = 20
@@ -43,11 +44,12 @@ export default function AdminUsers() {
   const [editForm, setEditForm] = useState({ fullName: '', mobile: '', password: '' })
   const [createForm, setCreateForm] = useState({ fullName: '', mobile: '', password: '', roleId: '' as number | '' })
 
-  const loadUsers = async (p = page, q = search) => {
+  const loadUsers = async (p = page, q = search, active = isActive) => {
     setLoading(true)
     try {
       const params: Record<string, string | number> = { pageNumber: p, pageSize }
       if (q.trim()) params.search = q.trim()
+      if (active) params.isActive = active
       const res = await adminApi.getUsers(params)
       if (res.code === 200 && res.result) {
         const r = res.result as any
@@ -62,7 +64,10 @@ export default function AdminUsers() {
     lookupApi.getRoles().then(r => { if (r.code === 200) setRoles(toArr(r.result)) })
   }, [])
 
-  const handleSearch = () => { setPage(1); loadUsers(1, search) }
+  const handleSearch = () => { setPage(1); loadUsers(1, search, isActive) }
+  const handleFilterActive = (val: '' | 'true' | 'false') => {
+    setIsActive(val); setPage(1); loadUsers(1, search, val)
+  }
 
   const openRoleModal = (u: AdminUser) => {
     setSelected(u); setSelectedRoleId(u.roleId ?? ''); setRoleModal(true)
@@ -156,6 +161,22 @@ export default function AdminUsers() {
             <Input placeholder="جستجو با نام یا موبایل..." value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+          </div>
+          <div className="flex h-[42px] overflow-hidden rounded-xl border border-gray-200 bg-white/80 text-sm">
+            {(['', 'true', 'false'] as const).map((val, i) => (
+              <button key={val} onClick={() => handleFilterActive(val)}
+                className={[
+                  'flex-1 px-3 font-medium transition-colors',
+                  i === 1 ? 'border-x border-gray-200' : '',
+                  isActive === val
+                    ? val === 'true' ? 'bg-emerald-500 text-white'
+                      : val === 'false' ? 'bg-red-500 text-white'
+                      : 'bg-primary-700 text-white'
+                    : 'bg-transparent text-gray-500 hover:bg-emerald-50',
+                ].join(' ')}>
+                {val === '' ? 'همه' : val === 'true' ? 'فعال' : 'غیرفعال'}
+              </button>
+            ))}
           </div>
           <Button variant="secondary" onClick={handleSearch}><Search className="h-4 w-4" /> جستجو</Button>
         </div>

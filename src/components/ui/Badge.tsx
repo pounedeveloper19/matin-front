@@ -17,11 +17,18 @@ const variants: Record<BadgeVariant, string> = {
   purple: 'bg-purple-100 text-purple-800 ring-1 ring-purple-200',
 }
 
-export function contractStatusVariant(status: string): BadgeVariant {
-  if (status.includes('فعال') || status.includes('تایید')) return 'green'
-  if (status.includes('انتظار') || status.includes('بررسی')) return 'amber'
-  if (status.includes('لغو') || status.includes('رد')) return 'red'
-  return 'gray'
+// نگاشت دقیق بر اساس EnumContractStatuses واقعی دیتابیس (نه تشخیص از روی متن):
+// 1=پیش‌نویس، 2=فعال، 3=منقضی شده، 4=فسخ شده، 5=عدم تایید
+const CONTRACT_STATUS_VARIANT: Record<number, BadgeVariant> = {
+  1: 'amber',
+  2: 'green',
+  3: 'gray',
+  4: 'red',
+  5: 'red',
+}
+
+export function contractStatusVariantById(statusId: number): BadgeVariant {
+  return CONTRACT_STATUS_VARIANT[statusId] ?? 'gray'
 }
 
 export function ticketStatusVariant(status: string): BadgeVariant {
